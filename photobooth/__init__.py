@@ -1,0 +1,1 @@
+from .photobooth import PhotoBooth
