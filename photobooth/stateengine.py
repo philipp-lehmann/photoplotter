@@ -4,30 +4,36 @@ class StateEngine:
     def __init__(self):
         self.display = Display()
         self.state = "Startup"
+        self.imageID = 0
+        self.imagesPerRow = 5
+        self.imagesPerColumn = 3
         self.transitions = {
             "Startup": ["Ready"],
             "Ready": ["Tracking", "Processing"],
             "Tracking": ["Processing"],
             "Processing": ["Drawing", "Ready"],
-            "Drawing": ["Ready"]
+            "Drawing": ["Ready"],
+            "ResetPending": ["Ready"]
         }
-
-    def change_state(self, new_state):
-        if new_state in self.transitions[self.state]:
-            print(f"Transitioning from {self.state} to {new_state}.")
-            self.state = new_state
-        else:
-            print(f"Invalid transition from {self.state} to {new_state}.")
 
     def get_state(self):
         return self.state
     
-
-    def update_state(self, new_state):
-        # Logic to update the current state
-        self.display.update_status(new_state)
-    
     def change_state(self, new_state):
-        self.current_state = new_state
-        # Add any additional logic you need when changing states
-        print(f"State changed to: {self.current_state}")
+        # Only update state ii transitions is possible
+        if new_state in self.transitions[self.state]:
+            print(f"State change from {self.state} to {new_state}.")
+            self.state = new_state 
+            self.display.update_status(new_state)  
+        else:
+            print(f"Invalid transition from {self.state} to {new_state}.")
+            
+    def update_image_id(self):
+        self.imageID += 1
+        max_images = self.imagesPerRow * self.imagesPerColumn
+        
+        # Check if all available spots for images have been drawn
+        if self.imageID >= max_images:
+            self.imageID = 0  
+            self.change_state("ResetPending") 
+            print(f"ImageID reached maximum capacity ({max_images}). Resetting ID and changing state to 'ResetPending'.")

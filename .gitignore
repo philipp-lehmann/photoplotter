@@ -1,1 +1,3 @@
 __pycache__/
+photos/captured/*.jpg
+photos/vector/*.svg
