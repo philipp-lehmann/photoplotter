@@ -4,6 +4,7 @@ from pyaxidraw import axidraw  # Make sure this is installed
 class Plotter:
     def __init__(self):
         # Initialize plotter connection or any other setup
+        print(f"Starting Plotter ...")
         self.ad = axidraw.AxiDraw()  # Create an AxiDraw instance
 
     def plot_image(self, svg_path, imageID, imagesPerRow, totalImages):

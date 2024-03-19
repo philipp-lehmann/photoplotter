@@ -2,6 +2,7 @@ from .display import Display
 
 class StateEngine:
     def __init__(self):
+        print(f"Starting StateEngine ...")
         self.display = Display()
         self.state = "Startup"
         self.imageID = 0

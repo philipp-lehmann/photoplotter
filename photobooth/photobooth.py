@@ -6,6 +6,7 @@ from .imageparser import ImageParser
 
 class PhotoBooth:
     def __init__(self):
+        print(f"Starting PhotoBooth ...")
         self.state_engine = StateEngine()
         self.camera = Camera()
         self.plotter = Plotter()

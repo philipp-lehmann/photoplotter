@@ -2,6 +2,7 @@ from .imageparser import ImageParser
 
 class Camera:
     def __init__(self):
+        print(f"Starting Camera ...")
         self.image_parser = ImageParser()
 
     def capture_image(self):

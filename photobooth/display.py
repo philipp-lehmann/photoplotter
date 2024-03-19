@@ -1,5 +1,6 @@
 class Display:
     def __init__(self):
+        print(f"Starting Display ...")
         # Initialize your display here (e.g., setup LCD connection)
         pass
 
