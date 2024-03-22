@@ -13,5 +13,18 @@ class PhotoBooth:
         self.image_parser = ImageParser()
 
     def start(self):
-        # Init state engine
+        # Initialize the state engine
         self.state_engine.change_state("Ready")
+
+        try:
+            while True:
+                # Your application's main loop
+                print(f"Current state: {self.state_engine.state}")
+                while True:
+                    
+                    pass 
+
+                
+        except KeyboardInterrupt:
+            # Handle graceful exit upon Ctrl+C
+            print("\nExiting PhotoBooth due to keyboard interrupt...")
