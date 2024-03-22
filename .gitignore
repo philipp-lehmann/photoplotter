@@ -1,4 +1,4 @@
 __pycache__/
-env/
+photoplotter-env/
 photos/captured/*.jpg
 photos/vector/*.svg
