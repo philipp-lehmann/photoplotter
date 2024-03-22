@@ -2,31 +2,31 @@ import os
 import time
 from pyaxidraw import axidraw
 
-
-## Make sure plotter returns home!
-
 class Plotter:
     def __init__(self):
-        # Initialize plotter connection or any other setup
         print("Starting Plotter ...")
         self.ad = axidraw.AxiDraw()
         self.ad.interactive()
-         
-        if not self.ad.connect():            
-            quit()
-            
-        self.ad.options.units = 2
-        self.ad.update()   
-        self.ad.moveto(0, 0)
+
+        self.plotter_found = self.ad.connect()
+        if not self.plotter_found:
+            print("AxiDraw not found. Entering simulation mode.")
+        else:
+            self.ad.options.units = 2
+            self.ad.update()
+            self.ad.moveto(0, 0)
 
     def return_home(self):
-        self.ad.moveto(1, 0)
-    
+        if self.plotter_found:
+            self.ad.moveto(1, 0)
+        else:
+            print("Simulation Mode: Returning home.")
+
     def plot_image(self, svg_path, imageID, imagesPerRow, totalImages):
-        # Plot an image based on the SVG file at svg_path
-        if os.path.isfile(svg_path):
-            print("---")
-            
+        if not self.plotter_found:
+            print("Simulation Mode: Plotting image from", svg_path)
+            return  # Skip the actual plotting commands in simulation mode
+        
             # Attempt to connect to the AxiDraw plotter
             if not self.ad.connect():  
                 print("Failed to connect to AxiDraw.")

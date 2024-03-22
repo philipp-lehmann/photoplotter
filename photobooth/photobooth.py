@@ -15,8 +15,21 @@ class PhotoBooth:
     def start(self):
         # Initialize the state engine
         
-        
         self.state_engine.change_state("Ready")
+        
+        # Snap a photo
+        print("Snapping a photo...")
+        image_path = self.camera.capture_image()
+        if image_path:
+            print(f"Photo captured and saved at {image_path}")
+            # If you want to process the image right after capturing it
+            # svg_filepath, num_paths = self.image_parser.convert_to_svg(image_path)
+            # if svg_filepath:
+            #     print(f"Image processed successfully. SVG saved at: {svg_filepath}")
+            # Proceed with any additional steps, like sending the image to the plotter
+            # self.plotter.plot(svg_filepath)
+        else:
+            print("Failed to capture photo.")
         
         # Draw a test on a position
         # self.state_engine.change_state("Drawing")
