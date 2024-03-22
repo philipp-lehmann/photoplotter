@@ -18,7 +18,7 @@ class Camera:
 
         # Use libcamera-still to capture an image
         try:
-            subprocess.run(["libcamera-still", "-o", image_filepath, "-t", "100"], check=True)  # 100ms timeout
+            subprocess.run(["libcamera-still", "-o", image_filepath, "-t", "500", "-n", "--autofocus-on-capture"], check=True)
 
             print(f"Image saved to {image_filepath}")
             return image_filepath
