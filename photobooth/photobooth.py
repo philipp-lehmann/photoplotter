@@ -16,15 +16,15 @@ class PhotoBooth:
         # Initialize the state engine
         self.state_engine.change_state("Ready")
 
-        try:
-            while True:
-                # Your application's main loop
-                print(f"Current state: {self.state_engine.state}")
-                while True:
+        # try:
+        #     while True:
+        #         # Your application's main loop
+        #         print(f"Current state: {self.state_engine.state}")
+        #         while True:
                     
-                    pass 
+        #             pass 
 
                 
-        except KeyboardInterrupt:
-            # Handle graceful exit upon Ctrl+C
-            print("\nExiting PhotoBooth due to keyboard interrupt...")
+        # except KeyboardInterrupt:
+        #     # Handle graceful exit upon Ctrl+C
+        #     print("\nExiting PhotoBooth due to keyboard interrupt...")
