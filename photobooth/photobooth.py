@@ -2,6 +2,7 @@ from .stateengine import StateEngine
 from .camera import Camera
 from .plotter import Plotter
 from .imageparser import ImageParser
+import time
 
 
 class PhotoBooth:
@@ -12,39 +13,50 @@ class PhotoBooth:
         self.plotter = Plotter()
         self.image_parser = ImageParser()
 
-    def start(self):
-        # Initialize the state engine
-        
+    # Handling states
+    # ------------------------------------------------------------------------
+    def process_startup(self):
+        # Logic for "Startup" state
         self.state_engine.change_state("Ready")
-        
-        # Snap a photo
-        print("Snapping a photo...")
+        pass
+    
+    def process_ready(self):
+        # Logic for "Ready" state
         image_path = self.camera.capture_image()
         if image_path:
             print(f"Photo captured and saved at {image_path}")
-            # If you want to process the image right after capturing it
-            # svg_filepath, num_paths = self.image_parser.convert_to_svg(image_path)
-            # if svg_filepath:
-            #     print(f"Image processed successfully. SVG saved at: {svg_filepath}")
-            # Proceed with any additional steps, like sending the image to the plotter
-            # self.plotter.plot(svg_filepath)
+            self.state_engine.change_state("Processing")
+            # Processing logic here...
+            self.state_engine.change_state("Drawing")
         else:
             print("Failed to capture photo.")
-        
-        # Draw a test on a position
-        # self.state_engine.change_state("Drawing")
-        # self.plotter.plot_image("./assets/test.svg", 0, 5, 3)
-        # self.plotter.return_home()
+        time.sleep(2)  # Adjust based on your capture frequency needs
+        pass
 
-        # try:
-        #     while True:
-        #         # Your application's main loop
-        #         print(f"Current state: {self.state_engine.state}")
-        #         while True:
-                    
-        #             pass 
+    def process_drawing(self):
+        # Logic for "Drawing" state
+        pass
 
-                
-        # except KeyboardInterrupt:
-        #     # Handle graceful exit upon Ctrl+C
-        #     print("\nExiting PhotoBooth due to keyboard interrupt...")
+    def process_reset_pending(self):
+        # Logic for "ResetPending" state
+        pass
+
+    # Main loop
+    # ------------------------------------------------------------------------
+    def start(self):
+        state_actions = {
+            "Startup": self.process_startup,
+            "Ready": self.process_ready,
+            "Drawing": self.process_drawing,
+            "ResetPending": self.process_reset_pending,
+            # Add more states and their corresponding methods as needed
+        }
+
+        try:
+            while True:
+                current_state = self.state_engine.get_state()
+                action = state_actions.get(current_state, lambda: print(f"Unhandled state: {current_state}"))
+                action()  # Execute the function associated with the current state
+
+        except KeyboardInterrupt:
+            print("\nExiting PhotoBooth due to keyboard interrupt...")
