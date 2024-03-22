@@ -1,20 +1,35 @@
 import os
-from pyaxidraw import axidraw  # Make sure this is installed
+import time
+from pyaxidraw import axidraw
+
+
+## Make sure plotter returns home!
 
 class Plotter:
     def __init__(self):
         # Initialize plotter connection or any other setup
         print("Starting Plotter ...")
-        self.ad = axidraw.AxiDraw()  # Create an AxiDraw instance
+        self.ad = axidraw.AxiDraw()
+        self.ad.interactive()
+         
+        if not self.ad.connect():            
+            quit()
+            
+        self.ad.options.units = 2
+        self.ad.update()   
+        self.ad.moveto(0, 0)
 
+    def return_home(self):
+        self.ad.moveto(1, 0)
+    
     def plot_image(self, svg_path, imageID, imagesPerRow, totalImages):
         # Plot an image based on the SVG file at svg_path
         if os.path.isfile(svg_path):
+            print("---")
+            
             # Attempt to connect to the AxiDraw plotter
-            try:
-                self.ad.connect()
-            except Exception as e:
-                print("Failed to connect to AxiDraw: {e}")
+            if not self.ad.connect():  
+                print("Failed to connect to AxiDraw.")
                 return  # Stop execution if connection fails
 
             # Define border and gutter sizes (mm)
@@ -26,7 +41,7 @@ class Plotter:
             maxY = 297 - (borderSize * 2)  # Maximum Y dimension in mm for A3 paper
 
             # Calculate the number of gutters and subtract their total size from the drawable area
-            totalRows = (totalImages + imagesPerRow - 1) // imagesPerRow  # Calculate total rows needed
+            totalRows = (totalImages + imagesPerRow - 1) // imagesPerRow
             drawableWidth = maxX - (gutterSize * (imagesPerRow - 1))
             drawableHeight = maxY - (gutterSize * (totalRows - 1))
 
@@ -40,18 +55,20 @@ class Plotter:
             startPositionX = (col * offsetX) + (col * gutterSize) + borderSize
             startPositionY = (row * offsetY) + (row * gutterSize) + borderSize
 
-            print("Plotting image from {svg_path} at position ({startPositionX}, {startPositionY})")
+            print(f"Plotting image from {svg_path} at position ({startPositionX}, {startPositionY})")
 
-            # Perform the plotting operation
+            self.ad.moveto(startPositionX, startPositionY)    
             self.ad.plot_setup(svg_path)
             self.ad.plot_run()
 
-            # Provide feedback to the user
+            # Move back to the "home" position after plotting
+            print("Returning to home position.")
+            self.ad.moveto(0, 0)
+
             print("Plotting complete.")
 
-            # Disable the motors and disconnect from the AxiDraw plotter
-            self.ad.motor_disable()  # Disable the motors
-            self.ad.disconnect()  # Disconnect from the AxiDraw plotter
+            # Disconnect is commented out; uncomment if ending the session
+            # self.ad.disconnect()  # Disconnect from the AxiDraw plotter
         else:
             print("SVG file not found.")
 

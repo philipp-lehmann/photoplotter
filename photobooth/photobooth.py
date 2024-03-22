@@ -14,7 +14,14 @@ class PhotoBooth:
 
     def start(self):
         # Initialize the state engine
+        
+        
         self.state_engine.change_state("Ready")
+        
+        # Draw a test on a position
+        # self.state_engine.change_state("Drawing")
+        # self.plotter.plot_image("./assets/test.svg", 0, 5, 3)
+        # self.plotter.return_home()
 
         # try:
         #     while True:

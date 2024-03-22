@@ -10,7 +10,7 @@ class StateEngine:
         self.imagesPerColumn = 3
         self.transitions = {
             "Startup": ["Ready"],
-            "Ready": ["Tracking", "Processing"],
+            "Ready": ["Tracking", "Processing", "Drawing"],
             "Tracking": ["Processing"],
             "Processing": ["Drawing", "Ready"],
             "Drawing": ["Ready"],
