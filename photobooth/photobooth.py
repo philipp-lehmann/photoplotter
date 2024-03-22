@@ -22,23 +22,39 @@ class PhotoBooth:
     
     def process_ready(self):
         # Logic for "Ready" state
-        image_path = self.camera.capture_image()
+        image_path = self.camera.snap_image(output_dir="photos/current", filename="temp")
         if image_path:
-            print(f"Photo captured and saved at {image_path}")
-            self.state_engine.current_photo = image_path
+            print(f"Ready: Photo snapped {image_path}")
+            # Todo: If face detected set state to "Tracking"
+            self.state_engine.change_state("Tracking")
+        else:
+            print("Failed to snap photo.")
+        time.sleep(3)
+        pass
+    
+    def process_tracking(self):
+        # Logic for "Tracking" state
+        image_path = self.camera.snap_image()
+        if image_path:
+            print(f"Tracking: Photo snapped and saved at {image_path}")
+            self.state_engine.currentPhotoPath = image_path
             self.state_engine.change_state("Processing")
         else:
-            print("Failed to capture photo.")
-        time.sleep(2)  # Adjust based on your capture frequency needs
+            print("Failed to snap photo.")
+        time.sleep(3)
         pass
 
     def process_processing(self):
-        self.image_parser.convert_to_svg(self.state_engine.current_photo)
+        print(f"Processing: Converting photo to SVG")
+        self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath)
         self.state_engine.change_state("Drawing")
         # Logic for "Drawing" state
         pass
     
     def process_drawing(self):
+        print(f"Drawing: Connecting with penplotter {self.state_engine.currentPhotoPath}")
+        self.state_engine.change_state("Ready")
+        time.sleep(10)
         # Logic for "Drawing" state
         pass
 
@@ -52,6 +68,7 @@ class PhotoBooth:
         state_actions = {
             "Startup": self.process_startup,
             "Ready": self.process_ready,
+            "Tracking": self.process_tracking,
             "Processing": self.process_processing,
             "Drawing": self.process_drawing,
             "ResetPending": self.process_reset_pending,

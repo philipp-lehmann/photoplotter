@@ -5,13 +5,13 @@ class StateEngine:
         print("Starting StateEngine ...")
         self.display = Display()
         self.state = "Startup"
-        self.currentPhoto = ""
-        self.imageID = 0
+        self.currentPhotoPath = ""
+        self.photoID = 0
         self.imagesPerRow = 5
         self.imagesPerColumn = 3
         self.transitions = {
             "Startup": ["Ready"],
-            "Ready": ["Tracking", "Processing", "Drawing"],
+            "Ready": ["Tracking"],
             "Tracking": ["Processing"],
             "Processing": ["Drawing", "Ready"],
             "Drawing": ["Ready"],
@@ -31,11 +31,11 @@ class StateEngine:
             print(f"Invalid transition from {self.state} to {new_state}.")
             
     def update_image_id(self):
-        self.imageID += 1
+        self.photoID += 1
         max_images = self.imagesPerRow * self.imagesPerColumn
         
         # Check if all available spots for images have been drawn
-        if self.imageID >= max_images:
-            self.imageID = 0  
+        if self.photoID >= max_images:
+            self.photoID = 0  
             self.change_state("ResetPending") 
-            print("ImageID reached maximum capacity ({max_images}). Resetting ID and changing state to 'ResetPending'.")
+            print("photoID reached maximum capacity ({max_images}). Resetting ID and changing state to 'ResetPending'.")

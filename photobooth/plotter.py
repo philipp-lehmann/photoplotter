@@ -22,7 +22,7 @@ class Plotter:
         else:
             print("Simulation Mode: Returning home.")
 
-    def plot_image(self, svg_path, imageID, imagesPerRow, totalImages):
+    def plot_image(self, svg_path, photoID, imagesPerRow, totalImages):
         if not self.plotter_found:
             print("Simulation Mode: Plotting image from", svg_path)
             return  # Skip the actual plotting commands in simulation mode
@@ -50,8 +50,8 @@ class Plotter:
             offsetY = drawableHeight / totalRows
 
             # Calculate starting position for the drawing, including border
-            col = imageID % imagesPerRow
-            row = imageID // imagesPerRow
+            col = photoID % imagesPerRow
+            row = photoID // imagesPerRow
             startPositionX = (col * offsetX) + (col * gutterSize) + borderSize
             startPositionY = (row * offsetY) + (row * gutterSize) + borderSize
 
@@ -74,8 +74,8 @@ class Plotter:
 
 # Usage example
 # plotter = Plotter()
-# imageID = some_value_from_state_engine
+# photoID = some_value_from_state_engine
 # imagesPerRow = some_value_from_state_engine
 # totalImages = some_calculated_or_defined_value
 # svg_path = "path/to/your/svg/file.svg"
-# plotter.plot_image(svg_path, imageID, imagesPerRow, totalImages)
+# plotter.plot_image(svg_path, photoID, imagesPerRow, totalImages)

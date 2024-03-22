@@ -11,19 +11,29 @@ class Camera:
         # Assuming ImageParser is correctly implemented elsewhere
         self.image_parser = ImageParser()
 
-    def capture_image(self):
+    def snap_image(self, output_dir=None, filename=None):
         print("Capturing image")
-        image_dir = "photos/captured"
-        os.makedirs(image_dir, exist_ok=True)
-        image_filename = f"image_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
-        image_filepath = os.path.join(image_dir, image_filename)
+        
+        # Set default output directory if not provided
+        if output_dir is None:
+            output_dir = "photos/snapped"
+        
+        # Create output directory if it doesn't exist
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Generate image file path
+        if filename is None:
+            image_filename = f"image_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
+        else:
+            image_filename = filename + ".jpg"  # Add file extension
+        image_filepath = os.path.join(output_dir, image_filename)
 
-        # Use libcamera-still to capture an image
+        # Use libcamera-still to snap an image
         try:
             subprocess.run(["libcamera-still", "-o", image_filepath, "-t", "500", "-n", "--autofocus-on-capture"], check=True)
 
             print(f"Image saved to {image_filepath}")
-            self.crop_to_square(image_filepath)
+            self.crop_to_square(image_filepath)  # Assuming you have a method for cropping
             return image_filepath
         except subprocess.CalledProcessError as e:
             print(f"Error capturing image: {e}")
