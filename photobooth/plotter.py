@@ -4,7 +4,7 @@ from pyaxidraw import axidraw  # Make sure this is installed
 class Plotter:
     def __init__(self):
         # Initialize plotter connection or any other setup
-        print(f"Starting Plotter ...")
+        print("Starting Plotter ...")
         self.ad = axidraw.AxiDraw()  # Create an AxiDraw instance
 
     def plot_image(self, svg_path, imageID, imagesPerRow, totalImages):
@@ -14,7 +14,7 @@ class Plotter:
             try:
                 self.ad.connect()
             except Exception as e:
-                print(f"Failed to connect to AxiDraw: {e}")
+                print("Failed to connect to AxiDraw: {e}")
                 return  # Stop execution if connection fails
 
             # Define border and gutter sizes (mm)
@@ -40,7 +40,7 @@ class Plotter:
             startPositionX = (col * offsetX) + (col * gutterSize) + borderSize
             startPositionY = (row * offsetY) + (row * gutterSize) + borderSize
 
-            print(f"Plotting image from {svg_path} at position ({startPositionX}, {startPositionY})")
+            print("Plotting image from {svg_path} at position ({startPositionX}, {startPositionY})")
 
             # Perform the plotting operation
             self.ad.plot_setup(svg_path)

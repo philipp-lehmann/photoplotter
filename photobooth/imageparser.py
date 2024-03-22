@@ -4,7 +4,7 @@ import svgwrite
 
 class ImageParser:
     def __init__(self):
-        print(f"Starting ImageParser ...")
+        print("Starting ImageParser ...")
         pass
 
     def convert_to_svg(self, image_filepath, target_width=400, target_height=600, scale_x=0.35, scale_y=0.35, min_paths=60, max_paths=100):

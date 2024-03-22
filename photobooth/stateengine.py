@@ -2,7 +2,7 @@ from .display import Display
 
 class StateEngine:
     def __init__(self):
-        print(f"Starting StateEngine ...")
+        print("Starting StateEngine ...")
         self.display = Display()
         self.state = "Startup"
         self.imageID = 0
@@ -23,11 +23,11 @@ class StateEngine:
     def change_state(self, new_state):
         # Only update state ii transitions is possible
         if new_state in self.transitions[self.state]:
-            print(f"State change from {self.state} to {new_state}.")
+            print("State change from {self.state} to {new_state}.")
             self.state = new_state 
             self.display.update_status(new_state)  
         else:
-            print(f"Invalid transition from {self.state} to {new_state}.")
+            print("Invalid transition from {self.state} to {new_state}.")
             
     def update_image_id(self):
         self.imageID += 1
@@ -37,4 +37,4 @@ class StateEngine:
         if self.imageID >= max_images:
             self.imageID = 0  
             self.change_state("ResetPending") 
-            print(f"ImageID reached maximum capacity ({max_images}). Resetting ID and changing state to 'ResetPending'.")
+            print("ImageID reached maximum capacity ({max_images}). Resetting ID and changing state to 'ResetPending'.")
