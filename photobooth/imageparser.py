@@ -7,7 +7,9 @@ class ImageParser:
         print("Starting ImageParser ...")
         pass
 
-    def convert_to_svg(self, image_filepath, target_width=400, target_height=600, scale_x=0.35, scale_y=0.35, min_paths=60, max_paths=100):
+    def convert_to_svg(self, image_filepath, target_width=640, target_height=640, scale_x=0.35, scale_y=0.35, min_paths=60, max_paths=100):
+        
+        print("Converting current photo to SVG")
          # Load the image using OpenCV
         if os.path.isfile(image_filepath):
 
@@ -49,21 +51,26 @@ class ImageParser:
                     # Limit the number of trials to prevent infinite loop
                     if trials > 10:
                         break
-                    
-                # Save SVG file
-                svg_filepath = os.path.splitext(image_filepath)[0] + '.svg'
+                
+                print(f"Settled on an image with {num_paths} paths.")
+                
+                # Save SVG file to the traced directory
+                output_dir = "photos/traced"
+                os.makedirs(output_dir, exist_ok=True)
+                svg_filename = os.path.splitext(os.path.basename(image_filepath))[0] + '.svg'
+                svg_filepath = os.path.join(output_dir, svg_filename)
                 dwg.saveas(svg_filepath)
                 return svg_filepath, num_paths
         return None, 0
 
     @staticmethod
     def add_contours_to_svg(dwg, contours, scale_x, scale_y):
-        # Implementation for adding contours to the SVG
+        # Implementation for adding contours to the SVG with styling
         num_paths = 0
         for contour in contours:
             # Convert contour points to a format suitable for svgwrite and apply scaling
             points = [(point[0][0] * scale_x, point[0][1] * scale_y) for point in contour]
-            dwg.add(dwg.polygon(points))
+            dwg.add(dwg.polyline(points, fill="none", stroke="#aaa", stroke_width="1"))
             num_paths += 1
         return num_paths
 

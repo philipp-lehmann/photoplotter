@@ -25,14 +25,19 @@ class PhotoBooth:
         image_path = self.camera.capture_image()
         if image_path:
             print(f"Photo captured and saved at {image_path}")
+            self.state_engine.current_photo = image_path
             self.state_engine.change_state("Processing")
-            # Processing logic here...
-            self.state_engine.change_state("Drawing")
         else:
             print("Failed to capture photo.")
         time.sleep(2)  # Adjust based on your capture frequency needs
         pass
 
+    def process_processing(self):
+        self.image_parser.convert_to_svg(self.state_engine.current_photo)
+        self.state_engine.change_state("Drawing")
+        # Logic for "Drawing" state
+        pass
+    
     def process_drawing(self):
         # Logic for "Drawing" state
         pass
@@ -47,6 +52,7 @@ class PhotoBooth:
         state_actions = {
             "Startup": self.process_startup,
             "Ready": self.process_ready,
+            "Processing": self.process_processing,
             "Drawing": self.process_drawing,
             "ResetPending": self.process_reset_pending,
             # Add more states and their corresponding methods as needed

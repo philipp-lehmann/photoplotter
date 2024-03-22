@@ -5,6 +5,7 @@ class StateEngine:
         print("Starting StateEngine ...")
         self.display = Display()
         self.state = "Startup"
+        self.currentPhoto = ""
         self.imageID = 0
         self.imagesPerRow = 5
         self.imagesPerColumn = 3
