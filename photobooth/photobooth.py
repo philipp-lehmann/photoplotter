@@ -17,14 +17,14 @@ class PhotoBooth:
     # ------------------------------------------------------------------------
     def process_startup(self):
         # Logic for "Startup" state
-        self.state_engine.change_state("Ready")
+        self.state_engine.change_state("Waiting")
         pass
     
-    def process_ready(self):
-        # Logic for "Ready" state
+    def process_Waiting(self):
+        # Logic for "Waiting" state
         image_path = self.camera.snap_image(output_dir="photos/current", filename="temp")
         if image_path:
-            print(f"Ready: Photo snapped {image_path}")
+            print(f"Waiting: Photo snapped {image_path}")
             # Todo: If face detected set state to "Tracking"
             self.state_engine.change_state("Tracking")
         else:
@@ -53,7 +53,7 @@ class PhotoBooth:
     
     def process_drawing(self):
         print(f"Drawing: Connecting with penplotter {self.state_engine.currentPhotoPath}")
-        self.state_engine.change_state("Ready")
+        self.state_engine.change_state("Waiting")
         time.sleep(10)
         # Logic for "Drawing" state
         pass
@@ -67,7 +67,7 @@ class PhotoBooth:
     def start(self):
         state_actions = {
             "Startup": self.process_startup,
-            "Ready": self.process_ready,
+            "Waiting": self.process_Waiting,
             "Tracking": self.process_tracking,
             "Processing": self.process_processing,
             "Drawing": self.process_drawing,

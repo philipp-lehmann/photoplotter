@@ -9,12 +9,12 @@ class StateEngine:
         self.imagesPerRow = 5
         self.imagesPerColumn = 3
         self.transitions = {
-            "Startup": ["Ready"],
-            "Ready": ["Tracking"],
+            "Startup": ["Waiting"],
+            "Waiting": ["Tracking"],
             "Tracking": ["Processing"],
-            "Processing": ["Drawing", "Ready"],
-            "Drawing": ["Ready"],
-            "ResetPending": ["Ready"]
+            "Processing": ["Drawing", "Waiting"],
+            "Drawing": ["Waiting"],
+            "ResetPending": ["Waiting"]
         }
         # Set the path to the FIFO
         self.fifo_path = 'lcd/tmp/state_fifo'
