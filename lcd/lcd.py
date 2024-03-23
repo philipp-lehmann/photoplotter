@@ -1,11 +1,13 @@
+import os
 import LCD_1in44
-import time
 from PIL import Image
 
 # Function to display an image on the LCD
 def display_image_on_lcd(image_path, LCD):
     try:
         image = Image.open(image_path)
+        print(f"Displaying {image_path}")
+        LCD.LCD_Clear()
         LCD.LCD_ShowImage(image, 0, 0)
     except Exception as e:
         print(f"Error displaying {image_path}: {e}")
@@ -14,7 +16,8 @@ def display_image_on_lcd(image_path, LCD):
 
 # Function to display a default image
 def display_default_image(LCD):
-    default_image_path = '../assets/default.jpg'  # Adjusted path
+    # Assuming your script runs from the photoplotter directory
+    default_image_path = '../assets/Ready.jpg'
     try:
         image = Image.open(default_image_path)
         LCD.LCD_ShowImage(image, 0, 0)
@@ -28,22 +31,28 @@ def main():
     LCD.LCD_Init(Lcd_ScanDir)
     LCD.LCD_Clear()
 
-    # Set the path to the FIFO
-    fifo_path = '/tmp/state_fifo'
+    # Set paths
+    fifo_path = 'tmp/state_fifo'
+    assets_dir = '../assets/'
+
+    # Ensure the FIFO exists before attempting to read from it
+    if not os.path.exists(fifo_path):
+        os.mkfifo(fifo_path)
 
     # Initialize display with a default image
     display_default_image(LCD)
 
-    # Read from FIFO and update the LCD with new images
+    # Continuously read from FIFO and update the LCD with new images
     try:
         with open(fifo_path, 'r') as fifo:
             while True:
-                image_path = fifo.readline().strip()
-                if image_path:
+                filename = fifo.readline().strip()  # Filename from FIFO
+                if filename:
+                    image_path = os.path.join(assets_dir, filename)
                     print(f"Received request to display: {image_path}")
                     display_image_on_lcd(image_path, LCD)
                 else:
-                    # If the path is empty, continue displaying the default image
+                    # If the path is empty, this will ensure the default image is displayed
                     display_default_image(LCD)
     except KeyboardInterrupt:
         print("\nExiting LCD due to keyboard interrupt...")
