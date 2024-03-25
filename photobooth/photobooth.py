@@ -25,12 +25,15 @@ class PhotoBooth:
         image_path = self.camera.snap_image(output_dir="photos/current", filename="temp")
         if image_path:
             print(f"Waiting: Photo snapped {image_path}")
-            # Todo: If face detected set state to "Tracking"
-            self.state_engine.change_state("Tracking")
+            # Check if face detected
+            if self.image_parser.detect_faces(image_path):
+                # If face detected set state to "Tracking"
+                self.state_engine.change_state("Tracking")
+            else:
+                print("No faces detected, staying in Waiting state.")
         else:
             print("Failed to snap photo.")
         time.sleep(3)
-        pass
     
     def process_tracking(self):
         # Logic for "Tracking" state
@@ -72,7 +75,6 @@ class PhotoBooth:
             "Processing": self.process_processing,
             "Drawing": self.process_drawing,
             "ResetPending": self.process_reset_pending,
-            # Add more states and their corresponding methods as needed
         }
 
         try:

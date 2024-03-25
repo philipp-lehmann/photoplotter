@@ -6,6 +6,39 @@ class ImageParser:
     def __init__(self):
         print("Starting ImageParser ...")
         pass
+    
+    def detect_faces(self, image_filepath):
+        """
+        Detect faces in an image.
+
+        Args:
+            image_filepath (str): The path to the image file.
+
+        Returns:
+            bool: True if at least one face is detected, False otherwise.
+        """
+        # Load the pre-trained Haar Cascade Classifier for face detection
+        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        
+        # Load the image
+        image = cv2.imread(image_filepath)
+        if image is None:
+            print("Failed to load image.")
+            return False
+        
+        # Convert the image to grayscale (required for face detection)
+        gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        
+        # Detect faces in the image
+        faces = face_cascade.detectMultiScale(gray_image, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+        
+        # Check if any faces are detected
+        if len(faces) > 0:
+            print(f"Detected {len(faces)} face(s) in the image.")
+            return True
+        else:
+            print("No faces detected in the image.")
+            return False
 
     def convert_to_svg(self, image_filepath, target_width=640, target_height=640, scale_x=0.35, scale_y=0.35, min_paths=60, max_paths=100):
         
