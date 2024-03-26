@@ -18,6 +18,7 @@ class StateEngine:
         }
         # Set the path to the FIFO
         self.fifo_path = 'lcd/tmp/state_fifo'
+        self.key_fifo_path = 'lcd/tmp/key_fifo' 
 
     def get_state(self):
         return self.state

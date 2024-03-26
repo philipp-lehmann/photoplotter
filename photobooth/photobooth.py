@@ -3,6 +3,7 @@ from .camera import Camera
 from .plotter import Plotter
 from .imageparser import ImageParser
 import time
+import os
 
 
 class PhotoBooth:
@@ -64,6 +65,28 @@ class PhotoBooth:
     def process_reset_pending(self):
         # Logic for "ResetPending" state
         pass
+    
+    # Listen
+    def listen_for_keys(self):
+        key_input_lines = []
+        try:
+            # Open the FIFO in non-blocking mode
+            fd = os.open(self.state_engine.key_fifo_path, os.O_RDONLY | os.O_NONBLOCK)
+            while True:
+                # Try to read a chunk of data
+                data = os.read(fd, 4096)  # Read up to 4096 bytes
+                if not data:
+                    break  # No more data available
+                # Decode bytes to string and split into lines
+                lines = data.decode('utf-8').strip().split('\n')
+                key_input_lines.extend(lines)
+            os.close(fd)
+        except FileNotFoundError:
+            print(f"Error: Key FIFO at {self.state_engine.key_fifo_path} not found.")
+        except Exception as e:
+            print(f"Error reading from key FIFO: {e}")
+        
+        return key_input_lines
 
     # Main loop
     # ------------------------------------------------------------------------
@@ -79,9 +102,17 @@ class PhotoBooth:
 
         try:
             while True:
+                # Update state engine
                 current_state = self.state_engine.get_state()
                 action = state_actions.get(current_state, lambda: print(f"Unhandled state: {current_state}"))
                 action()  # Execute the function associated with the current state
+                
+                # Listen for key inputs
+                key_inputs = self.listen_for_keys()
+                for key_input in key_inputs:
+                    print(f"Key pressed: {key_input}")
+                    # Handle each key input
+
 
         except KeyboardInterrupt:
             print("\nExiting PhotoBooth due to keyboard interrupt...")

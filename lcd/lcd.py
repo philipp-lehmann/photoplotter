@@ -68,25 +68,27 @@ def main():
                         print(f"File not found: {image_path}, displaying default image.")
                         display_default_image(LCD)
                 else:
-                    print("Received empty filename, keeping current image.")
+                    pass
 
                 # Check for key presses and write to key_fifo
-                if LCD.digital_read(LCD.GPIO_KEY_UP_PIN) == 0:
+                if LCD.digital_read(LCD.GPIO_KEY_UP_PIN) != 0:
                     key_fifo.write("Up\n")
-                if LCD.digital_read(LCD.GPIO_KEY_DOWN_PIN) == 0:
+                if LCD.digital_read(LCD.GPIO_KEY_DOWN_PIN) != 0:
                     key_fifo.write("Down\n")
-                if LCD.digital_read(LCD.GPIO_KEY_LEFT_PIN) == 0:
+                if LCD.digital_read(LCD.GPIO_KEY_LEFT_PIN) != 0:
+                    print(f"Left")
                     key_fifo.write("Left\n")
-                if LCD.digital_read(LCD.GPIO_KEY_RIGHT_PIN) == 0:
+                if LCD.digital_read(LCD.GPIO_KEY_RIGHT_PIN) != 0:
+                    print(f"Right")
                     key_fifo.write("Right\n")
-                if LCD.digital_read(LCD.GPIO_KEY_PRESS_PIN) == 0:
+                if LCD.digital_read(LCD.GPIO_KEY_PRESS_PIN) != 0:
                     print(f"Pressed")
                     key_fifo.write("Press\n")
-                if LCD.digital_read(LCD.GPIO_KEY1_PIN) == 0:
+                if LCD.digital_read(LCD.GPIO_KEY1_PIN) != 0:
                     key_fifo.write("KEY1\n")
-                if LCD.digital_read(LCD.GPIO_KEY2_PIN) == 0:
+                if LCD.digital_read(LCD.GPIO_KEY2_PIN) != 0:
                     key_fifo.write("KEY2\n")
-                if LCD.digital_read(LCD.GPIO_KEY3_PIN) == 0:
+                if LCD.digital_read(LCD.GPIO_KEY3_PIN) != 0:
                     key_fifo.write("KEY3\n")
 
                 # Flush the FIFO to ensure the message is sent
