@@ -37,6 +37,24 @@ def display_gif_on_lcd(gif_path, LCD, duration_per_frame=0.1):
         display_default_image(LCD)
 
 
+def open_fifo(fifo_path, mode, attempts=5, delay=2):
+    print(f"Opening fifos")
+    for attempt in range(attempts):
+        try:
+            fifo = open(fifo_path, mode)
+            print(f"Successfully opened FIFO: {fifo_path}")
+            return fifo
+        except FileNotFoundError:
+            print(f"Waiting for FIFO to be created: {fifo_path}")
+            time.sleep(delay)
+        except Exception as e:
+            print(f"Failed to open FIFO: {fifo_path}, error: {e}")
+            time.sleep(delay)
+    print(f"Failed to open FIFO after {attempts} attempts: {fifo_path}")
+    return None
+
+
+
 def main():
     LCD = LCD_1in44.LCD()
     Lcd_ScanDir = LCD_1in44.SCAN_DIR_DFT
@@ -55,48 +73,58 @@ def main():
 
     display_default_image(LCD)
 
+    # Corrected indentation
+    display_fifo = open_fifo(display_fifo_path, 'r')
+    key_fifo = open_fifo(key_fifo_path, 'w')
+
+    if display_fifo is None or key_fifo is None:
+        print("Could not open FIFOs. Exiting...")
+        return
+
     try:
-        with open(display_fifo_path, 'r') as fifo, open(key_fifo_path, 'w') as key_fifo:
-            while True:
-                filename = fifo.readline().strip()
-                if filename:
-                    image_path = os.path.join(assets_dir, filename)
-                    if os.path.exists(image_path):
-                        print(f"Received request to display: {image_path}")
-                        display_image_on_lcd(image_path, LCD)
-                    else:
-                        print(f"File not found: {image_path}, displaying default image.")
-                        display_default_image(LCD)
+        while True:
+            filename = display_fifo.readline().strip()
+            if filename:
+                image_path = os.path.join(assets_dir, filename)
+                if os.path.exists(image_path):
+                    print(f"Received request to display: {image_path}")
+                    display_image_on_lcd(image_path, LCD)
                 else:
-                    pass
+                    print(f"File not found: {image_path}, displaying default image.")
+                    display_default_image(LCD)
+            else:
+                pass
 
-                # Check for key presses and write to key_fifo
-                if LCD.digital_read(LCD.GPIO_KEY_UP_PIN) != 0:
-                    key_fifo.write("Up\n")
-                if LCD.digital_read(LCD.GPIO_KEY_DOWN_PIN) != 0:
-                    key_fifo.write("Down\n")
-                if LCD.digital_read(LCD.GPIO_KEY_LEFT_PIN) != 0:
-                    print(f"Left")
-                    key_fifo.write("Left\n")
-                if LCD.digital_read(LCD.GPIO_KEY_RIGHT_PIN) != 0:
-                    print(f"Right")
-                    key_fifo.write("Right\n")
-                if LCD.digital_read(LCD.GPIO_KEY_PRESS_PIN) != 0:
-                    print(f"Pressed")
-                    key_fifo.write("Press\n")
-                if LCD.digital_read(LCD.GPIO_KEY1_PIN) != 0:
-                    key_fifo.write("KEY1\n")
-                if LCD.digital_read(LCD.GPIO_KEY2_PIN) != 0:
-                    key_fifo.write("KEY2\n")
-                if LCD.digital_read(LCD.GPIO_KEY3_PIN) != 0:
-                    key_fifo.write("KEY3\n")
+            # Check for key presses and write to key_fifo
+            if LCD.digital_read(LCD.GPIO_KEY_UP_PIN) != 0:
+                key_fifo.write("Up\n")
+            if LCD.digital_read(LCD.GPIO_KEY_DOWN_PIN) != 0:
+                key_fifo.write("Down\n")
+            if LCD.digital_read(LCD.GPIO_KEY_LEFT_PIN) != 0:
+                print(f"Left")
+                key_fifo.write("Left\n")
+            if LCD.digital_read(LCD.GPIO_KEY_RIGHT_PIN) != 0:
+                print(f"Right")
+                key_fifo.write("Right\n")
+            if LCD.digital_read(LCD.GPIO_KEY_PRESS_PIN) != 0:
+                print(f"Pressed")
+                key_fifo.write("Press\n")
+            if LCD.digital_read(LCD.GPIO_KEY1_PIN) != 0:
+                key_fifo.write("KEY1\n")
+            if LCD.digital_read(LCD.GPIO_KEY2_PIN) != 0:
+                key_fifo.write("KEY2\n")
+            if LCD.digital_read(LCD.GPIO_KEY3_PIN) != 0:
+                key_fifo.write("KEY3\n")
 
-                # Flush the FIFO to ensure the message is sent
-                key_fifo.flush()
-                time.sleep(0.1)
+            # Flush the FIFO to ensure the message is sent
+            key_fifo.flush()
+            time.sleep(0.1)
 
     except KeyboardInterrupt:
         print("\nExiting LCD due to keyboard interrupt...")
+    finally:
+        display_fifo.close()
+        key_fifo.close()
 
 if __name__ == '__main__':
     main()
