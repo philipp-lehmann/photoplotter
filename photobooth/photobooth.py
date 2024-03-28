@@ -1,13 +1,8 @@
-import paho.mqtt.client as mqtt
-
 from .stateengine import StateEngine
 from .camera import Camera
 from .plotter import Plotter
 from .imageparser import ImageParser
 import time
-
-
-broker_address = "localhost" 
 
 
 class PhotoBooth:
@@ -17,14 +12,6 @@ class PhotoBooth:
         self.camera = Camera()
         self.plotter = Plotter()
         self.image_parser = ImageParser()
-        
-        # MQTT Setup
-        self.broker_address = "localhost"  # Assuming Mosquitto is running on the same device
-        self.client = mqtt.Client("PhotoBooth_Client")  # Create a new instance with a unique client ID
-        self.client.connect(self.broker_address)  # Connect to the broker
-
-        # Subscribe to relevant topics
-        self.client.subscribe("photobooth/actions")
 
     # Handling states
     # ------------------------------------------------------------------------
@@ -33,20 +20,9 @@ class PhotoBooth:
         self.state_engine.change_state("Waiting")
         pass
     
-    def process_Waiting(self):
+    def process_waiting(self):
         # Logic for "Waiting" state
-        image_path = self.camera.snap_image(output_dir="photos/current", filename="temp")
-        if image_path:
-            print(f"Waiting: Photo snapped {image_path}")
-            # Check if face detected
-            if self.image_parser.detect_faces(image_path):
-                # If face detected set state to "Tracking"
-                self.state_engine.change_state("Tracking")
-            else:
-                print("No faces detected, staying in Waiting state.")
-        else:
-            print("Failed to snap photo.")
-        time.sleep(3)
+        pass
     
     def process_tracking(self):
         # Logic for "Tracking" state
@@ -57,7 +33,6 @@ class PhotoBooth:
             self.state_engine.change_state("Processing")
         else:
             print("Failed to snap photo.")
-        time.sleep(3)
         pass
 
     def process_processing(self):
@@ -84,34 +59,22 @@ class PhotoBooth:
     def start(self):
         state_actions = {
             "Startup": self.process_startup,
-            "Waiting": self.process_Waiting,
+            "Waiting": self.process_waiting,
             "Tracking": self.process_tracking,
             "Processing": self.process_processing,
             "Drawing": self.process_drawing,
             "ResetPending": self.process_reset_pending,
         }
         
-        # Associate the on_message method with the callback for handling incoming messages
-        self.client.message_callback_add("photobooth/actions", self.on_message)
-
+        # self.state_engine.client.subscribe("#")
+        self.state_engine.client.on_message = self.state_engine.on_message
+        
         try:
             while True:
                 # Update state engine
                 current_state = self.state_engine.get_state()
                 action = state_actions.get(current_state, lambda: print(f"Unhandled state: {current_state}"))
                 action()  # Execute the function associated with the current state
-                
-                # Listen for MQTT messages
-                self.client.loop()
-
+            
         except KeyboardInterrupt:
             print("\nExiting PhotoBooth due to keyboard interrupt...")
-
-    def on_message(self, client, userdata, msg):
-        # Handle messages received on subscribed topics
-        print(f"Received message on topic '{msg.topic}': {msg.payload.decode()}")
-        # Add logic to handle incoming messages as needed
-        pass
-
-    def publish_message(self, topic, message):
-        self.client.publish(topic, message)
