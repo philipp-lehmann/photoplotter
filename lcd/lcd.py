@@ -2,6 +2,14 @@ import os
 import time
 import LCD_1in44
 from PIL import Image, ImageSequence
+import paho.mqtt.client as mqtt
+
+broker_address = "localhost"
+client = mqtt.Client("LCD_Client", protocol=mqtt.MQTTv311)
+client.connect(broker_address)  # Connect to the broker
+
+def publish_message(topic, message):
+    client.publish(topic, message)
 
 def display_default_image(LCD):
     default_image_path = 'assets/Waiting.jpg'
@@ -12,48 +20,11 @@ def display_default_image(LCD):
     except Exception as e:
         print(f"Error displaying default image: {e}")
 
-
-def display_image_on_lcd(image_path, LCD):
-    try:
-        image = Image.open(image_path)
-        print(f"Displaying {image_path}")
-        LCD.LCD_Clear()
-        LCD.LCD_ShowImage(image, 0, 0)
-    except Exception as e:
-        print(f"Error displaying {image_path}: {e}")
-        display_default_image(LCD)
-
-
-def display_gif_on_lcd(gif_path, LCD, duration_per_frame=0.1):
-    try:
-        with Image.open(gif_path) as img:
-            for frame in ImageSequence.Iterator(img):
-                frame = frame.convert("RGB")
-                frame = frame.resize((LCD.LCD_Dis_Column, LCD.LCD_Dis_Page))
-                LCD.LCD_ShowImage(frame, 0, 0)
-                time.sleep(duration_per_frame)
-    except Exception as e:
-        print(f"Failed to display GIF: {e}")
-        display_default_image(LCD)
-
-
-def open_fifo(fifo_path, mode, attempts=5, delay=2):
-    print(f"Opening fifos")
-    for attempt in range(attempts):
-        try:
-            fifo = open(fifo_path, mode)
-            print(f"Successfully opened FIFO: {fifo_path}")
-            return fifo
-        except FileNotFoundError:
-            print(f"Waiting for FIFO to be created: {fifo_path}")
-            time.sleep(delay)
-        except Exception as e:
-            print(f"Failed to open FIFO: {fifo_path}, error: {e}")
-            time.sleep(delay)
-    print(f"Failed to open FIFO after {attempts} attempts: {fifo_path}")
-    return None
-
-
+def on_message(client, userdata, message):
+    # Handle messages received on subscribed topics
+    print(f"Received message on topic '{message.topic}': {message.payload.decode()}")
+    # Add logic to handle incoming messages as needed
+    # Example: Update LCD display based on the received message
 
 def main():
     LCD = LCD_1in44.LCD()
@@ -61,70 +32,41 @@ def main():
     LCD.LCD_Init(Lcd_ScanDir)
     LCD.LCD_Clear()
 
-    display_fifo_path = 'lcd/tmp/state_fifo'
-    key_fifo_path = 'lcd/tmp/key_fifo'
     assets_dir = 'assets/'
-
-    # Create FIFOs if they don't exist
-    if not os.path.exists(display_fifo_path):
-        os.mkfifo(display_fifo_path)
-    if not os.path.exists(key_fifo_path):
-        os.mkfifo(key_fifo_path)
-
     display_default_image(LCD)
 
-    # Corrected indentation
-    display_fifo = open_fifo(display_fifo_path, 'r')
-    key_fifo = open_fifo(key_fifo_path, 'w')
-
-    if display_fifo is None or key_fifo is None:
-        print("Could not open FIFOs. Exiting...")
-        return
+    # Subscribe to messages from the StateEngine
+    client.subscribe("state_engine/state")
+    client.on_message = on_message
 
     try:
         while True:
-            filename = display_fifo.readline().strip()
-            if filename:
-                image_path = os.path.join(assets_dir, filename)
-                if os.path.exists(image_path):
-                    print(f"Received request to display: {image_path}")
-                    display_image_on_lcd(image_path, LCD)
-                else:
-                    print(f"File not found: {image_path}, displaying default image.")
-                    display_default_image(LCD)
-            else:
-                pass
-
             # Check for key presses and write to key_fifo
             if LCD.digital_read(LCD.GPIO_KEY_UP_PIN) != 0:
-                key_fifo.write("Up\n")
+                publish_message("lcd/buttons", "UP")
             if LCD.digital_read(LCD.GPIO_KEY_DOWN_PIN) != 0:
-                key_fifo.write("Down\n")
+                publish_message("lcd/buttons", "DOWN")
             if LCD.digital_read(LCD.GPIO_KEY_LEFT_PIN) != 0:
-                print(f"Left")
-                key_fifo.write("Left\n")
+                publish_message("lcd/buttons", "LEFT")
             if LCD.digital_read(LCD.GPIO_KEY_RIGHT_PIN) != 0:
-                print(f"Right")
-                key_fifo.write("Right\n")
+                publish_message("lcd/buttons", "RIGHT")
             if LCD.digital_read(LCD.GPIO_KEY_PRESS_PIN) != 0:
-                print(f"Pressed")
-                key_fifo.write("Press\n")
+                publish_message("lcd/buttons", "PRESS")
+                print(f"press")
             if LCD.digital_read(LCD.GPIO_KEY1_PIN) != 0:
-                key_fifo.write("KEY1\n")
+                publish_message("lcd/buttons", "KEY1")
             if LCD.digital_read(LCD.GPIO_KEY2_PIN) != 0:
-                key_fifo.write("KEY2\n")
+                publish_message("lcd/buttons", "KEY2")
             if LCD.digital_read(LCD.GPIO_KEY3_PIN) != 0:
-                key_fifo.write("KEY3\n")
+                publish_message("lcd/buttons", "KEY3")
 
-            # Flush the FIFO to ensure the message is sent
-            key_fifo.flush()
+            # Listen for MQTT messages
+            client.loop()
+
             time.sleep(0.1)
 
     except KeyboardInterrupt:
         print("\nExiting LCD due to keyboard interrupt...")
-    finally:
-        display_fifo.close()
-        key_fifo.close()
 
 if __name__ == '__main__':
     main()

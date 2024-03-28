@@ -1,9 +1,13 @@
+import paho.mqtt.client as mqtt
+
 from .stateengine import StateEngine
 from .camera import Camera
 from .plotter import Plotter
 from .imageparser import ImageParser
 import time
-import os
+
+
+broker_address = "localhost" 
 
 
 class PhotoBooth:
@@ -13,6 +17,14 @@ class PhotoBooth:
         self.camera = Camera()
         self.plotter = Plotter()
         self.image_parser = ImageParser()
+        
+        # MQTT Setup
+        self.broker_address = "localhost"  # Assuming Mosquitto is running on the same device
+        self.client = mqtt.Client("PhotoBooth_Client")  # Create a new instance with a unique client ID
+        self.client.connect(self.broker_address)  # Connect to the broker
+
+        # Subscribe to relevant topics
+        self.client.subscribe("photobooth/actions")
 
     # Handling states
     # ------------------------------------------------------------------------
@@ -66,27 +78,6 @@ class PhotoBooth:
         # Logic for "ResetPending" state
         pass
     
-    # Listen
-    def listen_for_keys(self):
-        key_input_lines = []
-        try:
-            # Open the FIFO in non-blocking mode
-            fd = os.open(self.state_engine.key_fifo_path, os.O_RDONLY | os.O_NONBLOCK)
-            while True:
-                # Try to read a chunk of data
-                data = os.read(fd, 4096)  # Read up to 4096 bytes
-                if not data:
-                    break  # No more data available
-                # Decode bytes to string and split into lines
-                lines = data.decode('utf-8').strip().split('\n')
-                key_input_lines.extend(lines)
-            os.close(fd)
-        except FileNotFoundError:
-            print(f"Error: Key FIFO at {self.state_engine.key_fifo_path} not found.")
-        except Exception as e:
-            print(f"Error reading from key FIFO: {e}")
-        
-        return key_input_lines
 
     # Main loop
     # ------------------------------------------------------------------------
@@ -99,6 +90,9 @@ class PhotoBooth:
             "Drawing": self.process_drawing,
             "ResetPending": self.process_reset_pending,
         }
+        
+        # Associate the on_message method with the callback for handling incoming messages
+        self.client.message_callback_add("photobooth/actions", self.on_message)
 
         try:
             while True:
@@ -107,12 +101,17 @@ class PhotoBooth:
                 action = state_actions.get(current_state, lambda: print(f"Unhandled state: {current_state}"))
                 action()  # Execute the function associated with the current state
                 
-                # Listen for key inputs
-                key_inputs = self.listen_for_keys()
-                for key_input in key_inputs:
-                    print(f"Key pressed: {key_input}")
-                    # Handle each key input
-
+                # Listen for MQTT messages
+                self.client.loop()
 
         except KeyboardInterrupt:
             print("\nExiting PhotoBooth due to keyboard interrupt...")
+
+    def on_message(self, client, userdata, msg):
+        # Handle messages received on subscribed topics
+        print(f"Received message on topic '{msg.topic}': {msg.payload.decode()}")
+        # Add logic to handle incoming messages as needed
+        pass
+
+    def publish_message(self, topic, message):
+        self.client.publish(topic, message)

@@ -1,4 +1,4 @@
-import os
+import paho.mqtt.client as mqtt
 
 class StateEngine:
     def __init__(self):
@@ -16,9 +16,10 @@ class StateEngine:
             "Drawing": ["Waiting"],
             "ResetPending": ["Waiting"]
         }
-        # Set the path to the FIFO
-        self.fifo_path = 'lcd/tmp/state_fifo'
-        self.key_fifo_path = 'lcd/tmp/key_fifo' 
+        # MQTT Setup
+        self.broker_address = "localhost"  # Assuming Mosquitto is running on the same device
+        self.client = mqtt.Client("StateEngine_Client")  # Create a new instance with a unique client ID
+        self.client.connect(self.broker_address)  # Connect to the broker
 
     def get_state(self):
         return self.state
@@ -28,14 +29,14 @@ class StateEngine:
         if new_state in self.transitions[self.state]:
             print(f"State change from {self.state} to {new_state}.")
             self.state = new_state
-            self.write_to_fifo(f"{new_state}.jpg")
+            self.publish_message("state_engine/state", new_state)  # Publish new state to the broker
         else:
             print(f"Invalid transition from {self.state} to {new_state}.")
 
     def update_image_path(self, photo_path):
         self.currentPhotoPath = photo_path
         print(f"Photo path updated to {photo_path}.")
-        self.write_to_fifo(photo_path)
+        self.publish_message("state_engine/photo_path", photo_path)
             
     def update_image_id(self):
         self.photoID += 1
@@ -47,10 +48,5 @@ class StateEngine:
             self.change_state("ResetPending") 
             print(f"photoID reached maximum capacity ({max_images}). Resetting ID and changing state to 'ResetPending'.")
 
-    def write_to_fifo(self, message):
-        # Ensure the FIFO exists before trying to write
-        if os.path.exists(self.fifo_path):
-            with open(self.fifo_path, 'w') as fifo:
-                fifo.write(message + '\n')
-        else:
-            print(f"Error: FIFO at {self.fifo_path} not found.")
+    def publish_message(self, topic, message):
+        self.client.publish(topic, message)
