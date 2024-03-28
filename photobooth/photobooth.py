@@ -36,8 +36,8 @@ class PhotoBooth:
         pass
 
     def process_processing(self):
-        print(f"Processing: Converting photo to SVG")
-        self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath)
+        svgpath = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath)
+        print(f"Converted to SVG: {svgpath}")
         self.state_engine.change_state("Drawing")
         # Logic for "Drawing" state
         pass

@@ -40,7 +40,7 @@ class ImageParser:
             print("No faces detected in the image.")
             return False
 
-    def convert_to_svg(self, image_filepath, target_width=640, target_height=640, scale_x=0.35, scale_y=0.35, min_paths=60, max_paths=100):
+    def convert_to_svg(self, image_filepath, target_width=640, target_height=640, scale_x=0.35, scale_y=0.35, min_paths=10, max_paths=30):
         
         print("Converting current photo to SVG")
          # Load the image using OpenCV
@@ -93,7 +93,13 @@ class ImageParser:
                 svg_filename = os.path.splitext(os.path.basename(image_filepath))[0] + '.svg'
                 svg_filepath = os.path.join(output_dir, svg_filename)
                 dwg.saveas(svg_filepath)
-                return svg_filepath, num_paths
+                
+                print(f"Final number of paths: {len(simplified_contours)}")
+                avg_points = sum(len(contour) for contour in simplified_contours) / len(simplified_contours)
+                print(f"Average number of points per contour: {avg_points}")
+
+
+                return svg_filepath
         return None, 0
 
     @staticmethod
