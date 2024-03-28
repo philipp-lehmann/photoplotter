@@ -40,67 +40,68 @@ class ImageParser:
             print("No faces detected in the image.")
             return False
 
-    def convert_to_svg(self, image_filepath, target_width=640, target_height=640, scale_x=0.35, scale_y=0.35, min_paths=10, max_paths=30):
-        
+    def convert_to_svg(self, image_filepath, target_width=640, target_height=640, scale_x=0.35, scale_y=0.35, min_paths=30, max_paths=75):
         print("Converting current photo to SVG")
-         # Load the image using OpenCV
         if os.path.isfile(image_filepath):
-
-            # Attempt to load the image
+            # Load the image using OpenCV
             image = cv2.imread(image_filepath)
             if image is not None:
-                # Perform image processing
-                # Resize the image
+                # Resize the image to the target dimensions
                 image = cv2.resize(image, (target_width, target_height))
-                # Convert the image to grayscale
+                # Convert the image to grayscale for edge detection
                 gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-                # Perform edge detection
+                # Perform initial edge detection
                 edges = cv2.Canny(gray_image, threshold1=80, threshold2=200)
-                # Find contours in the edge image
+                # Find initial contours based on edges
                 contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                # Simplify contours
+                # Initially simplify contours to reduce complexity
                 simplified_contours = [cv2.approxPolyDP(contour, 1, True) for contour in contours]
 
-                 # Create SVG drawing
-                dwg = svgwrite.Drawing(size=(target_width, target_height))
+                # Initialize variables for the adjustment loop
                 num_paths = 0
                 trials = 0
                 lower_threshold = 80
                 upper_threshold = 200
                 epsilon = 1
 
-                # Check if thresholds are no yet met
+                # Loop to adjust thresholds until the number of paths is within desired range
                 while num_paths < min_paths or num_paths > max_paths:
+                    # Create a new SVG drawing for each iteration to avoid duplicating paths
+                    dwg = svgwrite.Drawing(size=(target_width, target_height))
+
+                    # Add current contours to the SVG drawing
                     num_paths = ImageParser.add_contours_to_svg(dwg, simplified_contours, scale_x, scale_y)
 
-                    # Adjust thresholds
-                    lower_threshold, upper_threshold, epsilon = ImageParser.adjust_thresholds(num_paths, min_paths, max_paths, lower_threshold, upper_threshold, epsilon, gray_image)
-                    # Perform edge detection with adjusted thresholds
-                    edges = cv2.Canny(gray_image, threshold1=lower_threshold, threshold2=upper_threshold)
-                    # Find contours in the edge image
-                    contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                    # Simplify contours with adjusted epsilon
-                    simplified_contours = [cv2.approxPolyDP(contour, epsilon, True) for contour in contours]
-                    # Limit the number of trials to prevent infinite loop
+                    # If the number of paths is not within the desired range, adjust the thresholds
+                    if num_paths < min_paths or num_paths > max_paths:
+                        lower_threshold, upper_threshold, epsilon = ImageParser.adjust_thresholds(
+                            num_paths, min_paths, max_paths, lower_threshold, upper_threshold, epsilon, gray_image)
+
+                        # Perform edge detection with adjusted thresholds
+                        edges = cv2.Canny(gray_image, threshold1=lower_threshold, threshold2=upper_threshold)
+                        # Find new contours with the adjusted thresholds
+                        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                        # Simplify contours again with the adjusted epsilon
+                        simplified_contours = [cv2.approxPolyDP(contour, epsilon, True) for contour in contours]
+
+                    # Limit the number of adjustment trials to prevent infinite loops
+                    trials += 1
                     if trials > 10:
                         break
-                
+
+                # After finalizing the contours, print the outcome
                 print(f"Settled on an image with {num_paths} paths.")
-                
-                # Save SVG file to the traced directory
+
+                # Save the SVG file to the traced directory
                 output_dir = "photos/traced"
                 os.makedirs(output_dir, exist_ok=True)
                 svg_filename = os.path.splitext(os.path.basename(image_filepath))[0] + '.svg'
                 svg_filepath = os.path.join(output_dir, svg_filename)
                 dwg.saveas(svg_filepath)
-                
-                print(f"Final number of paths: {len(simplified_contours)}")
-                avg_points = sum(len(contour) for contour in simplified_contours) / len(simplified_contours)
-                print(f"Average number of points per contour: {avg_points}")
-
 
                 return svg_filepath
-        return None, 0
+        # Return None if the file doesn't exist or no image is loaded
+        return None
 
     @staticmethod
     def add_contours_to_svg(dwg, contours, scale_x, scale_y):
