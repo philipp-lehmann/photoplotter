@@ -36,14 +36,16 @@ class PhotoBooth:
         pass
 
     def process_processing(self):
-        svgpath = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath)
-        print(f"Converted to SVG: {svgpath}")
-        self.state_engine.change_state("Drawing")
         # Logic for "Drawing" state
+        self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath)
+        print(f"Converted to SVG: {self.state_engine.currentSVGPath}")
+        self.state_engine.change_state("Drawing")
         pass
     
     def process_drawing(self):
-        print(f"Drawing: Connecting with penplotter {self.state_engine.currentPhotoPath}")
+        print(f"Drawing: Connecting with penplotter {self.state_engine.currentSVGPath}")
+        self.state_engine.update_image_id()
+        self.plotter.plot_image(self.state_engine.currentSVGPath, self.state_engine.photoID, self.state_engine.imagesPerRow, 15)
         self.state_engine.change_state("Waiting")
         time.sleep(10)
         # Logic for "Drawing" state

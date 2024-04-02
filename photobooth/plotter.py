@@ -7,14 +7,19 @@ class Plotter:
         print("Starting Plotter ...")
         self.ad = axidraw.AxiDraw()
         self.ad.interactive()
+        self.plotter_found = self.connect_to_plotter()
 
-        self.plotter_found = self.ad.connect()
-        if not self.plotter_found:
-            print("AxiDraw not found. Entering simulation mode.")
-        else:
+    def connect_to_plotter(self):
+        """Attempt to connect to the AxiDraw plotter."""
+        if self.ad.connect():
+            print("AxiDraw connected.")
             self.ad.options.units = 2
             self.ad.update()
             self.ad.moveto(0, 0)
+            return True
+        else:
+            print("AxiDraw not found. Entering simulation mode.")
+            return False
 
     def return_home(self):
         if self.plotter_found:

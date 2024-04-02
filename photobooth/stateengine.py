@@ -5,6 +5,7 @@ class StateEngine:
         # State
         self.state = "Startup"
         self.currentPhotoPath = ""
+        self.currentSVGPath = ""
         self.photoID = 0
         self.imagesPerRow = 5
         self.imagesPerColumn = 3
@@ -50,6 +51,7 @@ class StateEngine:
     def update_image_id(self):
         self.photoID += 1
         max_images = self.imagesPerRow * self.imagesPerColumn
+        print(f"Photo ID: {self.photoID}")
         
         # Check if all available spots for images have been drawn
         if self.photoID >= max_images:
