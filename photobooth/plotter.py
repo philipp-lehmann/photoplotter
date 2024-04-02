@@ -28,14 +28,17 @@ class Plotter:
             print("Simulation Mode: Returning home.")
 
     def plot_image(self, svg_path, photoID, imagesPerRow, totalImages):
-        if not self.plotter_found:
-            print("Simulation Mode: Plotting image from", svg_path)
-            return  # Skip the actual plotting commands in simulation mode
         
-            # Attempt to connect to the AxiDraw plotter
-            if not self.ad.connect():  
-                print("Failed to connect to AxiDraw.")
-                return  # Stop execution if connection fails
+        svg_path = os.path.abspath(svg_path)
+        
+        print(f"Attempting to access SVG file at: {svg_path}")
+        if os.path.exists(svg_path):
+            print("SVG file found.")
+        else:
+            print("SVG file not found.")
+        
+        if self.plotter_found:
+            print("Plotting image.")
 
             # Define border and gutter sizes (mm)
             borderSize = 10  # Border size around the entire drawing area
@@ -75,7 +78,7 @@ class Plotter:
             # Disconnect is commented out; uncomment if ending the session
             # self.ad.disconnect()  # Disconnect from the AxiDraw plotter
         else:
-            print("SVG file not found.")
+            print("AxiDraw not found.")
 
 # Usage example
 # plotter = Plotter()

@@ -45,7 +45,8 @@ class PhotoBooth:
     def process_drawing(self):
         print(f"Drawing: Connecting with penplotter {self.state_engine.currentSVGPath}")
         self.state_engine.update_image_id()
-        self.plotter.plot_image(self.state_engine.currentSVGPath, self.state_engine.photoID, self.state_engine.imagesPerRow, 15)
+        self.plotter.plot_image("/home/user/Documents/photoplotter/assets/test.svg", self.state_engine.photoID, self.state_engine.imagesPerRow, 15)
+        #self.plotter.plot_image(self.state_engine.currentSVGPath, self.state_engine.photoID, self.state_engine.imagesPerRow, 15)
         self.state_engine.change_state("Waiting")
         time.sleep(10)
         # Logic for "Drawing" state

@@ -1,5 +1,3 @@
 __pycache__/
 photoplotter-env/
-photos/current/*.jpg
-photos/snapped/*.jpg
-photos/traced/*.svg
+photos/*

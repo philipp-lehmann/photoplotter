@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Generator: Adobe Illustrator 28.3.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
-<svg version="1.1" id="Ebene_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
-     x="0px" y="0px" width="72mm" height="72mm" viewBox="0 0 215.4 215.4" style="enable-background:new 0 0 215.4 215.4;" xml:space="preserve">
-<style type="text/css">
-	.st0{fill:#FFFFFF;stroke:#1D1D1B;stroke-miterlimit:10;}
-</style>
-<circle class="st0" cx="107.7" cy="107.7" r="51"/>
+<svg baseProfile="full" height="640" version="1.1" width="640" xmlns="http://www.w3.org/2000/svg" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:xlink="http://www.w3.org/1999/xlink">x
+<circle class="st0" cx="320" cy="320" r="320"/>
+<polyline fill="none" points="215.6,70.35 213.5,73.85 215.6,71.75 215.6,73.85 213.85,74.89999999999999 215.6,74.55" stroke="#aaa" stroke-width="1" />
+<polyline fill="none" points="51.099999999999994,219.45 51.099999999999994,223.64999999999998" stroke="#aaa" stroke-width="1" /><polyline fill="none" points="50.4,219.45 46.55,223.64999999999998" stroke="#aaa" stroke-width="1" /><polyline fill="none" points="69.3,214.89999999999998 65.8,223.64999999999998 68.94999999999999,215.25 71.39999999999999,223.64999999999998" stroke="#aaa" stroke-width="1" />
+<polyline fill="none" points="18.9,0.0 22.75,7.35 30.099999999999998,11.2 37.099999999999994,11.549999999999999 41.65,7.35 37.099999999999994,11.549999999999999 30.099999999999998,11.2 23.45,7.699999999999999 20.299999999999997,4.199999999999999" stroke="#aaa" stroke-width="1" />
+<polyline fill="none" points="13.299999999999999,0.0 14.0,7.699999999999999 17.5,13.649999999999999 16.799999999999997,16.799999999999997 17.5,13.649999999999999 14.0,7.699999999999999" stroke="#aaa" stroke-width="1" />
 </svg>

@@ -92,11 +92,13 @@ class ImageParser:
                 # After finalizing the contours, print the outcome
                 print(f"Settled on an image with {num_paths} paths.")
 
-                # Save the SVG file to the traced directory
-                output_dir = "photos/traced"
-                os.makedirs(output_dir, exist_ok=True)
+                # Use an absolute path for the output directory
+                parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                output_dir = os.path.join(parent_dir, "photos/traced")  # Join it with your relative path
+                os.makedirs(output_dir, exist_ok=True)  # Create the directory if it doesn't exist
+                
                 svg_filename = os.path.splitext(os.path.basename(image_filepath))[0] + '.svg'
-                svg_filepath = os.path.join(output_dir, svg_filename)
+                svg_filepath = os.path.join(output_dir, svg_filename)  # This is your absolute path for the SVG file
                 dwg.saveas(svg_filepath)
 
                 return svg_filepath
