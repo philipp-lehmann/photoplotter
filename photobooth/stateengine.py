@@ -10,6 +10,7 @@ class StateEngine:
         self.photoID = 0
         self.imagesPerRow = 5
         self.imagesPerColumn = 3
+        self.totalImages = self.imagesPerColumn * self.imagesPerRow
         self.transitions = {
             "Startup": ["Waiting", "Test"],
             "Waiting": ["Tracking"],
@@ -66,6 +67,38 @@ class StateEngine:
             self.photoID = 0  
             self.change_state("ResetPending") 
             print(f"photoID reached maximum capacity ({max_images}). Resetting ID and changing state to 'ResetPending'.")
+    
+            
+    def get_image_params_by_id(self, id=0):
+        # Define border and gutter
+        borderSize = 100
+        gutterSize = 10
+
+        # Adjusted maximum dimensions to account for border
+        paperSizeX = 1587
+        paperSizeY = 1122
+        maxX = paperSizeX - (borderSize * 2)  # Maximum X dimension in mm for A3 paper
+        maxY = paperSizeY - (borderSize * 2)  # Maximum Y dimension in mm for A3 paper
+
+        # Total rows needed, given the total images and images per row
+        totalRows = (self.totalImages + self.imagesPerRow - 1) // self.imagesPerRow
+        
+        # Adjust drawableWidth and drawableHeight to account for gutters
+        drawableWidth = maxX - (gutterSize * (self.imagesPerRow - 1))
+        drawableHeight = maxY - (gutterSize * (totalRows - 1))
+
+        # Calculate offset for each image, including gutters
+        offsetX = drawableWidth / self.imagesPerRow
+        offsetY = drawableHeight / totalRows  # Now based on actual totalRows
+
+        # Calculate starting position for the drawing, including border
+        col = id % self.imagesPerRow
+        row = id // self.imagesPerRow  # Fixed to divide by imagesPerRow for consistency
+        
+        startPositionX = (col * offsetX) + (col * gutterSize) + borderSize
+        startPositionY = (row * offsetY) + (row * gutterSize) + borderSize
+        
+        return (startPositionX, startPositionY)
 
 
     # Messages

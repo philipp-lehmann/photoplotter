@@ -139,6 +139,7 @@ class ImageParser:
         output_dir = os.path.join(parent_dir, "photos/current")  # Join it with your relative path
         os.makedirs(output_dir, exist_ok=True)  # Create the directory if it doesn't exist
         
+        # svg_filename = os.path.splitext(os.path.basename(image_svg_path))[0] + str(id) + '.svg'
         svg_filename = os.path.splitext(os.path.basename(image_svg_path))[0] + str(id) + '.svg'
         output_svg_path = os.path.join(output_dir, svg_filename)  # This is your absolute path for the SVG file
         dwg.saveas(output_svg_path)

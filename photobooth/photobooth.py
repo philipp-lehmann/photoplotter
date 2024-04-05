@@ -23,11 +23,18 @@ class PhotoBooth:
     def process_test(self):
         # Logic for "Waiting" state
         parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        self.state_engine.currentPhotoPath = os.path.join(parent_dir, f"photos/current/test.jpg")
+        self.state_engine.currentPhotoPath = os.path.join(parent_dir, f"photos/snapped/test.jpg")
         self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath)
         
+        # Calc test positions
+        for id in range(15): 
+            startX, startY = self.state_engine.get_image_params_by_id(id)
+            print(f"ID {id}: Position X {startX} / {startY}")
+            self.image_parser.create_output_svg(self.state_engine.currentSVGPath, 1.0, startX, startY, id)
+        
+        # Create test image
         print(f"Positioning SVG: {self.state_engine.currentSVGPath}")
-        self.state_engine.currentSVGPath = self.image_parser.create_output_svg(self.state_engine.currentSVGPath, 1.0, 300, 300, 1)
+        #self.state_engine.currentSVGPath = self.image_parser.create_output_svg(self.state_engine.currentSVGPath, 1.0, 300, 300, 1)
         
         time.sleep(1)
         self.state_engine.change_state("Drawing")

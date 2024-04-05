@@ -15,7 +15,7 @@ class Plotter:
         """Attempt to connect to the AxiDraw plotter."""
         if self.ad.connect():
             print("AxiDraw connected.")
-            self.ad.options.units = 2
+            self.ad.options.model = 2
             self.ad.update()
             return True
         else:
@@ -25,22 +25,15 @@ class Plotter:
     def return_home(self):
         if self.plotter_found:
             # New code to return home
-            print("Returning to home position.")
-            self.ad.interactive()
-            self.ad.moveto(10, 10)                 # Raise pen, return home
-            self.ad.moveto(0, 0)                 # Raise pen, return home
-            self.ad.plot_run()
             print("Plotter: Returning home.")
         else:
             print("Simulation Mode: Returning home.")
 
     def plot_image(self, svg_path):
-        
         svg_path = os.path.abspath(svg_path)
         
-        print(f"Attempting to access SVG file at: {svg_path}")
         if os.path.exists(svg_path):
-            print("SVG file found.")
+            pass
         else:
             print("SVG file not found.")
         
@@ -53,11 +46,3 @@ class Plotter:
             print("Plotting complete.")
         else:
             print("AxiDraw not found.")
-
-# Usage example
-# plotter = Plotter()
-# photoID = some_value_from_state_engine
-# imagesPerRow = some_value_from_state_engine
-# totalImages = some_calculated_or_defined_value
-# svg_path = "path/to/your/svg/file.svg"
-# plotter.plot_image(svg_path, photoID, imagesPerRow, totalImages)
