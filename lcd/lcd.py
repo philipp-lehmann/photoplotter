@@ -25,8 +25,7 @@ def display_default_image(LCD):
         print(f"Error displaying default image: {e}")
         
         
-def display_image_based_on_state(LCD, state):
-    # Map each state to its corresponding image file
+def display_image_based_on_state(LCD, state, rotation_angle=-90):
     state_to_image_path = {
         "Waiting": "assets/Waiting.jpg",
         "Tracking": "assets/Tracking.jpg",
@@ -34,18 +33,16 @@ def display_image_based_on_state(LCD, state):
         "Drawing": "assets/Drawing.jpg",
         "ResetPending": "assets/Change.jpg",
         "Test": "assets/Change.jpg",
-        # Add other states and their corresponding images as needed
     }
     
-    # Get the image path for the current state
     image_path = state_to_image_path.get(state)
     
-    # If an image path was found, display the image; otherwise, log an error
     if image_path:
         try:
             image = Image.open(image_path)
+            rotated_image = image.rotate(rotation_angle, expand=True)
             print(f"Displaying image for {state} state.")
-            LCD.LCD_ShowImage(image, 0, 0)
+            LCD.LCD_ShowImage(rotated_image, 0, 0)
         except Exception as e:
             print(f"Error displaying image for {state} state: {e}")
     else:
