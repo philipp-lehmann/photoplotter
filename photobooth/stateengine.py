@@ -1,4 +1,5 @@
 import paho.mqtt.client as mqtt
+import time
 
 class StateEngine:
     def __init__(self):
@@ -16,7 +17,7 @@ class StateEngine:
             "Waiting": ["Tracking"],
             "Tracking": ["Processing"],
             "Processing": ["Drawing", "Waiting"],
-            "Drawing": ["Waiting"],
+            "Drawing": ["Waiting", "ResetPending"],
             "ResetPending": ["Waiting"], 
             "Test": ["Waiting", "Drawing"]
         }
@@ -28,6 +29,7 @@ class StateEngine:
             
         if self.debugmode:
             print("Starting Debugmode...")
+            self.photoID = 1
             pass
         else:
             self.client.connect(self.broker_address) 
@@ -60,13 +62,9 @@ class StateEngine:
     def update_image_id(self):
         self.photoID -= 1
         print(f"Photo ID: {self.photoID}")
-        
-        # Check if all available spots for images have been drawn
-        if self.photoID <= 0:
-            self.photoID = self.totalImages  
-            self.change_state("ResetPending") 
-            print(f"photoID reached maximum capacity ({max_images}). Resetting ID and changing state to 'ResetPending'.")
     
+    def reset_photo_id(self):
+        self.photoID = self.totalImages
             
     def get_image_params_by_id(self, id=0):
         # Define border and gutter
@@ -116,7 +114,10 @@ class StateEngine:
         if self.state == "Waiting":
             self.change_state("Tracking")
         elif self.state == "ResetPending":
+            print("Reset confirmed")
+            self.reset_photo_id()
             self.change_state("Waiting")
+            time.sleep(3)
         else:
             pass
         

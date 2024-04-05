@@ -40,11 +40,12 @@ class PhotoBooth:
         # print(f"ID {id}: Position X {startX} / {startY}")
         # tempsvg = self.image_parser.create_output_svg(self.state_engine.currentSVGPath, 1.0, startX, startY, id)
         # self.plotter.plot_image(tempsvg)
-        # time.sleep(10)
+        
         
         # Create test image
         # print(f"Positioning SVG: {self.state_engine.currentSVGPath}")
         # self.state_engine.change_state("Drawing")
+        time.sleep(10)
         pass
     
     def process_waiting(self):
@@ -73,12 +74,16 @@ class PhotoBooth:
     
     def process_drawing(self):
         print(f"Drawing: Connecting with penplotter {self.state_engine.currentSVGPath}")
-        self.state_engine.update_image_id()
         self.plotter.plot_image(self.state_engine.currentSVGPath)
-        self.state_engine.change_state("Waiting")
-        time.sleep(10)
-        # Logic for "Drawing" state
-        pass
+        self.state_engine.update_image_id()
+        
+        # Check if all available spots for images have been drawn
+        if self.state_engine.photoID > 0:
+            self.state_engine.change_state("Waiting")
+        else:
+            self.state_engine.change_state("ResetPending") 
+            print(f"All photos printed, changing state to 'ResetPending'.")
+        
 
     def process_reset_pending(self):
         # Logic for "ResetPending" state

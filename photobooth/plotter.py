@@ -32,21 +32,23 @@ class Plotter:
             print("Simulation Mode: Returning home.")
 
     def plot_image(self, svg_path):
-        
-        print(f"AxiDraw connected. Model: {self.ad.options.model}" )
+           
         svg_path = os.path.abspath(svg_path)
         
         if os.path.exists(svg_path):
-            pass
+            if self.plotter_found:
+                print("Plotter: Plotting image.")
+
+                self.ad.options.model = 2
+                self.ad.update()
+                print(f"AxiDraw connected. Model: {self.ad.options.model}" )
+                self.ad.plot_setup(svg_path)
+                self.ad.plot_run()
+                
+                print("Plotting complete.")
+            else:
+                print("AxiDraw not found.")
         else:
             print("SVG file not found.")
         
-        if self.plotter_found:
-            print("Plotter: Plotting image.")
-
-            self.ad.plot_setup(svg_path)
-            self.ad.plot_run()
-            
-            print("Plotting complete.")
-        else:
-            print("AxiDraw not found.")
+        

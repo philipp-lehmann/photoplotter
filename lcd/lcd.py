@@ -32,6 +32,8 @@ def display_image_based_on_state(LCD, state):
         "Tracking": "assets/Tracking.jpg",
         "Processing": "assets/Processing.jpg",
         "Drawing": "assets/Drawing.jpg",
+        "ResetPending": "assets/Change.jpg",
+        "Test": "assets/Change.jpg",
         # Add other states and their corresponding images as needed
     }
     
