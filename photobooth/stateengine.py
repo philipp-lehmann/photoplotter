@@ -23,8 +23,8 @@ class StateEngine:
         }
         
         # MQTT
-        self.broker_address = "localhost"  # Assuming Mosquitto is running on the same device
-        self.client = mqtt.Client("StateEngine_Client")  # Create a new instance with a unique client ID
+        self.broker_address = "localhost"
+        self.client = mqtt.Client("StateEngine_Client")
         self.client.on_connect = self.on_connect
             
         if self.debugmode:
@@ -50,7 +50,12 @@ class StateEngine:
         if new_state in self.transitions[self.state]:
             print(f"State change from {self.state} to {new_state}.")
             self.state = new_state
-            self.publish_message("state_engine/state", new_state)
+            if self.state == "Drawing":
+                # Special case to display the current drawing image 
+                message = f"{new_state}-{self.photoID}"
+                self.publish_message("state_engine/state", message)
+            else:
+                self.publish_message("state_engine/state", new_state)
         else:
             print(f"Invalid transition from {self.state} to {new_state}.")
 

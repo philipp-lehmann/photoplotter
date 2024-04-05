@@ -66,7 +66,7 @@ def display_image_based_on_state(LCD, state):
     # Configuration for each state with paths, timings, and loop settings
     state_config = {
         "Waiting": {
-            "images": ["assets/Ready-1.jpg", "assets/Ready-2.jpg", "assets/Ready-1.jpg", "assets/Ready-2.jpg"],
+            "images": ["assets/Ready-3.jpg", "assets/Ready-2.jpg", "assets/Ready-1.jpg"],
             "display_time": 0.5,
             "loop": False
         },
@@ -95,9 +95,20 @@ def display_image_based_on_state(LCD, state):
             "display_time": 1,
             "loop": False
         },
-        # Define other states as needed...
     }
+    
+    # Define the number of images
+    num_images = 15
 
+    # Loop through the range and create a unique key for each "Drawing" state
+    for i in range(1, num_images + 1):
+        state_config[f"Drawing-{i:02}"] = {
+            "images": [f"assets/Drawing-{i:02}.jpg"],
+            "display_time": 0.1,
+            "loop": False
+        }
+
+    state_config.update(state_config)  
     config = state_config.get(state)
     if config:
         display_image_series(LCD, config['images'], config['display_time'], config['loop'])
