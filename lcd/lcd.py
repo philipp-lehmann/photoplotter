@@ -23,30 +23,86 @@ def display_default_image(LCD):
         LCD.LCD_ShowImage(image, 0, 0)
     except Exception as e:
         print(f"Error displaying default image: {e}")
+
+def display_image_series(LCD, image_paths, display_time=1, loop=False):
+    start_time = time.time()
+    current_image_index = 0
+    total_images = len(image_paths)
+    
+    # Initially set to False, will be updated based on loop and operation
+    completed = False 
+    
+    while not completed:
+        elapsed_time = time.time() - start_time
         
+        # Check if it's time to switch to the next image
+        if elapsed_time >= display_time:
+            start_time = time.time()  # Reset the start time
+            
+            # Load and display the current image
+            try:
+                image_path = image_paths[current_image_index]
+                image = Image.open(image_path)
+                rotated_image = image.rotate(-90, expand=True)  # Assuming rotation is needed
+                LCD.LCD_ShowImage(rotated_image, 0, 0)
+            except Exception as e:
+                print(f"Error displaying image: {e}")
+            
+            # Move to the next image
+            current_image_index += 1
+            
+            # Check if we've displayed all images
+            if current_image_index >= total_images:
+                if loop:
+                    current_image_index = 0  # Reset to the first image for looping
+                else:
+                    completed = True  # Stop if not looping
         
-def display_image_based_on_state(LCD, state, rotation_angle=-90):
-    state_to_image_path = {
-        "Waiting": "assets/Waiting.jpg",
-        "Tracking": "assets/Tracking.jpg",
-        "Processing": "assets/Processing.jpg",
-        "Drawing": "assets/Drawing.jpg",
-        "ResetPending": "assets/Change.jpg",
-        "Test": "assets/Change.jpg",
+        # Non-blocking wait (very short sleep to reduce CPU usage)
+        time.sleep(0.01) 
+
+
+def display_image_based_on_state(LCD, state):
+    # Configuration for each state with paths, timings, and loop settings
+    state_config = {
+        "Waiting": {
+            "images": ["assets/Ready-1.jpg", "assets/Ready-2.jpg", "assets/Ready-1.jpg", "assets/Ready-2.jpg"],
+            "display_time": 0.5,
+            "loop": False
+        },
+        "Tracking": {
+            "images": ["assets/Tracking-4.jpg", "assets/Tracking-3.jpg", "assets/Tracking-2.jpg", "assets/Tracking-1.jpg"],
+            "display_time": 1,
+            "loop": False
+        },
+        "Processing": {
+            "images": ["assets/Processing-1.jpg", "assets/Processing-2.jpg", "assets/Processing-3.jpg", "assets/Processing-4.jpg"],
+            "display_time": 0.1,
+            "loop": False
+        },
+        "Drawing": {
+            "images": ["assets/Drawing-04.jpg", "assets/Drawing-03.jpg", "assets/Drawing-02.jpg", "assets/Drawing-01.jpg"],
+            "display_time": 0.1,
+            "loop": False
+        },
+        "ResetPending": {
+            "images": ["assets/ResetPending.jpg"],
+            "display_time": 1,
+            "loop": False
+        },
+        "Test": {
+            "images": ["assets/Test.jpg"],
+            "display_time": 1,
+            "loop": False
+        },
+        # Define other states as needed...
     }
-    
-    image_path = state_to_image_path.get(state)
-    
-    if image_path:
-        try:
-            image = Image.open(image_path)
-            rotated_image = image.rotate(rotation_angle, expand=True)
-            print(f"Displaying image for {state} state.")
-            LCD.LCD_ShowImage(rotated_image, 0, 0)
-        except Exception as e:
-            print(f"Error displaying image for {state} state: {e}")
+
+    config = state_config.get(state)
+    if config:
+        display_image_series(LCD, config['images'], config['display_time'], config['loop'])
     else:
-        print(f"No image mapping found for state: {state}")
+        print(f"No configuration found for state: {state}")      
 
 
 # Messages
