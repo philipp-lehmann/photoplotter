@@ -9,15 +9,6 @@ class ImageParser:
         pass
     
     def detect_faces(self, image_filepath):
-        """
-        Detect faces in an image.
-
-        Args:
-            image_filepath (str): The path to the image file.
-
-        Returns:
-            bool: True if at least one face is detected, False otherwise.
-        """
         # Load the pre-trained Haar Cascade Classifier for face detection
         face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
         
@@ -93,15 +84,16 @@ class ImageParser:
                 # After finalizing the contours, print the outcome
                 print(f"Settled on an image with {num_paths} paths.")
 
-                # Use an absolute path for the output directory
+                # Save to output folder
                 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                output_dir = os.path.join(parent_dir, "photos/traced")  # Join it with your relative path
-                os.makedirs(output_dir, exist_ok=True)  # Create the directory if it doesn't exist
+                output_dir = os.path.join(parent_dir, "photos/traced")
+                os.makedirs(output_dir, exist_ok=True)
                 
                 svg_filename = os.path.splitext(os.path.basename(image_filepath))[0] + '.svg'
-                svg_filepath = os.path.join(output_dir, svg_filename)  # This is your absolute path for the SVG file
+                svg_filepath = os.path.join(output_dir, svg_filename)
                 dwg.saveas(svg_filepath)
 
+                # Return file path
                 return svg_filepath
         # Return None if the file doesn't exist or no image is loaded
         return None
@@ -114,7 +106,7 @@ class ImageParser:
         # Parse the original SVG
         root = etree.fromstring(svg_data)
 
-        # Create a new SVG drawing with svgwrite, setting the artboard size to 420x297mm
+        # Create a new SVG drawing with svgwrite, setting the artboard size to 420x297mm (check size)
         dwg = svgwrite.Drawing(size=('1587', '1122'))
 
         # Transform and position the image

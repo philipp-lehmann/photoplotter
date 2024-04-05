@@ -38,7 +38,7 @@ class StateEngine:
         print("Starting StateEngine ...")
         
     
-    # Statee
+    # State
     # ------------------------------------------------------------------------     
     def get_state(self):
         return self.state

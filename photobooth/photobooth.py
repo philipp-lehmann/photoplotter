@@ -37,7 +37,7 @@ class PhotoBooth:
         #self.state_engine.currentSVGPath = self.image_parser.create_output_svg(self.state_engine.currentSVGPath, 1.0, 300, 300, 1)
         
         time.sleep(1)
-        self.state_engine.change_state("Drawing")
+        # self.state_engine.change_state("Drawing")
         pass
     
     def process_waiting(self):
