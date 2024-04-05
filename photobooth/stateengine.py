@@ -3,6 +3,7 @@ import paho.mqtt.client as mqtt
 class StateEngine:
     def __init__(self):
         # State
+        self.debugmode = True
         self.state = "Startup"
         self.currentPhotoPath = ""
         self.currentSVGPath = ""
@@ -10,22 +11,29 @@ class StateEngine:
         self.imagesPerRow = 5
         self.imagesPerColumn = 3
         self.transitions = {
-            "Startup": ["Waiting"],
+            "Startup": ["Waiting", "Test"],
             "Waiting": ["Tracking"],
             "Tracking": ["Processing"],
             "Processing": ["Drawing", "Waiting"],
             "Drawing": ["Waiting"],
-            "ResetPending": ["Waiting"]
+            "ResetPending": ["Waiting"], 
+            "Test": ["Waiting", "Drawing"]
         }
         
         # MQTT
         self.broker_address = "localhost"  # Assuming Mosquitto is running on the same device
         self.client = mqtt.Client("StateEngine_Client")  # Create a new instance with a unique client ID
         self.client.on_connect = self.on_connect
-        self.client.connect(self.broker_address) 
-        self.client.subscribe("lcd/buttons")
-        self.client.loop_start()
-        self.client.on_message = self.on_message
+            
+        if self.debugmode:
+            print("Starting Debugmode...")
+            pass
+        else:
+            self.client.connect(self.broker_address) 
+            self.client.subscribe("lcd/buttons")
+            self.client.loop_start()
+            self.client.on_message = self.on_message
+        
         print("Starting StateEngine ...")
         
     

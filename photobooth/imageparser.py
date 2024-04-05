@@ -1,6 +1,7 @@
 import cv2
 import os
 import svgwrite
+from lxml import etree
 
 class ImageParser:
     def __init__(self):
@@ -104,6 +105,45 @@ class ImageParser:
                 return svg_filepath
         # Return None if the file doesn't exist or no image is loaded
         return None
+
+    def create_output_svg(self, image_svg_path, scale_factor = 0.8, offset_x=0, offset_y=0, id=0):
+        # Load the original SVG content from a file
+        with open(image_svg_path, 'rb') as file:  # Note 'rb' mode for reading as bytes
+            svg_data = file.read()
+
+        # Parse the original SVG
+        root = etree.fromstring(svg_data)
+
+        # Create a new SVG drawing with svgwrite, setting the artboard size to 420x297mm
+        dwg = svgwrite.Drawing(size=('1587', '1122'))
+
+        # Transform and position the image
+        group = dwg.g(id="all_paths", transform=f"translate({offset_x}, {offset_y}) scale({scale_factor})")
+        dwg.add(dwg.rect(insert=(0, 0), size=('1587', '1122px'), fill='white'))
+
+        for element in root.iter("{http://www.w3.org/2000/svg}*"):
+            if element.tag.endswith('polyline'):
+                points = element.get('points')
+                if points:  # Ensure there's a points attribute
+                    # Prepare the points in the format expected by svgwrite
+                    points_list = points.strip().split(" ")
+                    # Convert each point from 'x,y' to (x, y) tuple format
+                    points_tuples = [tuple(map(float, p.split(','))) for p in points_list if ',' in p]
+                    if points_tuples:  # Ensure there's at least one valid point
+                        group.add(dwg.polyline(points=points_tuples, stroke='black', fill='none'))
+
+        dwg.add(group)
+        
+         # Use an absolute path for the output directory
+        parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        output_dir = os.path.join(parent_dir, "photos/current")  # Join it with your relative path
+        os.makedirs(output_dir, exist_ok=True)  # Create the directory if it doesn't exist
+        
+        svg_filename = os.path.splitext(os.path.basename(image_svg_path))[0] + str(id) + '.svg'
+        output_svg_path = os.path.join(output_dir, svg_filename)  # This is your absolute path for the SVG file
+        dwg.saveas(output_svg_path)
+
+        return output_svg_path
 
     @staticmethod
     def add_contours_to_svg(dwg, contours, scale_x, scale_y):
