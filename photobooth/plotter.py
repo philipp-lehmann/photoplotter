@@ -14,9 +14,11 @@ class Plotter:
     def connect_to_plotter(self):
         """Attempt to connect to the AxiDraw plotter."""
         if self.ad.connect():
-            print("AxiDraw connected.")
             self.ad.options.model = 2
+            self.ad.options.auto_rotate = True
+            self.ad.options.speed_pendown = 100
             self.ad.update()
+            print(f"AxiDraw connected. Model: {self.ad.options.model}" )
             return True
         else:
             print("AxiDraw not found. Entering simulation mode.")
@@ -30,6 +32,8 @@ class Plotter:
             print("Simulation Mode: Returning home.")
 
     def plot_image(self, svg_path):
+        
+        print(f"AxiDraw connected. Model: {self.ad.options.model}" )
         svg_path = os.path.abspath(svg_path)
         
         if os.path.exists(svg_path):

@@ -3,14 +3,14 @@ import paho.mqtt.client as mqtt
 class StateEngine:
     def __init__(self):
         # State
-        self.debugmode = True
+        self.debugmode = False
         self.state = "Startup"
         self.currentPhotoPath = ""
         self.currentSVGPath = ""
-        self.photoID = 0
         self.imagesPerRow = 5
         self.imagesPerColumn = 3
         self.totalImages = self.imagesPerColumn * self.imagesPerRow
+        self.photoID = self.totalImages
         self.transitions = {
             "Startup": ["Waiting", "Test"],
             "Waiting": ["Tracking"],
@@ -58,21 +58,20 @@ class StateEngine:
         self.publish_message("state_engine/photo_path", photo_path)
             
     def update_image_id(self):
-        self.photoID += 1
-        max_images = self.imagesPerRow * self.imagesPerColumn
+        self.photoID -= 1
         print(f"Photo ID: {self.photoID}")
         
         # Check if all available spots for images have been drawn
-        if self.photoID >= max_images:
-            self.photoID = 0  
+        if self.photoID <= 0:
+            self.photoID = self.totalImages  
             self.change_state("ResetPending") 
             print(f"photoID reached maximum capacity ({max_images}). Resetting ID and changing state to 'ResetPending'.")
     
             
     def get_image_params_by_id(self, id=0):
         # Define border and gutter
-        borderSize = 100
-        gutterSize = 10
+        borderSize = 50
+        gutterSize = 50
 
         # Adjusted maximum dimensions to account for border
         paperSizeX = 1587

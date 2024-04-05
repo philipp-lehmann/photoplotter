@@ -17,7 +17,7 @@ class PhotoBooth:
     # ------------------------------------------------------------------------
     def process_startup(self):
         # Logic for "Startup" state
-        self.state_engine.change_state("Test")
+        self.state_engine.change_state("Waiting")
         pass
     
     def process_test(self):
@@ -26,17 +26,24 @@ class PhotoBooth:
         self.state_engine.currentPhotoPath = os.path.join(parent_dir, f"photos/snapped/test.jpg")
         self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath)
         
-        # Calc test positions
-        for id in range(15): 
-            startX, startY = self.state_engine.get_image_params_by_id(id)
-            print(f"ID {id}: Position X {startX} / {startY}")
-            self.image_parser.create_output_svg(self.state_engine.currentSVGPath, 1.0, startX, startY, id)
+        # Test and calc all positions
+        # for id in range(15): 
+        #     startX, startY = self.state_engine.get_image_params_by_id(id)
+        #     print(f"ID {id}: Position X {startX} / {startY}")
+        #     tempsvg = self.image_parser.create_output_svg(self.state_engine.currentSVGPath, 1.0, startX, startY, id)
+        #     self.plotter.plot_image(tempsvg)
+        #     time.sleep(1)
+        
+        # Plot a single test
+        # id = 13
+        # startX, startY = self.state_engine.get_image_params_by_id(id)
+        # print(f"ID {id}: Position X {startX} / {startY}")
+        # tempsvg = self.image_parser.create_output_svg(self.state_engine.currentSVGPath, 1.0, startX, startY, id)
+        # self.plotter.plot_image(tempsvg)
+        # time.sleep(10)
         
         # Create test image
-        print(f"Positioning SVG: {self.state_engine.currentSVGPath}")
-        #self.state_engine.currentSVGPath = self.image_parser.create_output_svg(self.state_engine.currentSVGPath, 1.0, 300, 300, 1)
-        
-        time.sleep(1)
+        # print(f"Positioning SVG: {self.state_engine.currentSVGPath}")
         # self.state_engine.change_state("Drawing")
         pass
     
@@ -57,7 +64,9 @@ class PhotoBooth:
 
     def process_processing(self):
         # Logic for "Drawing" state
-        self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath)
+        tempSVG = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath)
+        startX, startY = self.state_engine.get_image_params_by_id(self.state_engine.photoID)
+        self.state_engine.currentSVGPath = self.image_parser.create_output_svg(tempSVG, 1.0, startX, startY, self.state_engine.photoID)
         print(f"Converted to SVG: {self.state_engine.currentSVGPath}")
         self.state_engine.change_state("Drawing")
         pass
@@ -66,7 +75,6 @@ class PhotoBooth:
         print(f"Drawing: Connecting with penplotter {self.state_engine.currentSVGPath}")
         self.state_engine.update_image_id()
         self.plotter.plot_image(self.state_engine.currentSVGPath)
-        #self.plotter.plot_image(self.state_engine.currentSVGPath, self.state_engine.photoID, self.state_engine.imagesPerRow, 15)
         self.state_engine.change_state("Waiting")
         time.sleep(10)
         # Logic for "Drawing" state

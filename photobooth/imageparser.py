@@ -111,7 +111,7 @@ class ImageParser:
 
         # Transform and position the image
         group = dwg.g(id="all_paths", transform=f"translate({offset_x}, {offset_y}) scale({scale_factor})")
-        dwg.add(dwg.rect(insert=(0, 0), size=('1587', '1122px'), fill='white'))
+        # dwg.add(dwg.rect(insert=(0, 0), size=('1587', '1122px'), fill='white'))
 
         for element in root.iter("{http://www.w3.org/2000/svg}*"):
             if element.tag.endswith('polyline'):
