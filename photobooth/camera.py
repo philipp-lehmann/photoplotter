@@ -1,6 +1,7 @@
 from .imageparser import ImageParser
 import subprocess
 import os
+import time
 import datetime
 from PIL import Image
 
@@ -12,6 +13,7 @@ class Camera:
         self.image_parser = ImageParser()
 
     def snap_image(self, output_dir=None, filename=None):
+        time.sleep(4)
         print("Capturing image")
         
         # Set default output directory if not provided
