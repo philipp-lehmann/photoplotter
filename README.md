@@ -4,9 +4,6 @@ The photoplotter project is a Python-based application designed to create a digi
 **Description:**
 The photobooth application allows users to take photos, process them, and print them with an axidraw penplotter. It simulates the experience of a traditional photobooth but with added digital features. 
 
-**Repository:**
-https://github.com/philipp-lehmann/photoplotter
-
 **Classes:**
 
 1. `photobooth.py:` This module contains the main logic for the photobooth application, coordinating interactions between different components.
@@ -15,7 +12,7 @@ Should also track the current id of the current portrait drawing. Communicates w
 3. `camera.py:` Handles camera functionality, including facetracking, capturing photos and providing them for processing. Saves snapped image temporary and source images for vectorization separately.
 4. `imageparser.py:` Processes the snapped images captured by the camera, converting them to traced SVGs for plotting.
 5. `plotter.py:` Manages the plotter connection and functionality to draw the portraits, which could be used for printing svg images with a axidraw penplotter.
-6. `lcd.py:` Display interface of the photobooth, showing instructions and the current state of the application to users on a 128x128 lcd display. Located in a separate directory and communicates with broker to submit button inputs.
+6. `lcd.py:` Display interface of the photobooth, showing instructions and the current state of the application to users on a 128x128 lcd display. Located in a separate directory and communicates with broker to submit button inputs. Runs as a separate task.
 
 **File Structure:**
 The project is structured as follows:
@@ -68,7 +65,6 @@ This project aims to combine the nostalgic charm of traditional photobooths with
 ```bash
 # Startup lcd display first
 cd photoplotter
-# sudo systemctl start mosquitto
 sudo python lcd/lcd.py
 ```
 
