@@ -1,12 +1,17 @@
-import os
 import time
 import LCD_1in44
-from PIL import Image, ImageSequence
+from PIL import Image
 import paho.mqtt.client as mqtt
 
 # LCD
 LCD = LCD_1in44.LCD()
 Lcd_ScanDir = LCD_1in44.SCAN_DIR_DFT
+last_press_time = {
+    "UP": 0, "DOWN": 0, "LEFT": 0, "RIGHT": 0, "PRESS": 0,
+    "KEY1": 0, "KEY2": 0, "KEY3": 0
+}
+debounce_delay = 0.02
+
 
 # MQTT
 broker_address = "localhost"
@@ -19,8 +24,9 @@ def display_default_image(LCD):
     default_image_path = 'assets/Waiting.jpg'
     try:
         image = Image.open(default_image_path)
+        rotated_image = image.rotate(-90, expand=True) 
         print("Displaying default image.")
-        LCD.LCD_ShowImage(image, 0, 0)
+        LCD.LCD_ShowImage(rotated_image, 0, 0)
     except Exception as e:
         print(f"Error displaying default image: {e}")
 
@@ -43,7 +49,7 @@ def display_image_series(LCD, image_paths, display_time=1, loop=False):
             try:
                 image_path = image_paths[current_image_index]
                 image = Image.open(image_path)
-                rotated_image = image.rotate(-90, expand=True)  # Assuming rotation is needed
+                rotated_image = image.rotate(-90, expand=True) 
                 LCD.LCD_ShowImage(rotated_image, 0, 0)
             except Exception as e:
                 print(f"Error displaying image: {e}")
@@ -59,7 +65,7 @@ def display_image_series(LCD, image_paths, display_time=1, loop=False):
                     completed = True  # Stop if not looping
         
         # Non-blocking wait (very short sleep to reduce CPU usage)
-        time.sleep(0.01) 
+        time.sleep(0.001) 
 
 
 def display_image_based_on_state(LCD, state):
@@ -132,6 +138,14 @@ def publish_message(topic, message):
     client.publish(topic, message)
 
 
+def check_button(LCD, button_pin, button_name):
+    current_time = time.time()
+    if LCD.digital_read(button_pin) == 1:
+        if (current_time - last_press_time[button_name]) > debounce_delay:
+            last_press_time[button_name] = current_time
+            return True
+    return False
+
 # Main
 # ------------------------------------------------------------------------
 def main():
@@ -144,33 +158,35 @@ def main():
     # MQTT
     client.subscribe("state_engine/state")
     client.on_message = on_message
-
+    client.loop_start()
+    
     try:
         while True:
-            # Check for key presses and write to key_fifo
-            if LCD.digital_read(LCD.GPIO_KEY_UP_PIN) != 0:
+            
+            if check_button(LCD, LCD.GPIO_KEY_UP_PIN, "UP"):
                 publish_message("lcd/buttons", "UP")
-            if LCD.digital_read(LCD.GPIO_KEY_DOWN_PIN) != 0:
+            if check_button(LCD, LCD.GPIO_KEY_DOWN_PIN, "DOWN"):
                 publish_message("lcd/buttons", "DOWN")
-            if LCD.digital_read(LCD.GPIO_KEY_LEFT_PIN) != 0:
+            if check_button(LCD, LCD.GPIO_KEY_LEFT_PIN, "LEFT"):
                 publish_message("lcd/buttons", "LEFT")
-            if LCD.digital_read(LCD.GPIO_KEY_RIGHT_PIN) != 0:
+            if check_button(LCD, LCD.GPIO_KEY_RIGHT_PIN, "RIGHT"):
                 publish_message("lcd/buttons", "RIGHT")
-            if LCD.digital_read(LCD.GPIO_KEY_PRESS_PIN) != 0:
+            if check_button(LCD, LCD.GPIO_KEY_PRESS_PIN, "PRESS"):
                 publish_message("lcd/buttons", "PRESS")
-            if LCD.digital_read(LCD.GPIO_KEY1_PIN) != 0:
+            if check_button(LCD, LCD.GPIO_KEY1_PIN, "KEY1"):
                 publish_message("lcd/buttons", "KEY1")
-            if LCD.digital_read(LCD.GPIO_KEY2_PIN) != 0:
+            if check_button(LCD, LCD.GPIO_KEY2_PIN, "KEY2"):
                 publish_message("lcd/buttons", "KEY2")
-            if LCD.digital_read(LCD.GPIO_KEY3_PIN) != 0:
+            if check_button(LCD, LCD.GPIO_KEY3_PIN, "KEY3"):
                 publish_message("lcd/buttons", "KEY3")
 
             # Listen for MQTT messages
-            client.loop()
-            time.sleep(0.05)
+            # client.loop()
+            time.sleep(0.001)
 
     except KeyboardInterrupt:
         print("\nExiting LCD due to keyboard interrupt...")
+        client.loop_stop() 
 
 if __name__ == '__main__':
     main()
