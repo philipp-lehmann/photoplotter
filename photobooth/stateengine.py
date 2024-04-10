@@ -14,10 +14,11 @@ class StateEngine:
         self.photoID = self.totalImages
         self.transitions = {
             "Startup": ["Waiting", "Test"],
-            "Waiting": ["Tracking"],
+            "Waiting": ["Tracking", "Setting"],
             "Tracking": ["Processing"],
             "Processing": ["Drawing", "Waiting"],
             "Drawing": ["Waiting", "ResetPending"],
+            "Setting": ["Waiting"], 
             "ResetPending": ["Waiting"], 
             "Test": ["Waiting", "Drawing"]
         }
@@ -67,6 +68,15 @@ class StateEngine:
     def update_image_id(self):
         self.photoID -= 1
         print(f"Photo ID: {self.photoID}")
+        
+    def set_image_id(self, inc):
+        self.photoID += inc
+        
+        if self.photoID <= 0 or self.photoID > self.totalImage:
+            self.photoID = self.photoID % self.totalImages
+        
+        print(f"Set photoID to {self.photoID}")
+        
     
     def reset_photo_id(self):
         self.photoID = self.totalImages
@@ -117,7 +127,22 @@ class StateEngine:
         
         # Handler for each state
         if self.state == "Waiting":
-            self.change_state("Tracking")
+            # publish_message("lcd/buttons", "UP")
+            if msg.payload.decode() == "PRESS":
+                self.change_state("Tracking")
+            if msg.payload.decode() == "KEY2":
+                self.change_state("Setting")
+        elif self.state == "Setting":
+            if msg.payload.decode() == "PRESS":
+                self.change_state("Waiting")
+            elif msg.payload.decode() == "UP":
+                self.set_image_id(-imagesPerRow)
+            elif msg.payload.decode() == "RIGHT":
+                self.set_image_id(1)
+            elif msg.payload.decode() == "DOWN":
+                self.set_image_id(imagesPerRow)
+            elif msg.payload.decode() == "LEFT":
+                self.set_image_id(-1)
         elif self.state == "ResetPending":
             print("Reset confirmed")
             self.reset_photo_id()
