@@ -1,4 +1,5 @@
 import cv2
+import numpy as np
 import os
 import svgwrite
 from lxml import etree
@@ -31,6 +32,56 @@ class ImageParser:
         else:
             print("No faces detected in the image.")
             return False
+        
+    def enhance_faces(self, image):
+        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        faces = face_cascade.detectMultiScale(gray_image, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+
+        mask = np.zeros_like(image)
+
+        for (x, y, w, h) in faces:
+            center = (x + w//2, y + h//2)
+            axes = (w//2, h//2)  # width and height of the ellipse axes
+            mask = cv2.ellipse(mask, center, axes, 0, 0, 360, (255, 255, 255), -1)
+
+        # Soften the edges of the mask
+        blurred_mask = cv2.GaussianBlur(mask, (15, 15), 0)
+
+        # Create a 3-channel mask for color image blending
+        mask_channels = cv2.split(blurred_mask)
+        mask_for_blending = cv2.merge(mask_channels)
+
+        # Blend the original image with the mask using a weighted sum
+        # Note: ensure the masks and image are of the same data type (e.g., uint8)
+        enhanced_image = cv2.addWeighted(image, 1, mask_for_blending, 0.5, 0)
+
+        return enhanced_image
+
+    def apply_local_enhancements(self, roi):
+        # Convert to YUV color space
+        img_yuv = cv2.cvtColor(roi, cv2.COLOR_BGR2YUV)
+        # Apply CLAHE to the Y channel
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        img_yuv[:, :, 0] = clahe.apply(img_yuv[:, :, 0])
+        # Convert back to BGR color space
+        enhanced_roi = cv2.cvtColor(img_yuv, cv2.COLOR_YUV2BGR)
+        return enhanced_roi
+
+    def optimize_image(self, img):
+        # Convert to YUV color space
+        img_yuv = cv2.cvtColor(img, cv2.COLOR_BGR2YUV)
+
+        # Apply histogram equalization on the luminance channel
+        img_yuv[:,:,0] = cv2.equalizeHist(img_yuv[:,:,0])
+
+        # Convert back to BGR color space
+        img_output = cv2.cvtColor(img_yuv, cv2.COLOR_YUV2BGR)
+
+        # Optionally, apply additional enhancements like HDR effect here
+
+        # Return the optimized image
+        return img_output
 
     def convert_to_svg(self, image_filepath, target_width=640, target_height=640, scale_x=0.35, scale_y=0.35, min_paths=30, max_paths=75):
         print("Converting current photo to SVG")
@@ -40,8 +91,19 @@ class ImageParser:
             if image is not None:
                 # Resize the image to the target dimensions
                 image = cv2.resize(image, (target_width, target_height))
+                
+                opt_image = self.optimize_image(image)
+                # optimized_image_path = image_filepath.rsplit('.', 1)[0] + '_optimized.' + image_filepath.rsplit('.', 1)[1]
+                # cv2.imwrite(optimized_image_path, opt_image)
+                # print(f"Optimized image saved to: {optimized_image_path}")
+                
+                # opt_image = self.enhance_faces(opt_image)
+                # optimized_image_path = image_filepath.rsplit('.', 1)[0] + '_optimized_faces.' + image_filepath.rsplit('.', 1)[1]
+                # cv2.imwrite(optimized_image_path, opt_image)
+                # print(f"Optimized image saved to: {optimized_image_path}")
+                
                 # Convert the image to grayscale for edge detection
-                gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+                gray_image = cv2.cvtColor(opt_image, cv2.COLOR_BGR2GRAY)
                 # Perform initial edge detection
                 edges = cv2.Canny(gray_image, threshold1=80, threshold2=200)
                 # Find initial contours based on edges
