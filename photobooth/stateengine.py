@@ -136,11 +136,11 @@ class StateEngine:
             if msg.payload.decode() == "PRESS":
                 self.change_state("Waiting")
             elif msg.payload.decode() == "UP":
-                self.set_image_id(-imagesPerRow)
+                self.set_image_id(-self.imagesPerRow)
             elif msg.payload.decode() == "RIGHT":
                 self.set_image_id(1)
             elif msg.payload.decode() == "DOWN":
-                self.set_image_id(imagesPerRow)
+                self.set_image_id(self.imagesPerRow)
             elif msg.payload.decode() == "LEFT":
                 self.set_image_id(-1)
         elif self.state == "ResetPending":
