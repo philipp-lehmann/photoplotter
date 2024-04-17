@@ -12,30 +12,34 @@ class Camera:
         # Assuming ImageParser is correctly implemented elsewhere
         self.image_parser = ImageParser()
 
-    def snap_image(self, output_dir=None, filename=None):
+    def snap_image(self, output_dir=None, filename=None, roi=[0.33, 0.33, 0.67, 0.67]):
         time.sleep(4)
         print("Capturing image")
         
-        # Set default output directory if not provided
         if output_dir is None:
             output_dir = "photos/snapped"
         
-        # Create output directory if it doesn't exist
         os.makedirs(output_dir, exist_ok=True)
         
-        # Generate image file path
         if filename is None:
             image_filename = f"image_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
         else:
-            image_filename = filename + ".jpg"  # Add file extension
+            image_filename = filename + ".jpg"
         image_filepath = os.path.join(output_dir, image_filename)
 
-        # Use libcamera-still to snap an image
-        try:
-            subprocess.run(["libcamera-still", "-o", image_filepath, "-t", "500", "-n", "--autofocus-on-capture"], check=True)
+        libcamera_command = ["libcamera-still", "-o", image_filepath, "-t", "500", "-n"]
 
+        # Set the Region of interest for autofocus if provided
+        if roi:
+            # ROI should be a tuple or list [x0, y0, x1, y1]
+            roi_cmd = "--roi=" + ",".join(map(str, roi))
+            libcamera_command.append(roi_cmd)
+            libcamera_command.append("--autofocus-on-capture")
+
+        try:
+            subprocess.run(libcamera_command, check=True)
             print(f"Image saved to {image_filepath}")
-            self.crop_to_square(image_filepath)  # Assuming you have a method for cropping
+            self.crop_to_square(image_filepath)
             return image_filepath
         except subprocess.CalledProcessError as e:
             print(f"Error capturing image: {e}")
