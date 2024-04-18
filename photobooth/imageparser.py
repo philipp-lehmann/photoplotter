@@ -6,6 +6,7 @@ from lxml import etree
 
 class ImageParser:
     def __init__(self):
+        self.maxTrials = 10
         print("Starting ImageParser ...")
         pass
     
@@ -83,7 +84,7 @@ class ImageParser:
         # Return the optimized image
         return img_output
 
-    def convert_to_svg(self, image_filepath, target_width=640, target_height=640, scale_x=0.35, scale_y=0.35, min_paths=30, max_paths=75):
+    def convert_to_svg(self, image_filepath, target_width=640, target_height=640, scale_x=0.35, scale_y=0.35, min_paths=30, max_paths=90, min_contour_area=20, suffix=''):
         print("Converting current photo to SVG")
         if os.path.isfile(image_filepath):
             # Load the image using OpenCV
@@ -93,8 +94,8 @@ class ImageParser:
                 image = cv2.resize(image, (target_width, target_height))
                 
                 opt_image = self.optimize_image(image)
-                # optimized_image_path = image_filepath.rsplit('.', 1)[0] + '_optimized.' + image_filepath.rsplit('.', 1)[1]
-                # cv2.imwrite(optimized_image_path, opt_image)
+                optimized_image_path = image_filepath.rsplit('.', 1)[0] + '_optimized.' + image_filepath.rsplit('.', 1)[1]
+                cv2.imwrite(optimized_image_path, opt_image)
                 # print(f"Optimized image saved to: {optimized_image_path}")
                 
                 # opt_image = self.enhance_faces(opt_image)
@@ -108,8 +109,10 @@ class ImageParser:
                 edges = cv2.Canny(gray_image, threshold1=80, threshold2=200)
                 # Find initial contours based on edges
                 contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                # Filter out small contours
+                filtered_contours = [contour for contour in contours if cv2.contourArea(contour) > min_contour_area]
                 # Initially simplify contours to reduce complexity
-                simplified_contours = [cv2.approxPolyDP(contour, 1, True) for contour in contours]
+                simplified_contours = [cv2.approxPolyDP(contour, 1, True) for contour in filtered_contours]
 
                 # Initialize variables for the adjustment loop
                 num_paths = 0
@@ -118,43 +121,51 @@ class ImageParser:
                 upper_threshold = 200
                 epsilon = 1
 
-                # Loop to adjust thresholds until the number of paths is within desired range
+                # Adjustment loop
                 while num_paths < min_paths or num_paths > max_paths:
-                    # Create a new SVG drawing for each iteration to avoid duplicating paths
                     dwg = svgwrite.Drawing(size=(target_width, target_height))
+                    num_paths = self.add_contours_to_svg(dwg, simplified_contours, scale_x, scale_y)
 
-                    # Add current contours to the SVG drawing
-                    num_paths = ImageParser.add_contours_to_svg(dwg, simplified_contours, scale_x, scale_y)
-
-                    # If the number of paths is not within the desired range, adjust the thresholds
                     if num_paths < min_paths or num_paths > max_paths:
-                        lower_threshold, upper_threshold, epsilon = ImageParser.adjust_thresholds(
-                            num_paths, min_paths, max_paths, lower_threshold, upper_threshold, epsilon, gray_image)
-
-                        # Perform edge detection with adjusted thresholds
-                        edges = cv2.Canny(gray_image, threshold1=lower_threshold, threshold2=upper_threshold)
-                        # Find new contours with the adjusted thresholds
+                        print(f"{min_contour_area} - {trials}: {num_paths}")
+                        lower_threshold, upper_threshold, epsilon = self.adjust_thresholds(
+                            num_paths, min_paths, max_paths, lower_threshold, upper_threshold, epsilon, trials)
+                        edges = cv2.Canny(gray_image, lower_threshold, upper_threshold)
                         contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                        # Simplify contours again with the adjusted epsilon
                         simplified_contours = [cv2.approxPolyDP(contour, epsilon, True) for contour in contours]
 
-                    # Limit the number of adjustment trials to prevent infinite loops
                     trials += 1
-                    if trials > 10:
+                    if trials > self.maxTrials:
                         break
+                    
+                print(f"{min_contour_area} - {trials}: {num_paths}")
+                
+                # Sort contours by their distance from the image center
+                image_center = np.array([target_width // 2, target_height // 2])
+                sorted_contours = sorted(simplified_contours, key=lambda c: np.linalg.norm(np.mean(np.squeeze(c), axis=0) - image_center))
 
-                # After finalizing the contours, print the outcome
-                print(f"Settled on an image with {num_paths} paths.")
+                # Limit the number of paths if necessary
+                if len(sorted_contours) > max_paths:
+                    simplified_contours = sorted_contours[:max_paths]
+                else:
+                    simplified_contours = sorted_contours
+
+                num_paths = len(simplified_contours)
+
+                # Print the number of paths after processing and before saving
+                print(f"Creating an image with {num_paths} paths.")
+                dwg = svgwrite.Drawing(size=(target_width, target_height))
+                num_paths = self.add_contours_to_svg(dwg, simplified_contours, scale_x, scale_y)
 
                 # Save to output folder
                 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
                 output_dir = os.path.join(parent_dir, "photos/traced")
                 os.makedirs(output_dir, exist_ok=True)
                 
-                svg_filename = os.path.splitext(os.path.basename(image_filepath))[0] + '.svg'
+                svg_filename = os.path.splitext(os.path.basename(image_filepath))[0] + suffix + '.svg'
                 svg_filepath = os.path.join(output_dir, svg_filename)
                 dwg.saveas(svg_filepath)
-
+                
                 # Return file path
                 return svg_filepath
         # Return None if the file doesn't exist or no image is loaded
@@ -212,14 +223,16 @@ class ImageParser:
         return num_paths
 
     @staticmethod
-    def adjust_thresholds(num_paths, min_paths, max_paths, lower_threshold, upper_threshold, epsilon, gray_image):
+    def adjust_thresholds(num_paths, min_paths, max_paths, lower_threshold, upper_threshold, epsilon, trial):
         # Adjusts the thresholds based on the number of paths
+        
         if num_paths < min_paths:
-            lower_threshold -= 10
-            upper_threshold -= 10
-            epsilon *= 0.9
+            lower_threshold -= 5
+            upper_threshold -= 10 
+            epsilon *= 0.85 
         elif num_paths > max_paths:
-            lower_threshold += 5
-            upper_threshold += 15
-            epsilon *= 1.1
+            lower_threshold += 5 
+            upper_threshold += 15 
+            epsilon *= 1.15
+            
         return lower_threshold, upper_threshold, epsilon
