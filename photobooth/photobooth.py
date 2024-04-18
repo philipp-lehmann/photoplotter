@@ -24,7 +24,10 @@ class PhotoBooth:
         # Logic for "Waiting" state
         parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         self.state_engine.currentPhotoPath = os.path.join(parent_dir, f"photos/snapped/test.jpg")
-        self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath)
+        self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath, min_contour_area=5, suffix='-5')
+        self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath, min_contour_area=20, suffix='-20')
+        self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath, min_contour_area=75, suffix='-75')
+        self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath, min_contour_area=200, suffix='-200')
         
         # Test and calc all positions
         # for id in range(15): 
