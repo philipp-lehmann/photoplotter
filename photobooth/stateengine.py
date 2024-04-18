@@ -4,7 +4,7 @@ import time
 class StateEngine:
     def __init__(self):
         # State
-        self.debugmode = False
+        self.debugmode = True
         self.state = "Startup"
         self.currentPhotoPath = ""
         self.currentSVGPath = ""
@@ -14,7 +14,7 @@ class StateEngine:
         self.photoID = self.totalImages
         self.transitions = {
             "Startup": ["Waiting", "Test"],
-            "Waiting": ["Tracking", "Setting"],
+            "Waiting": ["Tracking", "Setting", "Test"],
             "Tracking": ["Processing"],
             "Processing": ["Drawing", "Waiting"],
             "Drawing": ["Waiting", "ResetPending"],
