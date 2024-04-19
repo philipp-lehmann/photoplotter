@@ -69,6 +69,7 @@ class PhotoBooth:
     def process_processing(self):
         # Logic for "Drawing" state
         tempSVG = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath)
+        # tempSVG = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath, optim=True, suffix="-optim")
         startX, startY = self.state_engine.get_image_params_by_id(self.state_engine.photoID-1)
         self.state_engine.currentSVGPath = self.image_parser.create_output_svg(tempSVG, 1.0, startX, startY, self.state_engine.photoID)
         print(f"Converted to SVG: {self.state_engine.currentSVGPath}")

@@ -69,22 +69,39 @@ class ImageParser:
         enhanced_roi = cv2.cvtColor(img_yuv, cv2.COLOR_YUV2BGR)
         return enhanced_roi
 
-    def optimize_image(self, img):
-        # Convert to YUV color space
-        img_yuv = cv2.cvtColor(img, cv2.COLOR_BGR2YUV)
+    def bilateral_filter_image(self, image, d=9, sigmaColor=75, sigmaSpace=75):
+        return cv2.bilateralFilter(image, d, sigmaColor, sigmaSpace)
 
-        # Apply histogram equalization on the luminance channel
-        img_yuv[:,:,0] = cv2.equalizeHist(img_yuv[:,:,0])
+    def optimize_image(self, img):
+        # Convert to HSV color space
+        img_hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+
+        # Define skin tone range in HSV
+        lower_skin = np.array([0, 48, 80], dtype=np.uint8)
+        upper_skin = np.array([20, 255, 255], dtype=np.uint8)
+
+        # Create a mask for skin tones
+        skin_mask = cv2.inRange(img_hsv, lower_skin, upper_skin)
+        skin_mask = cv2.GaussianBlur(skin_mask, (9, 9), 0) 
+
+        # Increase contrast in the skin tone areas
+        contrast_enhancer = cv2.createCLAHE(clipLimit=0.3, tileGridSize=(8, 8)) 
+        enhanced_channel = contrast_enhancer.apply(img_hsv[:,:,2])
+        img_hsv[:,:,2] = cv2.addWeighted(img_hsv[:,:,2], 0.8, enhanced_channel, 0.2, 0) 
 
         # Convert back to BGR color space
-        img_output = cv2.cvtColor(img_yuv, cv2.COLOR_YUV2BGR)
+        img_output = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2BGR)
 
-        # Optionally, apply additional enhancements like HDR effect here
+        # Apply histogram equalization on the luminance channel in YUV space
+        img_yuv = cv2.cvtColor(img_output, cv2.COLOR_BGR2YUV)
+        img_yuv[:,:,0] = cv2.equalizeHist(img_yuv[:,:,0])
+        img_output = cv2.cvtColor(img_yuv, cv2.COLOR_YUV2BGR)
 
         # Return the optimized image
         return img_output
 
-    def convert_to_svg(self, image_filepath, target_width=640, target_height=640, scale_x=0.35, scale_y=0.35, min_paths=30, max_paths=90, min_contour_area=20, suffix=''):
+
+    def convert_to_svg(self, image_filepath, target_width=640, target_height=640, scale_x=0.35, scale_y=0.35, min_paths=30, max_paths=90, min_contour_area=20, blur=False, suffix=''):
         print("Converting current photo to SVG")
         if os.path.isfile(image_filepath):
             # Load the image using OpenCV
@@ -94,17 +111,15 @@ class ImageParser:
                 image = cv2.resize(image, (target_width, target_height))
                 
                 opt_image = self.optimize_image(image)
+                if blur == True:
+                    opt_image = self.bilateral_filter_image(opt_image)
+                    
                 optimized_image_path = image_filepath.rsplit('.', 1)[0] + '_optimized.' + image_filepath.rsplit('.', 1)[1]
-                cv2.imwrite(optimized_image_path, opt_image)
-                # print(f"Optimized image saved to: {optimized_image_path}")
-                
-                # opt_image = self.enhance_faces(opt_image)
-                # optimized_image_path = image_filepath.rsplit('.', 1)[0] + '_optimized_faces.' + image_filepath.rsplit('.', 1)[1]
-                # cv2.imwrite(optimized_image_path, opt_image)
-                # print(f"Optimized image saved to: {optimized_image_path}")
+                cv2.imwrite(optimized_image_path, opt_image)               
                 
                 # Convert the image to grayscale for edge detection
                 gray_image = cv2.cvtColor(opt_image, cv2.COLOR_BGR2GRAY)
+               
                 # Perform initial edge detection
                 edges = cv2.Canny(gray_image, threshold1=80, threshold2=200)
                 # Find initial contours based on edges
