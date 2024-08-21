@@ -58,6 +58,32 @@ class ImageParser:
         enhanced_image = cv2.addWeighted(image, 1, mask_for_blending, 0.5, 0)
 
         return enhanced_image
+    
+    def crop_to_largest_face(self, image, target_width, target_height):
+        # Detect faces in the image
+        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        faces = face_cascade.detectMultiScale(gray_image, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+
+        if len(faces) == 0:
+            return None  # No faces detected
+
+        # Find the largest face
+        largest_face = max(faces, key=lambda rect: rect[2] * rect[3])
+        x, y, w, h = largest_face
+
+        # Calculate the square crop region around the largest face
+        face_center_x, face_center_y = x + w // 2, y + h // 2
+        crop_size = max(w, h, target_width, target_height)
+
+        x_start = max(face_center_x - crop_size // 2, 0)
+        y_start = max(face_center_y - crop_size // 2, 0)
+        x_end = min(x_start + crop_size, image.shape[1])
+        y_end = min(y_start + crop_size, image.shape[0])
+
+        # Crop the image to a square around the largest face
+        cropped_image = image[y_start:y_end, x_start:x_end]
+        return cv2.resize(cropped_image, (target_width, target_height))
 
     def apply_local_enhancements(self, roi):
         # Convert to YUV color space
@@ -84,52 +110,45 @@ class ImageParser:
         # Return the optimized image
         return img_output
 
-    def convert_to_svg(self, image_filepath, target_width=640, target_height=640, scale_x=0.35, scale_y=0.35, min_paths=30, max_paths=90, min_contour_area=20, suffix=''):
+    def convert_to_svg(self, image_filepath, target_width=800, target_height=800, scale_x=0.35, scale_y=0.35, min_paths=30, max_paths=90, min_contour_area=20, suffix=''):
         print("Converting current photo to SVG")
         if os.path.isfile(image_filepath):
             # Load the image using OpenCV
             image = cv2.imread(image_filepath)
             if image is not None:
+                # Detect faces and crop around the largest face
+                image = self.crop_to_largest_face(image, target_width, target_height)
+                if image is None:
+                    print("No face found. Proceeding with the original image.")
+                    image = cv2.imread(image_filepath)  # Reload the original image if no face is found
+                
                 # Resize the image to the target dimensions
                 image = cv2.resize(image, (target_width, target_height))
                 
+                # Optimize the image
                 opt_image = self.optimize_image(image)
                 optimized_image_path = image_filepath.rsplit('.', 1)[0] + '_optimized.' + image_filepath.rsplit('.', 1)[1]
                 cv2.imwrite(optimized_image_path, opt_image)
-                # print(f"Optimized image saved to: {optimized_image_path}")
                 
-                # opt_image = self.enhance_faces(opt_image)
-                # optimized_image_path = image_filepath.rsplit('.', 1)[0] + '_optimized_faces.' + image_filepath.rsplit('.', 1)[1]
-                # cv2.imwrite(optimized_image_path, opt_image)
-                # print(f"Optimized image saved to: {optimized_image_path}")
-                
-                # Convert the image to grayscale for edge detection
+                # Convert the optimized image to SVG
                 gray_image = cv2.cvtColor(opt_image, cv2.COLOR_BGR2GRAY)
-                # Perform initial edge detection
                 edges = cv2.Canny(gray_image, threshold1=80, threshold2=200)
-                # Find initial contours based on edges
                 contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                # Filter out small contours
                 filtered_contours = [contour for contour in contours if cv2.contourArea(contour) > min_contour_area]
-
-                # Initially simplify contours to reduce complexity
                 simplified_contours = [cv2.approxPolyDP(contour, 1, True) for contour in filtered_contours]
 
-                # Initialize variables for the adjustment loop
+                # Optimization loop for paths
                 num_paths = 0
                 trials = 0
                 lower_threshold = 80
                 upper_threshold = 200
                 epsilon = 1
 
-                # Loop to adjust thresholds until the number of paths is within desired range
-                # Adjustment loop
                 while num_paths < min_paths or num_paths > max_paths:
                     dwg = svgwrite.Drawing(size=(target_width, target_height))
                     num_paths = self.add_contours_to_svg(dwg, simplified_contours, scale_x, scale_y)
 
                     if num_paths < min_paths or num_paths > max_paths:
-                        print(f"{min_contour_area} - {trials}: {num_paths}")
                         lower_threshold, upper_threshold, epsilon = self.adjust_thresholds(
                             num_paths, min_paths, max_paths, lower_threshold, upper_threshold, epsilon, trials)
                         edges = cv2.Canny(gray_image, lower_threshold, upper_threshold)
@@ -139,27 +158,16 @@ class ImageParser:
                     trials += 1
                     if trials > self.maxTrials:
                         break
-                    
-                print(f"{min_contour_area} - {trials}: {num_paths}")
-                
-                # Sort contours by their distance from the image center
+
+                # Sort contours by distance from center and limit paths if necessary
                 image_center = np.array([target_width // 2, target_height // 2])
                 sorted_contours = sorted(simplified_contours, key=lambda c: np.linalg.norm(np.mean(np.squeeze(c), axis=0) - image_center))
 
-                # Limit the number of paths if necessary
-                if len(sorted_contours) > max_paths:
-                    simplified_contours = sorted_contours[:max_paths]
-                else:
-                    simplified_contours = sorted_contours
-
-                num_paths = len(simplified_contours)
-
-                # Print the number of paths after processing and before saving
-                print(f"Creating an image with {num_paths} paths.")
+                simplified_contours = sorted_contours[:max_paths] if len(sorted_contours) > max_paths else sorted_contours
                 dwg = svgwrite.Drawing(size=(target_width, target_height))
-                num_paths = self.add_contours_to_svg(dwg, simplified_contours, scale_x, scale_y)
+                self.add_contours_to_svg(dwg, simplified_contours, scale_x, scale_y)
 
-                # Save to output folder
+                # Save the SVG
                 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
                 output_dir = os.path.join(parent_dir, "photos/traced")
                 os.makedirs(output_dir, exist_ok=True)
@@ -168,9 +176,8 @@ class ImageParser:
                 svg_filepath = os.path.join(output_dir, svg_filename)
                 dwg.saveas(svg_filepath)
                 
-                # Return file path
                 return svg_filepath
-        # Return None if the file doesn't exist or no image is loaded
+
         return None
 
     def create_output_svg(self, image_svg_path, scale_factor = 0.8, offset_x=0, offset_y=0, id=0):
