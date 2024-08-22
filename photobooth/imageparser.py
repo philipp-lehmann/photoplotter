@@ -66,12 +66,12 @@ class ImageParser:
         
         return eyes, nose, mouth
     
-    def crop_to_largest_face(self, image, target_width, target_height, margin_percentage=0.20):
+    def crop_to_largest_face(self, image, target_width, target_height, margin_percentage=0.30):
         # Load the face cascade classifier
         face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
         
          # Enhance details in the image
-        enhanced_image = cv2.detailEnhance(image, sigma_s=10, sigma_r=0.55)
+        enhanced_image = cv2.detailEnhance(image, sigma_s=10, sigma_r=0.255)
         
         # Convert the enhanced image to grayscale for face detection
         enhanced_gray_image = cv2.cvtColor(enhanced_image, cv2.COLOR_BGR2GRAY)
@@ -91,18 +91,6 @@ class ImageParser:
         # Create a mask for the face region
         face_mask = np.zeros_like(enhanced_gray_image)
         face_mask[y:y+h, x:x+w] = 255
-
-        # Enhance contrast in the face region
-        face_region = image[y:y+h, x:x+w]
-        gray_face_region = enhanced_gray_image[y:y+h, x:x+w]
-
-        # Use CLAHE for contrast enhancement
-        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-        enhanced_face_region = clahe.apply(gray_face_region)
-        # enhanced_face_region = cv2.cvtColor(enhanced_face_region, cv2.COLOR_GRAY2BGR)
-
-        # Replace the original face region with the enhanced one
-        # image[y:y+h, x:x+w] = enhanced_face_region
 
         # Calculate the new crop region
         crop_size = max(w, h) + 2 * margin
@@ -134,30 +122,34 @@ class ImageParser:
         cropped_image = image[y_start:y_end, x_start:x_end]
         return cv2.resize(cropped_image, (target_width, target_height))
 
-    def apply_local_enhancements(self, roi):
-        # Convert to YUV color space
-        img_yuv = cv2.cvtColor(roi, cv2.COLOR_BGR2YUV)
-        # Apply CLAHE to the Y channel
-        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-        img_yuv[:, :, 0] = clahe.apply(img_yuv[:, :, 0])
-        # Convert back to BGR color space
-        enhanced_roi = cv2.cvtColor(img_yuv, cv2.COLOR_YUV2BGR)
-        return enhanced_roi
+    def optimize_image(self, img, dilation_iterations=5, erosion_iterations=0):
 
-    def optimize_image(self, img):
-        # Convert to YUV color space
-        img_yuv = cv2.cvtColor(img, cv2.COLOR_BGR2YUV)
+        # Step 1: Prepare the mask for GrabCut
+        mask = np.zeros(img.shape[:2], np.uint8)
+        bg_model = np.zeros((1, 65), np.float64)
+        fg_model = np.zeros((1, 65), np.float64)
+        
+        # Define a rectangle around the object of interest (foreground)
+        rect = (40, 40, img.shape[1] - 80, img.shape[0] - 80)
 
-        # Apply histogram equalization on the luminance channel
+        # Apply GrabCut
+        cv2.grabCut(img, mask, rect, bg_model, fg_model, iterCount=5, mode=cv2.GC_INIT_WITH_RECT)
+
+        # Modify the mask: Invert mask values
+        # Foreground (0 and 2) will be set to 0, and background (1 and 3) will be set to 1
+        mask2 = np.where((mask == 0) | (mask == 2), 0, 1).astype('uint8')
+
+        # Step 2: Extract the background using the inverted mask
+        # The foreground will be black (0), and the background will be preserved
+        background = img * mask2[:, :, np.newaxis]
+
+        # Convert to YUV for contrast enhancement
+        img_yuv = cv2.cvtColor(background, cv2.COLOR_BGR2YUV)
         img_yuv[:,:,0] = cv2.equalizeHist(img_yuv[:,:,0])
-
-        # Convert back to BGR color space
         img_output = cv2.cvtColor(img_yuv, cv2.COLOR_YUV2BGR)
 
-        # Optionally, apply additional enhancements like HDR effect here
-
-        # Return the optimized image
         return img_output
+
 
     def convert_to_svg(self, image_filepath, target_width=800, target_height=800, scale_x=0.35, scale_y=0.35, min_paths=30, max_paths=90, min_contour_area=20, suffix=''):
         print("Converting current photo to SVG")

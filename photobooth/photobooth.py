@@ -45,7 +45,7 @@ class PhotoBooth:
         # Example: Process each photo
         for photo_path in photo_files:
             self.state_engine.currentPhotoPath = photo_path
-            self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(photo_path, min_contour_area=60, suffix='')
+            self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(photo_path, min_contour_area=0, suffix='')
         
         # Test and calc all positions
         # for id in range(15): 
@@ -62,10 +62,6 @@ class PhotoBooth:
         # tempsvg = self.image_parser.create_output_svg(self.state_engine.currentSVGPath, 1.0, startX, startY, id)
         # self.plotter.plot_image(tempsvg)
         
-        
-        # Create test image
-        # print(f"Positioning SVG: {self.state_engine.currentSVGPath}")
-        # self.state_engine.change_state("Drawing")
         exit()
         pass
     
