@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Comparison Viewer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+
+        .image-triplet {
+            display: flex;
+            justify-content: center;
+            margin: 20px 0;
+        }
+
+        .image-triplet img {
+            max-width: 300px;
+            max-height: 300px;
+            margin: 0 10px;
+            border: 2px solid #ddd;
+        }
+
+        .image-triplet .missing {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 300px;
+            height: 300px;
+            margin: 0 10px;
+            border: 2px dashed #ddd;
+            color: #aaa;
+        }
+
+        .svgbox {
+            width: 200px;
+            height: 200px;
+        }
+
+        .svgbox svg {
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Image Comparison Viewer</h1>
+    <div>
+        {% for triplet in triplets %}
+        <div class="image-triplet">
+            <!-- Display the original image -->
+            <img src="{{ url_for('serve_snapped_image', filename=triplet.original) }}" alt="Original Image">
+
+            <!-- Display the optimized image if it exists -->
+            {% if triplet.optimized %}
+            <img src="{{ url_for('serve_snapped_image', filename=triplet.optimized) }}" alt="Optimized Image">
+            {% else %}
+            <div class="missing">No Optimized Image</div>
+            {% endif %}
+
+            <!-- Display the traced SVG if it exists -->
+            {% if triplet.traced %}
+            <div class="svgbox">
+            <object data="{{ url_for('serve_traced_image', filename=triplet.traced) }}" type="image/svg+xml"
+                alt="Traced SVG"></object>
+            </div>
+            {% else %}
+            <div class="missing">No Traced SVG</div>
+            {% endif %}
+
+        </div>
+        {% endfor %}
+    </div>
+
+</body>
+
+</html>

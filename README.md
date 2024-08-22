@@ -93,6 +93,7 @@ pip install Pillow
 pip install lxml
 pip install numpy
 pip install paho-mqtt
+pip install flask # for output preview
 
 python -m pip install https://cdn.evilmadscientist.com/dl/ad/public/AxiDraw_API.zip
 ```

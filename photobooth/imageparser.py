@@ -33,55 +33,104 @@ class ImageParser:
         else:
             print("No faces detected in the image.")
             return False
-        
-    def enhance_faces(self, image):
-        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-        gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        faces = face_cascade.detectMultiScale(gray_image, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
-
-        mask = np.zeros_like(image)
-
-        for (x, y, w, h) in faces:
-            center = (x + w//2, y + h//2)
-            axes = (w//2, h//2)  # width and height of the ellipse axes
-            mask = cv2.ellipse(mask, center, axes, 0, 0, 360, (255, 255, 255), -1)
-
-        # Soften the edges of the mask
-        blurred_mask = cv2.GaussianBlur(mask, (15, 15), 0)
-
-        # Create a 3-channel mask for color image blending
-        mask_channels = cv2.split(blurred_mask)
-        mask_for_blending = cv2.merge(mask_channels)
-
-        # Blend the original image with the mask using a weighted sum
-        # Note: ensure the masks and image are of the same data type (e.g., uint8)
-        enhanced_image = cv2.addWeighted(image, 1, mask_for_blending, 0.5, 0)
-
-        return enhanced_image
     
-    def crop_to_largest_face(self, image, target_width, target_height):
-        # Detect faces in the image
+    
+    def detect_facial_features(self, image, face_rect):
+        # Load Haar cascades for facial features
+        base_path = os.path.dirname(os.path.abspath(__file__))
+        eye_cascade_path = os.path.join(base_path, 'haarcascades', 'eye.xml')
+        nose_cascade_path = os.path.join(base_path, 'haarcascades', 'nose.xml')
+        mouth_cascade_path = os.path.join(base_path, 'haarcascades', 'mouth.xml')
+
+        eye_cascade = cv2.CascadeClassifier(eye_cascade_path)
+        nose_cascade = cv2.CascadeClassifier(nose_cascade_path)
+        mouth_cascade = cv2.CascadeClassifier(mouth_cascade_path)
+
+        if eye_cascade.empty():
+            print("Error: Eye cascade file not found or cannot be loaded.")
+        if nose_cascade.empty():
+            print("Error: Nose cascade file not found or cannot be loaded.")
+        if mouth_cascade.empty():
+            print("Error: Mouth cascade file not found or cannot be loaded.")
+        
+        x, y, w, h = face_rect
+        face_region = image[y:y+h, x:x+w]
+        
+        # Convert face region to grayscale
+        gray_face_region = cv2.cvtColor(face_region, cv2.COLOR_BGR2GRAY)
+        
+        # Detect eyes, nose, and mouth
+        eyes = eye_cascade.detectMultiScale(gray_face_region, scaleFactor=1.1, minNeighbors=5)
+        nose = nose_cascade.detectMultiScale(gray_face_region, scaleFactor=1.1, minNeighbors=5) if not nose_cascade.empty() else []
+        mouth = mouth_cascade.detectMultiScale(gray_face_region, scaleFactor=1.1, minNeighbors=5) if not mouth_cascade.empty() else []
+        
+        return eyes, nose, mouth
+    
+    def crop_to_largest_face(self, image, target_width, target_height, margin_percentage=0.20):
+        # Load the face cascade classifier
         face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-        gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        faces = face_cascade.detectMultiScale(gray_image, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+        
+         # Enhance details in the image
+        enhanced_image = cv2.detailEnhance(image, sigma_s=10, sigma_r=0.55)
+        
+        # Convert the enhanced image to grayscale for face detection
+        enhanced_gray_image = cv2.cvtColor(enhanced_image, cv2.COLOR_BGR2GRAY)
+
+        # Detect faces
+        faces = face_cascade.detectMultiScale(enhanced_gray_image, scaleFactor=1.1, minNeighbors=5, minSize=(2, 2))
 
         if len(faces) == 0:
             return None  # No faces detected
 
-        # Find the largest face
         largest_face = max(faces, key=lambda rect: rect[2] * rect[3])
         x, y, w, h = largest_face
+        margin = int(max(w, h) * margin_percentage)
 
-        # Calculate the square crop region around the largest face
-        face_center_x, face_center_y = x + w // 2, y + h // 2
-        crop_size = max(w, h, target_width, target_height)
+        eyes, nose, mouth = self.detect_facial_features(image, largest_face)
 
-        x_start = max(face_center_x - crop_size // 2, 0)
-        y_start = max(face_center_y - crop_size // 2, 0)
-        x_end = min(x_start + crop_size, image.shape[1])
-        y_end = min(y_start + crop_size, image.shape[0])
+        # Create a mask for the face region
+        face_mask = np.zeros_like(enhanced_gray_image)
+        face_mask[y:y+h, x:x+w] = 255
 
-        # Crop the image to a square around the largest face
+        # Enhance contrast in the face region
+        face_region = image[y:y+h, x:x+w]
+        gray_face_region = enhanced_gray_image[y:y+h, x:x+w]
+
+        # Use CLAHE for contrast enhancement
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        enhanced_face_region = clahe.apply(gray_face_region)
+        # enhanced_face_region = cv2.cvtColor(enhanced_face_region, cv2.COLOR_GRAY2BGR)
+
+        # Replace the original face region with the enhanced one
+        # image[y:y+h, x:x+w] = enhanced_face_region
+
+        # Calculate the new crop region
+        crop_size = max(w, h) + 2 * margin
+        crop_size = min(crop_size, image.shape[0], image.shape[1])
+
+        if len(eyes) > 0 or len(nose) > 0 or len(mouth) > 0:
+            features_x = [x + ex for (ex, ey, ew, eh) in eyes] + [x + nx for (nx, ny, nw, nh) in nose] + [x + mx for (mx, my, mw, mh) in mouth]
+            features_y = [y + ey for (ex, ey, ew, eh) in eyes] + [y + ny for (nx, ny, nw, nh) in nose] + [y + my for (mx, my, mw, mh) in mouth]
+            x_center = int(np.mean(features_x))
+            y_center = int(np.mean(features_y))
+
+            x_start = max(x_center - crop_size // 2, 0)
+            y_start = max(y_center - crop_size // 2, 0)
+            x_end = min(x_start + crop_size, image.shape[1])
+            y_end = min(y_start + crop_size, image.shape[0])
+
+            if x_end - x_start < crop_size:
+                x_start = max(image.shape[1] - crop_size, 0)
+                x_end = image.shape[1]
+            if y_end - y_start < crop_size:
+                y_start = max(image.shape[0] - crop_size, 0)
+                y_end = image.shape[0]
+        else:
+            x_start = max(x + w // 2 - crop_size // 2, 0)
+            y_start = max(y + h // 2 - crop_size // 2, 0)
+            x_end = min(x_start + crop_size, image.shape[1])
+            y_end = min(y_start + crop_size, image.shape[0])
+
         cropped_image = image[y_start:y_end, x_start:x_end]
         return cv2.resize(cropped_image, (target_width, target_height))
 

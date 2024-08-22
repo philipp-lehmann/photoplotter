@@ -4,6 +4,8 @@ from .plotter import Plotter
 from .imageparser import ImageParser
 import time
 import os
+import glob
+
 
 class PhotoBooth:
     def __init__(self):
@@ -20,11 +22,30 @@ class PhotoBooth:
         self.state_engine.change_state("Waiting")
         pass
     
+    
+    def get_test_photos(self, snapped_folder):
+        # Define the pattern to match all image files except those ending in _optimized.png
+        pattern = os.path.join(snapped_folder, "*[!_optimized].jpg")  # or use *.png for PNG images
+
+        # Get all matching files
+        photo_files = glob.glob(pattern)
+
+        # Filter out any that explicitly match the full optimized filename pattern
+        photo_files = [f for f in photo_files if not f.endswith('_optimized.png')]
+
+        return photo_files
+
     def process_test(self):
-        # Logic for "Waiting" state
         parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        self.state_engine.currentPhotoPath = os.path.join(parent_dir, f"photos/snapped/image_20240416_123309.jpg")
-        self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath, min_contour_area=5, suffix='-5')
+        snapped_folder = os.path.join(parent_dir, "photos/snapped")
+
+        # Get all valid photo files excluding the optimized ones
+        photo_files = self.get_test_photos(snapped_folder)
+
+        # Example: Process each photo
+        for photo_path in photo_files:
+            self.state_engine.currentPhotoPath = photo_path
+            self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(photo_path, min_contour_area=60, suffix='')
         
         # Test and calc all positions
         # for id in range(15): 
