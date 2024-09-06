@@ -72,7 +72,7 @@ def display_image_based_on_state(LCD, state):
     # Configuration for each state with paths, timings, and loop settings
     state_config = {
         "Waiting": {
-            "images": ["assets/Ready-3.jpg", "assets/Ready-2.jpg", "assets/Ready-1.jpg"],
+            "images": ["assets/Ready.jpg"],
             "display_time": 0.5,
             "loop": False
         },
@@ -83,11 +83,6 @@ def display_image_based_on_state(LCD, state):
         },
         "Processing": {
             "images": ["assets/Processing-1.jpg", "assets/Processing-2.jpg", "assets/Processing-3.jpg", "assets/Processing-4.jpg"],
-            "display_time": 0.1,
-            "loop": False
-        },
-        "Drawing": {
-            "images": ["assets/Drawing-04.jpg", "assets/Drawing-03.jpg", "assets/Drawing-02.jpg", "assets/Drawing-01.jpg"],
             "display_time": 0.1,
             "loop": False
         },
