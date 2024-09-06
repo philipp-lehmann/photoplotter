@@ -55,6 +55,10 @@ class PhotoBooth:
         # Logic for "Waiting" state
         pass
     
+    def process_working(self):
+        # Logic to draw pattern
+        pass
+    
     def process_tracking(self):
         # Logic for "Tracking" state
         image_path = self.camera.snap_image()
@@ -83,7 +87,7 @@ class PhotoBooth:
         
         # Check if all available spots for images have been drawn
         if self.state_engine.photoID > 0:
-            self.state_engine.change_state("Waiting")
+            self.state_engine.change_state("Working")
         else:
             self.state_engine.change_state("ResetPending") 
             print(f"All photos printed, changing state to 'ResetPending'.")
@@ -100,6 +104,7 @@ class PhotoBooth:
         state_actions = {
             "Startup": self.process_startup,
             "Waiting": self.process_waiting,
+            "Working": self.process_working,
             "Tracking": self.process_tracking,
             "Processing": self.process_processing,
             "Drawing": self.process_drawing,

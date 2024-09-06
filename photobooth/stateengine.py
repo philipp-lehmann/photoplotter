@@ -14,10 +14,11 @@ class StateEngine:
         self.photoID = self.totalImages
         self.transitions = {
             "Startup": ["Waiting", "Test"],
-            "Waiting": ["Tracking"],
+            "Waiting": ["Working", "Tracking"],
+            "Working": ["Tracking", "Waiting"],
             "Tracking": ["Processing"],
             "Processing": ["Drawing", "Waiting"],
-            "Drawing": ["Waiting", "ResetPending"],
+            "Drawing": ["Working", "ResetPending"],
             "ResetPending": ["Waiting"], 
             "Test": ["Waiting", "Drawing"]
         }
@@ -116,7 +117,9 @@ class StateEngine:
         print(f"Received message on topic '{msg.topic}': {msg.payload.decode()}")
         
         # Handler for each state
-        if self.state == "Waiting":
+        if self.state == "Working":
+            self.change_state("Waiting")
+        elif self.state == "Waiting":
             self.change_state("Tracking")
         elif self.state == "ResetPending":
             print("Reset confirmed")
