@@ -87,7 +87,7 @@ class PhotoBooth:
         
         # Check if all available spots for images have been drawn
         if self.state_engine.photoID > 0:
-            self.state_engine.change_state("Working")
+            self.state_engine.change_state("Waiting")
         else:
             self.state_engine.change_state("ResetPending") 
             print(f"All photos printed, changing state to 'ResetPending'.")
