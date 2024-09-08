@@ -21,7 +21,7 @@ client.connect(broker_address)
 # Display images
 # ------------------------------------------------------------------------
 def display_default_image(LCD):
-    default_image_path = 'assets/Waiting.jpg'
+    default_image_path = 'assets/display/Waiting.jpg'
     try:
         image = Image.open(default_image_path)
         rotated_image = image.rotate(-90, expand=True) 
@@ -72,32 +72,32 @@ def display_image_based_on_state(LCD, state):
     # Configuration for each state with paths, timings, and loop settings
     state_config = {
         "Waiting": {
-            "images": ["assets/Ready.jpg"],
+            "images": ["assets/display/Ready.jpg"],
             "display_time": 0.5,
             "loop": False
         },
         "Working": {
-            "images": ["assets/Working-4.jpg", "assets/Working-3.jpg", "assets/Working-2.jpg", "assets/Working-1.jpg"],
+            "images": ["assets/display/Working-4.jpg", "assets/display/Working-3.jpg", "assets/display/Working-2.jpg", "assets/display/Working-1.jpg"],
             "display_time": 0.5,
             "loop": False
         },
         "Tracking": {
-            "images": ["assets/Tracking-4.jpg", "assets/Tracking-3.jpg", "assets/Tracking-2.jpg", "assets/Tracking-1.jpg"],
+            "images": ["assets/display/Tracking-4.jpg", "assets/display/Tracking-3.jpg", "assets/display/Tracking-2.jpg", "assets/display/Tracking-1.jpg"],
             "display_time": 1,
             "loop": False
         },
         "Processing": {
-            "images": ["assets/Processing-1.jpg", "assets/Processing-2.jpg", "assets/Processing-3.jpg", "assets/Processing-4.jpg"],
+            "images": ["assets/display/Processing-1.jpg", "assets/display/Processing-2.jpg", "assets/display/Processing-3.jpg", "assets/display/Processing-4.jpg"],
             "display_time": 0.1,
             "loop": False
         },
         "ResetPending": {
-            "images": ["assets/ResetPending.jpg"],
+            "images": ["assets/display/ResetPending.jpg"],
             "display_time": 1,
             "loop": False
         },
         "Test": {
-            "images": ["assets/Test.jpg"],
+            "images": ["assets/display/Test.jpg"],
             "display_time": 1,
             "loop": False
         },
@@ -109,7 +109,7 @@ def display_image_based_on_state(LCD, state):
     # Loop through the range and create a unique key for each "Drawing" state
     for i in range(1, num_images + 1):
         state_config[f"Drawing-{i:02}"] = {
-            "images": [f"assets/Drawing-{i:02}.jpg"],
+            "images": [f"assets/display/Drawing-{i:02}.jpg"],
             "display_time": 0.1,
             "loop": False
         }

@@ -23,7 +23,7 @@ class PhotoBooth:
     def process_test(self):
         # Logic for "Waiting" state
         parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        self.state_engine.currentPhotoPath = os.path.join(parent_dir, f"photos/snapped/test.jpg")
+        self.state_engine.currentPhotoPath = os.path.join(parent_dir, f"photos/snapped/image_20240906_214205.jpg")
         self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath, min_contour_area=5, suffix='-5')
         self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath, min_contour_area=20, suffix='-20')
         self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath, min_contour_area=75, suffix='-75')
@@ -33,7 +33,7 @@ class PhotoBooth:
         # for id in range(15): 
         #     startX, startY = self.state_engine.get_image_params_by_id(id)
         #     print(f"ID {id}: Position X {startX} / {startY}")
-        #     tempsvg = self.image_parser.create_output_svg(self.state_engine.currentSVGPath, 1.0, startX, startY, id)
+        #     tempsvg = self.image_parser.create_output_svg(self.state_engine.currentSVGPath, "test-", 1.0, startX, startY, id)
         #     self.plotter.plot_image(tempsvg)
         #     time.sleep(1)
         
@@ -41,7 +41,7 @@ class PhotoBooth:
         # id = 13
         # startX, startY = self.state_engine.get_image_params_by_id(id)
         # print(f"ID {id}: Position X {startX} / {startY}")
-        # tempsvg = self.image_parser.create_output_svg(self.state_engine.currentSVGPath, 1.0, startX, startY, id)
+        # tempsvg = self.image_parser.create_output_svg(self.state_engine.currentSVGPath, "test-", 1.0, startX, startY, id)
         # self.plotter.plot_image(tempsvg)
         
         
@@ -56,7 +56,16 @@ class PhotoBooth:
         pass
     
     def process_working(self):
-        # Logic to draw pattern
+        # Logic to retrieve work pattern and create output svg
+        parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        self.state_engine.currentWorkPath = os.path.join(parent_dir, f"assets/work/work-01.svg")
+        startX, startY = self.state_engine.get_image_params_by_id(self.state_engine.photoID-1)
+        self.state_engine.currentSVGPath = self.image_parser.create_output_svg(self.state_engine.currentWorkPath, "work-", 1.0, startX, startY, self.state_engine.photoID)
+        
+        print(f"Converted Work pattern to SVG: {self.state_engine.currentSVGPath}")
+        self.plotter.plot_image(self.state_engine.currentSVGPath)
+        time.sleep(3)
+        self.state_engine.change_state("Tracking")
         pass
     
     def process_tracking(self):
@@ -75,7 +84,7 @@ class PhotoBooth:
         tempSVG = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath)
         # tempSVG = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath, optim=True, suffix="-optim")
         startX, startY = self.state_engine.get_image_params_by_id(self.state_engine.photoID-1)
-        self.state_engine.currentSVGPath = self.image_parser.create_output_svg(tempSVG, 1.0, startX, startY, self.state_engine.photoID)
+        self.state_engine.currentSVGPath = self.image_parser.create_output_svg(tempSVG, "image-", 1.0, startX, startY, self.state_engine.photoID)
         print(f"Converted to SVG: {self.state_engine.currentSVGPath}")
         self.state_engine.change_state("Drawing")
         pass

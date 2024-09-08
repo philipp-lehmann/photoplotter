@@ -7,6 +7,7 @@ class StateEngine:
         self.debugmode = False
         self.state = "Startup"
         self.currentPhotoPath = ""
+        self.currentWorkPath = ""
         self.currentSVGPath = ""
         self.imagesPerRow = 5
         self.imagesPerColumn = 3
@@ -118,7 +119,6 @@ class StateEngine:
         
         # Handler for each state
         if self.state == "Waiting":
-            time.sleep(3)
             self.change_state("Working")
         elif self.state == "Working":
             self.change_state("Tracking")

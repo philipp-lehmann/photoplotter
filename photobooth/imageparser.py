@@ -186,7 +186,7 @@ class ImageParser:
         # Return None if the file doesn't exist or no image is loaded
         return None
 
-    def create_output_svg(self, image_svg_path, scale_factor = 0.8, offset_x=0, offset_y=0, id=0):
+    def create_output_svg(self, image_svg_path, imgname = 'image', scale_factor = 0.8, offset_x=0, offset_y=0, id=0):
         # Load the original SVG content from a file
         with open(image_svg_path, 'rb') as file:  # Note 'rb' mode for reading as bytes
             svg_data = file.read()
@@ -220,7 +220,7 @@ class ImageParser:
         os.makedirs(output_dir, exist_ok=True)  # Create the directory if it doesn't exist
         
         # svg_filename = os.path.splitext(os.path.basename(image_svg_path))[0] + str(id) + '.svg'
-        svg_filename = 'temp-' + str(id) + '.svg'
+        svg_filename = imgname + str(id) + '.svg'
         output_svg_path = os.path.join(output_dir, svg_filename)  # This is your absolute path for the SVG file
         dwg.saveas(output_svg_path)
 
