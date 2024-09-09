@@ -15,7 +15,7 @@ class StateEngine:
         self.workID = 0
         self.photoID = self.totalImages
         self.transitions = {
-            "Startup": ["Waiting", "Test"],
+            "Startup": ["Waiting", "ResetPending", "Test"],
             "Waiting": ["Working"],
             "Working": ["Tracking"],
             "Tracking": ["Processing", "Working"],

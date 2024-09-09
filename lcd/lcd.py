@@ -124,8 +124,7 @@ def display_image_based_on_state(LCD, state):
 # Messages
 # ------------------------------------------------------------------------
 def on_message(client, userdata, message):
-    print(f"Received message on topic '{message.topic}': {message.payload.decode()}")
-
+    # print(f"Received message on topic '{message.topic}': {message.payload.decode()}")
     if message.topic == "state_engine/state":
         state = message.payload.decode()
         print(f"{state}")
