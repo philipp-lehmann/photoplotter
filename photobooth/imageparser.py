@@ -18,7 +18,7 @@ class ImageParser:
         image = cv2.imread(image_filepath)
         if image is None:
             print("Failed to load image.")
-            return False
+            return 0  # Return 0 as confidence if the image is not loaded
         
         # Convert the image to grayscale (required for face detection)
         gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -27,12 +27,26 @@ class ImageParser:
         faces = face_cascade.detectMultiScale(gray_image, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
         
         # Check if any faces are detected
-        if len(faces) > 0:
-            print(f"Detected {len(faces)} face(s) in the image.")
-            return True
-        else:
-            print("No faces detected in the image.")
+        if len(faces) == 0:
             return False
+        else:
+            print(f"Detected {len(faces)} face(s) in the image.")
+            
+            # Calculate confidence score based on the largest detected face area
+            largest_face_area = max([w * h for (x, y, w, h) in faces])
+            image_area = image.shape[0] * image.shape[1]
+            
+            # Confidence calculation (heuristic)
+            confidence = (largest_face_area / image_area) * 100
+            confidence = min(confidence, 100)
+            
+            if confidence < 1.0:
+                return False
+            else: 
+                print(f"Confidence score: {confidence:.2f}")
+                return True
+                
+            
         
     def enhance_faces(self, image):
         face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')

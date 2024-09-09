@@ -53,6 +53,8 @@ class PhotoBooth:
     
     def process_waiting(self):
         # Logic for "Waiting" state
+        time.sleep(4)
+        self.state_engine.change_state("Working")
         pass
     
     def process_working(self):
