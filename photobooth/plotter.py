@@ -38,7 +38,6 @@ class Plotter:
         if os.path.exists(svg_path):
             if self.plotter_found:
                 print("Plotter: Plotting image.")
-
                 self.ad.options.model = 2
                 self.ad.update()
                 print(f"AxiDraw connected. Model: {self.ad.options.model}" )

@@ -34,6 +34,7 @@ class PhotoBooth:
     
     def process_working(self):
         # Logic to retrieve work pattern and create output svg
+        time.sleep(4)
         parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         self.state_engine.currentWorkPath = os.path.join(parent_dir, f"assets/work/work-01.svg")
         startX, startY = self.state_engine.get_image_params_by_id(self.state_engine.photoID-1)
@@ -41,12 +42,13 @@ class PhotoBooth:
         
         print(f"Converted Work pattern to SVG: {self.state_engine.currentSVGPath}")
         self.plotter.plot_image(self.state_engine.currentSVGPath)
-        time.sleep(4)
+        
         self.state_engine.change_state("Tracking")
         pass
     
     def process_tracking(self):
         # Logic for "Tracking" state
+        time.sleep(4)
         image_path = self.camera.snap_image()
         if image_path:
             print(f"Tracking: Photo snapped and saved at {image_path}")
@@ -63,6 +65,7 @@ class PhotoBooth:
 
     def process_processing(self):
         # Logic for "Drawing" state
+        time.sleep(4)
         tempSVG = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath)
         startX, startY = self.state_engine.get_image_params_by_id(self.state_engine.photoID-1)
         self.state_engine.currentSVGPath = self.image_parser.create_output_svg(tempSVG, "image-", 1.0, startX, startY, self.state_engine.photoID)
@@ -71,6 +74,7 @@ class PhotoBooth:
         pass
     
     def process_drawing(self):
+        time.sleep(2)
         print(f"Drawing: Connecting with penplotter {self.state_engine.currentSVGPath}")
         self.plotter.plot_image(self.state_engine.currentSVGPath)
         self.state_engine.update_image_id()

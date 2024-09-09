@@ -25,7 +25,7 @@ stop_event = threading.Event()
 # Display images
 # ------------------------------------------------------------------------
 def display_default_image(LCD):
-    default_image_path = 'assets/display/Waiting.jpg'
+    default_image_path = 'assets/display/Ready.jpg'
     try:
         image = Image.open(default_image_path)
         rotated_image = image.rotate(-90, expand=True)
@@ -68,22 +68,22 @@ def display_image_based_on_state(LCD, state):
 
     state_config = {
         "Waiting": {
-            "images": ["assets/display/Ready.jpg", "assets/display/Waiting.jpg"],
-            "display_time": 2.0,
+            "images": ["assets/display/Waiting-1.jpg", "assets/display/Waiting-2.jpg", "assets/display/Waiting-3.jpg"],
+            "display_time": 0.25,
             "loop": True
         },
         "Working": {
-            "images": ["assets/display/Working-4.jpg", "assets/display/Working-3.jpg", "assets/display/Working-2.jpg", "assets/display/Working-1.jpg"],
-            "display_time": 0.5,
+            "images": ["assets/display/Working-1.jpg", "assets/display/Working-2.jpg", "assets/display/Working-3.jpg", "assets/display/Working-2.jpg"],
+            "display_time": 0.25,
             "loop": False
         },
         "Tracking": {
-            "images": ["assets/display/Tracking-4.jpg", "assets/display/Tracking-3.jpg", "assets/display/Tracking-2.jpg", "assets/display/Tracking-1.jpg"],
-            "display_time": 1,
-            "loop": False
+            "images": ["assets/display/Tracking-1.jpg", "assets/display/Tracking-2.jpg", "assets/display/Tracking-3.jpg", "assets/display/Tracking-2.jpg"],
+            "display_time": 0.25,
+            "loop": True
         },
         "Processing": {
-            "images": ["assets/display/Processing-1.jpg", "assets/display/Processing-2.jpg", "assets/display/Processing-3.jpg", "assets/display/Processing-4.jpg"],
+            "images": ["assets/display/Processing-1.jpg", "assets/display/Processing-2.jpg", "assets/display/Processing-3.jpg", "assets/display/Processing-4.jpg", "assets/display/Processing-5.jpg", "assets/display/Processing-6.jpg", "assets/display/Processing-7.jpg", "assets/display/Processing-8.jpg"],
             "display_time": 0.1,
             "loop": False
         },
@@ -102,7 +102,7 @@ def display_image_based_on_state(LCD, state):
     num_images = 15
     for i in range(1, num_images + 1):
         state_config[f"Drawing-{i:02}"] = {
-            "images": [f"assets/Drawing-{i:02}.jpg"],
+            "images": [f"assets/display/Drawing-{i:02}.jpg"],
             "display_time": 0.1,
             "loop": False
         }
