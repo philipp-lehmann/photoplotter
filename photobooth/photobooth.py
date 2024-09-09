@@ -57,6 +57,7 @@ class PhotoBooth:
             if self.image_parser.detect_faces(self.state_engine.currentPhotoPath):
                 self.state_engine.change_state("Processing")
             else:
+                os.remove(self.state_engine.currentPhotoPath)
                 self.state_engine.workID += 1
                 self.state_engine.change_state("Working")
         else:
