@@ -75,7 +75,7 @@ def display_image_based_on_state(LCD, state):
         "Working": {
             "images": ["assets/display/Working-1.jpg", "assets/display/Working-2.jpg", "assets/display/Working-3.jpg", "assets/display/Working-2.jpg"],
             "display_time": 0.25,
-            "loop": False
+            "loop": True
         },
         "Tracking": {
             "images": ["assets/display/Tracking-1.jpg", "assets/display/Tracking-2.jpg", "assets/display/Tracking-3.jpg", "assets/display/Tracking-2.jpg"],
