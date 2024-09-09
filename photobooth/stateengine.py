@@ -12,6 +12,7 @@ class StateEngine:
         self.imagesPerRow = 5
         self.imagesPerColumn = 3
         self.totalImages = self.imagesPerColumn * self.imagesPerRow
+        self.workID = 0
         self.photoID = self.totalImages
         self.transitions = {
             "Startup": ["Waiting", "Test"],
@@ -72,7 +73,14 @@ class StateEngine:
     
     def reset_photo_id(self):
         self.photoID = self.totalImages
-            
+    
+    def update_work_id(self):
+        self.workID += 1
+        print(f"Work ID: {self.workID}")
+        
+    def reset_work_id(self):
+        self.workID = 0
+      
     def get_image_params_by_id(self, id=0):
         # Define border and gutter
         borderSize = 50
@@ -119,6 +127,7 @@ class StateEngine:
         
         # Handler for each state
         if self.state == "Waiting":
+            self.reset_work_id()
             self.change_state("Working")
         elif self.state == "Working":
             self.change_state("Tracking")

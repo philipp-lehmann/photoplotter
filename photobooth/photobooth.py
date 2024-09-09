@@ -74,7 +74,12 @@ class PhotoBooth:
         if image_path:
             print(f"Tracking: Photo snapped and saved at {image_path}")
             self.state_engine.currentPhotoPath = image_path
-            self.state_engine.change_state("Processing")
+            
+            if self.image_parser.detect_faces(self.state_engine.currentPhotoPath):
+                self.state_engine.change_state("Processing")
+            else:
+                self.state_engine.workID += 1
+                self.state_engine.change_state("Working")
         else:
             print("Failed to snap photo.")
         pass
