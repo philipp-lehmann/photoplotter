@@ -78,7 +78,7 @@ class ImageParser:
         return eyes, nose, mouth
     
                 
-    def crop_to_largest_face(self, image, target_width, target_height, margin_percentage=0.30):
+    def crop_to_largest_face(self, image, target_width, target_height, margin_percentage=0.60):
         # Load the face cascade classifier
         face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
         
@@ -102,7 +102,7 @@ class ImageParser:
 
         # Create a mask for the face region
         face_mask = np.zeros_like(enhanced_gray_image)
-        face_mask[y:y+h, x:x+w] = 255
+        face_mask[y:y+h, x:x+w] = 200
 
         # Calculate the new crop region
         crop_size = max(w, h) + 2 * margin
