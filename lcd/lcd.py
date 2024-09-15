@@ -101,7 +101,7 @@ def display_image_based_on_state(LCD, state):
 
     num_images = 15
     for i in range(1, num_images + 1):
-        state_config[f"Drawing-{i:02}"] = {
+        state_config[f"Drawing-{i}"] = {
             "images": [f"assets/display/Drawing-{i:02}.jpg"],
             "display_time": 0.1,
             "loop": False
