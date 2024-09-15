@@ -69,23 +69,23 @@ def display_image_based_on_state(LCD, state):
     state_config = {
         "Waiting": {
             "images": ["assets/display/Waiting-1.jpg", "assets/display/Waiting-2.jpg", "assets/display/Waiting-3.jpg"],
-            "display_time": 0.25,
+            "display_time": 0.125,
             "loop": True
         },
         "Working": {
-            "images": ["assets/display/Working-1.jpg", "assets/display/Working-2.jpg", "assets/display/Working-3.jpg", "assets/display/Working-2.jpg"],
-            "display_time": 0.25,
+            "images": ["assets/display/Working-1.jpg", "assets/display/Working-2.jpg", "assets/display/Working-3.jpg", "assets/display/Working-4.jpg", "assets/display/Working-5.jpg", "assets/display/Working-6.jpg", "assets/display/Working-7.jpg", "assets/display/Working-8.jpg"],
+            "display_time": 0.125,
             "loop": True
         },
         "Tracking": {
-            "images": ["assets/display/Tracking-1.jpg", "assets/display/Tracking-2.jpg", "assets/display/Tracking-3.jpg", "assets/display/Tracking-2.jpg"],
-            "display_time": 0.25,
+            "images": ["assets/display/Tracking-1.jpg", "assets/display/Tracking-2.jpg", "assets/display/Tracking-3.jpg", "assets/display/Tracking-4.jpg", "assets/display/Tracking-5.jpg", "assets/display/Tracking-6.jpg", "assets/display/Tracking-7.jpg", "assets/display/Tracking-8.jpg"],
+            "display_time": 0.125,
             "loop": True
         },
         "Processing": {
-            "images": ["assets/display/Processing-1.jpg", "assets/display/Processing-2.jpg", "assets/display/Processing-3.jpg", "assets/display/Processing-4.jpg", "assets/display/Processing-5.jpg", "assets/display/Processing-6.jpg", "assets/display/Processing-7.jpg", "assets/display/Processing-8.jpg"],
-            "display_time": 0.1,
-            "loop": False
+            "images": ["assets/display/Processing-1.jpg", "assets/display/Processing-2.jpg", "assets/display/Processing-3.jpg", "assets/display/Processing-4.jpg", "assets/display/Processing-5.jpg", "assets/display/Processing-6.jpg", "assets/display/Processing-7.jpg", "assets/display/Processing-8.jpg", "assets/display/Processing-9.jpg", "assets/display/Processing-10.jpg"],
+            "display_time": 0.125,
+            "loop": True
         },
         "ResetPending": {
             "images": ["assets/display/ResetPending.jpg"],

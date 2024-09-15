@@ -36,7 +36,7 @@ class PhotoBooth:
         # Logic to retrieve work pattern and create output svg
         time.sleep(2)
         parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        self.state_engine.currentWorkPath = os.path.join(parent_dir, f"assets/work/work-01.svg")
+        self.state_engine.currentWorkPath = os.path.join(parent_dir, f"assets/work/work-0.svg")
         startX, startY = self.state_engine.get_image_params_by_id(self.state_engine.photoID-1)
         self.state_engine.currentSVGPath = self.image_parser.create_output_svg(self.state_engine.currentWorkPath, "work-", 1.0, startX, startY, self.state_engine.photoID)
         
