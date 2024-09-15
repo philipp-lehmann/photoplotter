@@ -16,9 +16,9 @@ class StateEngine:
         self.photoID = self.totalImages
         self.transitions = {
             "Startup": ["Waiting", "ResetPending", "Test"],
-            "Waiting": ["Working"],
+            "Waiting": ["Tracking"],
+            "Tracking": ["Working", "Processing"],
             "Working": ["Tracking"],
-            "Tracking": ["Processing", "Working"],
             "Processing": ["Drawing"],
             "Drawing": ["Waiting", "ResetPending"],
             "ResetPending": ["Waiting"], 
@@ -128,7 +128,7 @@ class StateEngine:
         # Handler for each state
         if self.state == "Waiting":
             self.reset_work_id()
-            self.change_state("Working")
+            self.change_state("Tracking")
         elif self.state == "Working":
             self.change_state("Tracking")
         elif self.state == "ResetPending":
