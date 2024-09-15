@@ -68,8 +68,8 @@ class PhotoBooth:
         if self.plotter.connect_to_plotter == False: 
             time.sleep(2)
         tempSVG = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath)
-        startX, startY = self.state_engine.get_image_params_by_id(self.state_engine.photoID-1)
-        self.state_engine.currentSVGPath = self.image_parser.create_output_svg(tempSVG, "image-", 1.0, startX, startY, self.state_engine.photoID)
+        startX, startY = self.state_engine.get_image_params_by_id(self.state_engine.photoID[-1] - 1)
+        self.state_engine.currentSVGPath = self.image_parser.create_output_svg(tempSVG, "image-", 1.0, startX, startY, self.state_engine.photoID[-1] - 1)
         print(f"Converted to SVG: {self.state_engine.currentSVGPath}")
         self.state_engine.change_state("Drawing")
         pass
@@ -79,13 +79,13 @@ class PhotoBooth:
             time.sleep(2)
         print(f"Drawing: Connecting with penplotter {self.state_engine.currentSVGPath}")
         self.plotter.plot_image(self.state_engine.currentSVGPath)
-        self.state_engine.update_image_id()
-        
-        # Check if all available spots for images have been drawn
-        if self.state_engine.photoID > 0:
+        self.state_engine.update_photo_id()
+
+        # Check if all spots for images have been drawn
+        if self.state_engine.photoID:
             self.state_engine.change_state("Waiting")
         else:
-            self.state_engine.change_state("ResetPending") 
+            self.state_engine.change_state("ResetPending")
             print(f"All photos printed, changing state to 'ResetPending'.")
         
 
