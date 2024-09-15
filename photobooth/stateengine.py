@@ -87,7 +87,6 @@ class StateEngine:
         ]
         for triplet in triplets:
             random.shuffle(triplet)
-
         self.photoID = [item for triplet in triplets for item in triplet]
         print(f"Photo IDs reset and shuffled within triplets: {self.photoID}")
     

@@ -4,6 +4,7 @@ from .plotter import Plotter
 from .imageparser import ImageParser
 import time
 import os
+import random
 
 class PhotoBooth:
     def __init__(self):
@@ -51,15 +52,23 @@ class PhotoBooth:
         pass
     
     def process_working(self):
-        # Logic to retrieve work pattern and create output svg
+        # Logic to retrieve work pattern and create output SVG
         parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         self.state_engine.currentWorkPath = os.path.join(parent_dir, f"assets/work/work-0.svg")
-        startX, startY = self.state_engine.get_image_params_by_id(self.state_engine.photoID-1)
-        self.state_engine.currentSVGPath = self.image_parser.create_output_svg(self.state_engine.currentWorkPath, "work-", 1.0, startX, startY, self.state_engine.photoID)
         
-        print(f"Converted Work pattern to SVG: {self.state_engine.currentSVGPath}")
+        # Randomly pick one photo ID from the remaining list without removing it
+        random_photo_id = random.choice(self.state_engine.photoID)
+        startX, startY = self.state_engine.get_image_params_by_id(random_photo_id - 1)
+        
+        # Create output SVG using the randomly chosen photo ID
+        self.state_engine.currentSVGPath = self.image_parser.create_output_svg(
+            self.state_engine.currentWorkPath, "work-", 1.0, startX, startY, random_photo_id
+        )
+        
+        print(f"Converted Work pattern to SVG: {self.state_engine.currentSVGPath}, random: {random_photo_id}, from {self.state_engine.photoID}")
         self.plotter.plot_image(self.state_engine.currentSVGPath)
         
+        # Change state to Tracking after the work is done
         self.state_engine.change_state("Tracking")
         pass
 
