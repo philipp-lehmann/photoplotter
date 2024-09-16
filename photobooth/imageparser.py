@@ -1,39 +1,20 @@
 import cv2
-import numpy as np
 import os
+import dlib
+import numpy as np
 import svgwrite
 from lxml import etree
 
 class ImageParser:
     def __init__(self):
         self.maxTrials = 10
+        # Initialize dlib face detector and shape predictor (68 landmarks)
+        self.face_detector = dlib.get_frontal_face_detector()
+        base_path = os.path.dirname(os.path.abspath(__file__))
+        predictor_path = os.path.join(base_path, 'shape_predictor', 'shape_predictor_68_face_landmarks.dat')
+        self.landmark_detector = dlib.shape_predictor(predictor_path)
         print("Starting ImageParser ...")
-        pass
-    
-    def detect_faces(self, image_filepath):
-        # Load the pre-trained Haar Cascade Classifier for face detection
-        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-        
-        # Load the image
-        image = cv2.imread(image_filepath)
-        if image is None:
-            print("Failed to load image.")
-            return False
-        
-        # Convert the image to grayscale (required for face detection)
-        gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        
-        # Detect faces in the image
-        faces = face_cascade.detectMultiScale(gray_image, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
-        
-        # Check if any faces are detected
-        if len(faces) > 0:
-            print(f"Detected {len(faces)} face(s) in the image.")
-            return True
-        else:
-            print("No faces detected in the image.")
-            return False
-    
+        pass    
     
     def detect_facial_features(self, image, face_rect):
         # Load Haar cascades for facial features
@@ -66,7 +47,7 @@ class ImageParser:
         
         return eyes, nose, mouth
     
-    def crop_to_largest_face(self, image, target_width, target_height, margin_percentage=0.30):
+    def crop_to_largest_face(self, image, target_width, target_height, margin_percentage=0.60):
         # Load the face cascade classifier
         face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
         
@@ -90,7 +71,7 @@ class ImageParser:
 
         # Create a mask for the face region
         face_mask = np.zeros_like(enhanced_gray_image)
-        face_mask[y:y+h, x:x+w] = 255
+        face_mask[y:y+h, x:x+w] = 200
 
         # Calculate the new crop region
         crop_size = max(w, h) + 2 * margin
@@ -122,34 +103,43 @@ class ImageParser:
         cropped_image = image[y_start:y_end, x_start:x_end]
         return cv2.resize(cropped_image, (target_width, target_height))
 
-    def optimize_image(self, img, dilation_iterations=5, erosion_iterations=0):
+    def optimize_image(self, img):
+        # Detect faces using dlib
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        faces = self.face_detector(gray)
 
-        # Step 1: Prepare the mask for GrabCut
-        mask = np.zeros(img.shape[:2], np.uint8)
-        bg_model = np.zeros((1, 65), np.float64)
-        fg_model = np.zeros((1, 65), np.float64)
+        if len(faces) == 0:
+            print("No faces detected")
+            return img
         
-        # Define a rectangle around the object of interest (foreground)
-        rect = (40, 40, img.shape[1] - 80, img.shape[0] - 80)
+        # For each detected face, find landmarks and draw them
+        for face in faces:
+            landmarks = self.landmark_detector(gray, face)
+            
+            # Separate facial regions (e.g., jawline, eyebrows, etc.)
+            self.draw_feature_line(img, landmarks, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])
+            self.draw_feature_line(img, landmarks, [17, 18, 19, 20, 21])
+            self.draw_feature_line(img, landmarks, [22, 23, 24, 25, 26])
+            self.draw_feature_line(img, landmarks, [36, 37, 38, 39, 40, 41, 36])  # Left eye
+            self.draw_feature_line(img, landmarks, [42, 43, 44, 45, 46, 47, 42])  # Right eye
+            self.draw_feature_line(img, landmarks, [31, 32, 33, 34, 35])
+            self.draw_feature_line(img, landmarks, [48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 48])  # Mouth outer
+            self.draw_feature_line(img, landmarks, [60, 61, 62, 63, 64, 65, 66, 67, 60])  # Mouth inner
 
-        # Apply GrabCut
-        cv2.grabCut(img, mask, rect, bg_model, fg_model, iterCount=5, mode=cv2.GC_INIT_WITH_RECT)
+        # Return the image with the landmarks highlighted
+        return img
+    
+    def draw_feature_line(self, img, landmarks, points_indices, color=(255, 255, 2550), thickness=1):
+        points = []
+        for i in points_indices:
+            if 0 <= i < 68:  # Ensure valid indices
+                points.append((landmarks.part(i).x, landmarks.part(i).y))
+            else:
+                print(f"Warning: Landmark index {i} is out of range and will be skipped.")
 
-        # Modify the mask: Invert mask values
-        # Foreground (0 and 2) will be set to 0, and background (1 and 3) will be set to 1
-        mask2 = np.where((mask == 0) | (mask == 2), 0, 1).astype('uint8')
-
-        # Step 2: Extract the background using the inverted mask
-        # The foreground will be black (0), and the background will be preserved
-        background = img * mask2[:, :, np.newaxis]
-
-        # Convert to YUV for contrast enhancement
-        img_yuv = cv2.cvtColor(background, cv2.COLOR_BGR2YUV)
-        img_yuv[:,:,0] = cv2.equalizeHist(img_yuv[:,:,0])
-        img_output = cv2.cvtColor(img_yuv, cv2.COLOR_YUV2BGR)
-
-        return img_output
-
+        # Draw lines connecting consecutive points
+        for i in range(len(points) - 1):
+            cv2.line(img, points[i], points[i + 1], color, thickness)
 
     def convert_to_svg(self, image_filepath, target_width=800, target_height=800, scale_x=0.35, scale_y=0.35, min_paths=30, max_paths=90, min_contour_area=20, suffix=''):
         print("Converting current photo to SVG")
