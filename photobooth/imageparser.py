@@ -32,14 +32,14 @@ class ImageParser:
         if image is None:
             print("Failed to load image.")
             return None
-
+        
         # Detect faces
         gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         faces = self.face_detector(gray_image)
 
         if len(faces) == 0:
             print("No faces detected.")
-            return None
+            return image
 
         # Process the largest face
         largest_face = max(faces, key=lambda rect: rect.width() * rect.height())
@@ -65,95 +65,16 @@ class ImageParser:
         cropped_image = image[y_start:y_end, x_start:x_end]
         return cv2.resize(cropped_image, (target_width, target_height))
      
-     
-        
-        
     def enhance_faces(self, image):
-        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-        gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        faces = face_cascade.detectMultiScale(gray_image, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
-     
-    def enhance_faces(self, image):
-        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-        gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        faces = face_cascade.detectMultiScale(gray_image, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
-
-
-        mask = np.zeros_like(image)
-
-        for (x, y, w, h) in faces:
-            center = (x + w//2, y + h//2)
-            axes = (w//2, h//2)  # width and height of the ellipse axes
-            mask = cv2.ellipse(mask, center, axes, 0, 0, 360, (255, 255, 255), -1)
-
-        # Soften the edges of the mask
-        blurred_mask = cv2.GaussianBlur(mask, (15, 15), 0)
-
-        # Create a 3-channel mask for color image blending
-        mask_channels = cv2.split(blurred_mask)
-        mask_for_blending = cv2.merge(mask_channels)
-
-        # Blend the original image with the mask using a weighted sum
-        # Note: ensure the masks and image are of the same data type (e.g., uint8)
-        enhanced_image = cv2.addWeighted(image, 1, mask_for_blending, 0.5, 0)
-
-        return enhanced_image
-
-    def apply_local_enhancements(self, roi):
-        # Convert to YUV color space
-        img_yuv = cv2.cvtColor(roi, cv2.COLOR_BGR2YUV)
-        # Apply CLAHE to the Y channel
-        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-        img_yuv[:, :, 0] = clahe.apply(img_yuv[:, :, 0])
-        # Convert back to BGR color space
-        enhanced_roi = cv2.cvtColor(img_yuv, cv2.COLOR_YUV2BGR)
-        return enhanced_roi
-
-    def bilateral_filter_image(self, image, d=9, sigmaColor=75, sigmaSpace=75):
-        return cv2.bilateralFilter(image, d, sigmaColor, sigmaSpace)
-        
-        mask = np.zeros_like(image)
-
-        for (x, y, w, h) in faces:
-            center = (x + w//2, y + h//2)
-            axes = (w//2, h//2)  # width and height of the ellipse axes
-            mask = cv2.ellipse(mask, center, axes, 0, 0, 360, (255, 255, 255), -1)
-
-        # Soften the edges of the mask
-        blurred_mask = cv2.GaussianBlur(mask, (15, 15), 0)
-
-        # Create a 3-channel mask for color image blending
-        mask_channels = cv2.split(blurred_mask)
-        mask_for_blending = cv2.merge(mask_channels)
-
-        # Blend the original image with the mask using a weighted sum
-        # Note: ensure the masks and image are of the same data type (e.g., uint8)
-        enhanced_image = cv2.addWeighted(image, 1, mask_for_blending, 0.5, 0)
-
-        return enhanced_image
-
-    def apply_local_enhancements(self, roi):
-        # Convert to YUV color space
-        img_yuv = cv2.cvtColor(roi, cv2.COLOR_BGR2YUV)
-        # Apply CLAHE to the Y channel
-        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-        img_yuv[:, :, 0] = clahe.apply(img_yuv[:, :, 0])
-        # Convert back to BGR color space
-        enhanced_roi = cv2.cvtColor(img_yuv, cv2.COLOR_YUV2BGR)
-        return enhanced_roi
-
-    def bilateral_filter_image(self, image, d=9, sigmaColor=75, sigmaSpace=75):
-        return cv2.bilateralFilter(image, d, sigmaColor, sigmaSpace)
-        
-     
-        
-    def enhance_faces(self, image):
-        """Apply filters and enhancements to the detected face."""
-        enhanced_image = cv2.bilateralFilter(image, d=9, sigmaColor=75, sigmaSpace=75)
+        enhanced_image = image
         return enhanced_image
 
     def draw_facial_landmarks(self, image, face_rect):
         """Draw the 68 facial landmarks using dlib's shape predictor."""
+        if image is None or image.size == 0:
+            print("Error: Image is empty or not loaded properly.")
+            return
+
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         landmarks = self.landmark_detector(gray, face_rect)
 
