@@ -1,15 +1,20 @@
 import cv2
-import numpy as np
 import os
-import re
+import dlib
+import numpy as np
 import svgwrite
 from lxml import etree
 
 class ImageParser:
     def __init__(self):
         self.maxTrials = 10
+        # Initialize dlib face detector and shape predictor (68 landmarks)
+        self.face_detector = dlib.get_frontal_face_detector()
+        base_path = os.path.dirname(os.path.abspath(__file__))
+        predictor_path = os.path.join(base_path, 'shape_predictor', 'shape_predictor_68_face_landmarks.dat')
+        self.landmark_detector = dlib.shape_predictor(predictor_path)
         print("Starting ImageParser ...")
-        pass
+        pass    
     
     def detect_faces(self, image_filepath):
         # Load the pre-trained Haar Cascade Classifier for face detection
@@ -78,7 +83,6 @@ class ImageParser:
         
         return eyes, nose, mouth
     
-                
     def crop_to_largest_face(self, image, target_width, target_height, margin_percentage=0.60):
         # Load the face cascade classifier
         face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
@@ -135,6 +139,47 @@ class ImageParser:
         cropped_image = image[y_start:y_end, x_start:x_end]
         return cv2.resize(cropped_image, (target_width, target_height))
      
+     
+        
+    def enhance_faces(self, image):
+        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        faces = face_cascade.detectMultiScale(gray_image, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+
+        mask = np.zeros_like(image)
+
+        for (x, y, w, h) in faces:
+            center = (x + w//2, y + h//2)
+            axes = (w//2, h//2)  # width and height of the ellipse axes
+            mask = cv2.ellipse(mask, center, axes, 0, 0, 360, (255, 255, 255), -1)
+
+        # Soften the edges of the mask
+        blurred_mask = cv2.GaussianBlur(mask, (15, 15), 0)
+
+        # Create a 3-channel mask for color image blending
+        mask_channels = cv2.split(blurred_mask)
+        mask_for_blending = cv2.merge(mask_channels)
+
+        # Blend the original image with the mask using a weighted sum
+        # Note: ensure the masks and image are of the same data type (e.g., uint8)
+        enhanced_image = cv2.addWeighted(image, 1, mask_for_blending, 0.5, 0)
+
+        return enhanced_image
+
+    def apply_local_enhancements(self, roi):
+        # Convert to YUV color space
+        img_yuv = cv2.cvtColor(roi, cv2.COLOR_BGR2YUV)
+        # Apply CLAHE to the Y channel
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        img_yuv[:, :, 0] = clahe.apply(img_yuv[:, :, 0])
+        # Convert back to BGR color space
+        enhanced_roi = cv2.cvtColor(img_yuv, cv2.COLOR_YUV2BGR)
+        return enhanced_roi
+
+    def bilateral_filter_image(self, image, d=9, sigmaColor=75, sigmaSpace=75):
+        return cv2.bilateralFilter(image, d, sigmaColor, sigmaSpace)
+
+
         
     def enhance_faces(self, image):
         face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
@@ -175,82 +220,82 @@ class ImageParser:
         return cv2.bilateralFilter(image, d, sigmaColor, sigmaSpace)
 
     def optimize_image(self, img):
-        # Convert to HSV color space
-        img_hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+        # Detect faces using dlib
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        faces = self.face_detector(gray)
 
-        # Define skin tone range in HSV
-        lower_skin = np.array([0, 48, 80], dtype=np.uint8)
-        upper_skin = np.array([20, 255, 255], dtype=np.uint8)
+        if len(faces) == 0:
+            print("No faces detected")
+            return img
+        
+        # For each detected face, find landmarks and draw them
+        for face in faces:
+            landmarks = self.landmark_detector(gray, face)
+            
+            # Separate facial regions (e.g., jawline, eyebrows, etc.)
+            self.draw_feature_line(img, landmarks, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])
+            self.draw_feature_line(img, landmarks, [17, 18, 19, 20, 21])
+            self.draw_feature_line(img, landmarks, [22, 23, 24, 25, 26])
+            self.draw_feature_line(img, landmarks, [36, 37, 38, 39, 40, 41, 36])  # Left eye
+            self.draw_feature_line(img, landmarks, [42, 43, 44, 45, 46, 47, 42])  # Right eye
+            self.draw_feature_line(img, landmarks, [31, 32, 33, 34, 35])
+            self.draw_feature_line(img, landmarks, [48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 48])  # Mouth outer
+            self.draw_feature_line(img, landmarks, [60, 61, 62, 63, 64, 65, 66, 67, 60])  # Mouth inner
 
-        # Create a mask for skin tones
-        skin_mask = cv2.inRange(img_hsv, lower_skin, upper_skin)
-        skin_mask = cv2.GaussianBlur(skin_mask, (9, 9), 0) 
+        # Return the image with the landmarks highlighted
+        return img
+    
+    def draw_feature_line(self, img, landmarks, points_indices, color=(255, 255, 2550), thickness=1):
+        points = []
+        for i in points_indices:
+            if 0 <= i < 68:  # Ensure valid indices
+                points.append((landmarks.part(i).x, landmarks.part(i).y))
+            else:
+                print(f"Warning: Landmark index {i} is out of range and will be skipped.")
 
-        # Increase contrast in the skin tone areas
-        contrast_enhancer = cv2.createCLAHE(clipLimit=0.3, tileGridSize=(8, 8)) 
-        enhanced_channel = contrast_enhancer.apply(img_hsv[:,:,2])
-        img_hsv[:,:,2] = cv2.addWeighted(img_hsv[:,:,2], 0.8, enhanced_channel, 0.2, 0) 
+        # Draw lines connecting consecutive points
+        for i in range(len(points) - 1):
+            cv2.line(img, points[i], points[i + 1], color, thickness)
 
-        # Convert back to BGR color space
-        img_output = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2BGR)
-
-        # Apply histogram equalization on the luminance channel in YUV space
-        img_yuv = cv2.cvtColor(img_output, cv2.COLOR_BGR2YUV)
-        img_yuv[:,:,0] = cv2.equalizeHist(img_yuv[:,:,0])
-        img_output = cv2.cvtColor(img_yuv, cv2.COLOR_YUV2BGR)
-
-        # Return the optimized image
-        return img_output
-
-
-    def convert_to_svg(self, image_filepath, target_width=640, target_height=640, scale_x=0.35, scale_y=0.35, min_paths=30, max_paths=90, min_contour_area=20, blur=False, suffix=''):
+    def convert_to_svg(self, image_filepath, target_width=800, target_height=800, scale_x=0.35, scale_y=0.35, min_paths=30, max_paths=90, min_contour_area=20, suffix=''):
         print("Converting current photo to SVG")
         if os.path.isfile(image_filepath):
             # Load the image using OpenCV
             image = cv2.imread(image_filepath)
             if image is not None:
-                
+                # Detect faces and crop around the largest face
                 image = self.crop_to_largest_face(image, target_width, target_height)
                 if image is None:
                     print("No face found. Proceeding with the original image.")
                     image = cv2.imread(image_filepath)  # Reload the original image if no face is found
-                    
+                
                 # Resize the image to the target dimensions
                 image = cv2.resize(image, (target_width, target_height))
                 
+                # Optimize the image
                 opt_image = self.optimize_image(image)
-                if blur == True:
-                    opt_image = self.bilateral_filter_image(opt_image)
-                    
                 optimized_image_path = image_filepath.rsplit('.', 1)[0] + '_optimized.' + image_filepath.rsplit('.', 1)[1]
-                cv2.imwrite(optimized_image_path, opt_image)               
+                cv2.imwrite(optimized_image_path, opt_image)
                 
-                # Convert the image to grayscale for edge detection
+                # Convert the optimized image to SVG
                 gray_image = cv2.cvtColor(opt_image, cv2.COLOR_BGR2GRAY)
-               
-                # Perform initial edge detection
                 edges = cv2.Canny(gray_image, threshold1=80, threshold2=200)
-                # Find initial contours based on edges
                 contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                # Filter out small contours
                 filtered_contours = [contour for contour in contours if cv2.contourArea(contour) > min_contour_area]
-                # Initially simplify contours to reduce complexity
                 simplified_contours = [cv2.approxPolyDP(contour, 1, True) for contour in filtered_contours]
 
-                # Initialize variables for the adjustment loop
+                # Optimization loop for paths
                 num_paths = 0
                 trials = 0
                 lower_threshold = 80
                 upper_threshold = 200
                 epsilon = 1
 
-                # Adjustment loop
                 while num_paths < min_paths or num_paths > max_paths:
                     dwg = svgwrite.Drawing(size=(target_width, target_height))
                     num_paths = self.add_contours_to_svg(dwg, simplified_contours, scale_x, scale_y)
 
                     if num_paths < min_paths or num_paths > max_paths:
-                        print(f"{min_contour_area} - {trials}: {num_paths}")
                         lower_threshold, upper_threshold, epsilon = self.adjust_thresholds(
                             num_paths, min_paths, max_paths, lower_threshold, upper_threshold, epsilon, trials)
                         edges = cv2.Canny(gray_image, lower_threshold, upper_threshold)
@@ -260,27 +305,16 @@ class ImageParser:
                     trials += 1
                     if trials > self.maxTrials:
                         break
-                    
-                print(f"{min_contour_area} - {trials}: {num_paths}")
-                
-                # Sort contours by their distance from the image center
+
+                # Sort contours by distance from center and limit paths if necessary
                 image_center = np.array([target_width // 2, target_height // 2])
                 sorted_contours = sorted(simplified_contours, key=lambda c: np.linalg.norm(np.mean(np.squeeze(c), axis=0) - image_center))
 
-                # Limit the number of paths if necessary
-                if len(sorted_contours) > max_paths:
-                    simplified_contours = sorted_contours[:max_paths]
-                else:
-                    simplified_contours = sorted_contours
-
-                num_paths = len(simplified_contours)
-
-                # Print the number of paths after processing and before saving
-                print(f"Creating an image with {num_paths} paths.")
+                simplified_contours = sorted_contours[:max_paths] if len(sorted_contours) > max_paths else sorted_contours
                 dwg = svgwrite.Drawing(size=(target_width, target_height))
-                num_paths = self.add_contours_to_svg(dwg, simplified_contours, scale_x, scale_y)
+                self.add_contours_to_svg(dwg, simplified_contours, scale_x, scale_y)
 
-                # Save to output folder
+                # Save the SVG
                 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
                 output_dir = os.path.join(parent_dir, "photos/traced")
                 os.makedirs(output_dir, exist_ok=True)
@@ -289,9 +323,8 @@ class ImageParser:
                 svg_filepath = os.path.join(output_dir, svg_filename)
                 dwg.saveas(svg_filepath)
                 
-                # Return file path
                 return svg_filepath
-        # Return None if the file doesn't exist or no image is loaded
+
         return None
 
     def create_output_svg(self, image_svg_path, imgname = 'image', scale_factor = 0.8, offset_x=0, offset_y=0, id=0):
@@ -312,13 +345,13 @@ class ImageParser:
         for element in root.iter("{http://www.w3.org/2000/svg}*"):
             if element.tag.endswith('polyline'):
                 points = element.get('points')
-                if points:
-                    points_tuples = re.findall(r'(-?\d*\.?\d+)[,\s](-?\d*\.?\d+)', points)
-                    if points_tuples:
-                        group.add(dwg.polyline(points=points_tuples, 
-                                            stroke=element.get('stroke', 'black'),
-                                            fill=element.get('fill', 'none'),
-                                            stroke_width=element.get('stroke-width', '1')))
+                if points:  # Ensure there's a points attribute
+                    # Prepare the points in the format expected by svgwrite
+                    points_list = points.strip().split(" ")
+                    # Convert each point from 'x,y' to (x, y) tuple format
+                    points_tuples = [tuple(map(float, p.split(','))) for p in points_list if ',' in p]
+                    if points_tuples:  # Ensure there's at least one valid point
+                        group.add(dwg.polyline(points=points_tuples, stroke='black', fill='none'))
 
         dwg.add(group)
         
