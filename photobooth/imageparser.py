@@ -17,134 +17,67 @@ class ImageParser:
         pass    
     
     def detect_faces(self, image_filepath):
-        # Load the pre-trained Haar Cascade Classifier for face detection
-        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-        
-        # Load the image
+        """Quick method to check if a face is present in the image"""
         image = cv2.imread(image_filepath)
         if image is None:
             print("Failed to load image.")
-            return 0  # Return 0 as confidence if the image is not loaded
-        
-        # Convert the image to grayscale (required for face detection)
-        gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        
-        # Detect faces in the image
-        faces = face_cascade.detectMultiScale(gray_image, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
-        
-        # Check if any faces are detected
-        if len(faces) == 0:
             return False
-        else:
-            print(f"Detected {len(faces)} face(s) in the image.")
-            
-            # Calculate confidence score based on the largest detected face area
-            largest_face_area = max([w * h for (x, y, w, h) in faces])
-            image_area = image.shape[0] * image.shape[1]
-            
-            # Confidence calculation (heuristic)
-            confidence = (largest_face_area / image_area) * 100
-            confidence = min(confidence, 100)
-            
-            if confidence < 1.0:
-                return False
-            else: 
-                print(f"Confidence score: {confidence:.2f}")
-                return True
-            
-    def detect_facial_features(self, image, face_rect):
-        # Load Haar cascades for facial features
-        base_path = os.path.dirname(os.path.abspath(__file__))
-        eye_cascade_path = os.path.join(base_path, 'haarcascades', 'eye.xml')
-        nose_cascade_path = os.path.join(base_path, 'haarcascades', 'nose.xml')
-        mouth_cascade_path = os.path.join(base_path, 'haarcascades', 'mouth.xml')
-
-        eye_cascade = cv2.CascadeClassifier(eye_cascade_path)
-        nose_cascade = cv2.CascadeClassifier(nose_cascade_path)
-        mouth_cascade = cv2.CascadeClassifier(mouth_cascade_path)
-
-        if eye_cascade.empty():
-            print("Error: Eye cascade file not found or cannot be loaded.")
-        if nose_cascade.empty():
-            print("Error: Nose cascade file not found or cannot be loaded.")
-        if mouth_cascade.empty():
-            print("Error: Mouth cascade file not found or cannot be loaded.")
         
-        x, y, w, h = face_rect
-        face_region = image[y:y+h, x:x+w]
-        
-        # Convert face region to grayscale
-        gray_face_region = cv2.cvtColor(face_region, cv2.COLOR_BGR2GRAY)
-        
-        # Detect eyes, nose, and mouth
-        eyes = eye_cascade.detectMultiScale(gray_face_region, scaleFactor=1.1, minNeighbors=5)
-        nose = nose_cascade.detectMultiScale(gray_face_region, scaleFactor=1.1, minNeighbors=5) if not nose_cascade.empty() else []
-        mouth = mouth_cascade.detectMultiScale(gray_face_region, scaleFactor=1.1, minNeighbors=5) if not mouth_cascade.empty() else []
-        
-        return eyes, nose, mouth
+        gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        faces = self.face_detector(gray_image)
+        return len(faces) > 0
     
-    def crop_to_largest_face(self, image, target_width, target_height, margin_percentage=0.60):
-        # Load the face cascade classifier
-        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-        
-         # Enhance details in the image
-        enhanced_image = cv2.detailEnhance(image, sigma_s=10, sigma_r=0.255)
-        
-        # Convert the enhanced image to grayscale for face detection
-        enhanced_gray_image = cv2.cvtColor(enhanced_image, cv2.COLOR_BGR2GRAY)
+    def process_face_image(self, image, target_width=800, target_height=800):
+        """Optimized method that detects, crops, enhances the face and draws facial features"""
+        if image is None:
+            print("Failed to load image.")
+            return None
 
         # Detect faces
-        faces = face_cascade.detectMultiScale(enhanced_gray_image, scaleFactor=1.1, minNeighbors=5, minSize=(2, 2))
+        gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        faces = self.face_detector(gray_image)
 
         if len(faces) == 0:
-            return None  # No faces detected
+            print("No faces detected.")
+            return None
 
-        largest_face = max(faces, key=lambda rect: rect[2] * rect[3])
-        x, y, w, h = largest_face
-        margin = int(max(w, h) * margin_percentage)
+        # Process the largest face
+        largest_face = max(faces, key=lambda rect: rect.width() * rect.height())
+        cropped_image = self.crop_to_largest_face(image, largest_face, target_width, target_height)
 
-        eyes, nose, mouth = self.detect_facial_features(image, largest_face)
+        # Enhance the cropped face
+        enhanced_image = self.enhance_faces(cropped_image)
 
-        # Create a mask for the face region
-        face_mask = np.zeros_like(enhanced_gray_image)
-        face_mask[y:y+h, x:x+w] = 200
+        # Detect landmarks and draw them
+        self.draw_facial_landmarks(enhanced_image, largest_face)
 
-        # Calculate the new crop region
-        crop_size = max(w, h) + 2 * margin
-        crop_size = min(crop_size, image.shape[0], image.shape[1])
+        return enhanced_image
 
-        if len(eyes) > 0 or len(nose) > 0 or len(mouth) > 0:
-            features_x = [x + ex for (ex, ey, ew, eh) in eyes] + [x + nx for (nx, ny, nw, nh) in nose] + [x + mx for (mx, my, mw, mh) in mouth]
-            features_y = [y + ey for (ex, ey, ew, eh) in eyes] + [y + ny for (nx, ny, nw, nh) in nose] + [y + my for (mx, my, mw, mh) in mouth]
-            x_center = int(np.mean(features_x))
-            y_center = int(np.mean(features_y))
-
-            x_start = max(x_center - crop_size // 2, 0)
-            y_start = max(y_center - crop_size // 2, 0)
-            x_end = min(x_start + crop_size, image.shape[1])
-            y_end = min(y_start + crop_size, image.shape[0])
-
-            if x_end - x_start < crop_size:
-                x_start = max(image.shape[1] - crop_size, 0)
-                x_end = image.shape[1]
-            if y_end - y_start < crop_size:
-                y_start = max(image.shape[0] - crop_size, 0)
-                y_end = image.shape[0]
-        else:
-            x_start = max(x + w // 2 - crop_size // 2, 0)
-            y_start = max(y + h // 2 - crop_size // 2, 0)
-            x_end = min(x_start + crop_size, image.shape[1])
-            y_end = min(y_start + crop_size, image.shape[0])
+    def crop_to_largest_face(self, image, face_rect, target_width, target_height):
+        """Crop the image around the largest detected face."""
+        x, y, w, h = face_rect.left(), face_rect.top(), face_rect.width(), face_rect.height()
+        margin = int(max(w, h) * 0.60)
+        x_start = max(x - margin, 0)
+        y_start = max(y - margin, 0)
+        x_end = min(x + w + margin, image.shape[1])
+        y_end = min(y + h + margin, image.shape[0])
 
         cropped_image = image[y_start:y_end, x_start:x_end]
         return cv2.resize(cropped_image, (target_width, target_height))
      
      
         
+        
     def enhance_faces(self, image):
         face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
         gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         faces = face_cascade.detectMultiScale(gray_image, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+     
+    def enhance_faces(self, image):
+        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        faces = face_cascade.detectMultiScale(gray_image, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+
 
         mask = np.zeros_like(image)
 
@@ -178,14 +111,7 @@ class ImageParser:
 
     def bilateral_filter_image(self, image, d=9, sigmaColor=75, sigmaSpace=75):
         return cv2.bilateralFilter(image, d, sigmaColor, sigmaSpace)
-
-
         
-    def enhance_faces(self, image):
-        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-        gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        faces = face_cascade.detectMultiScale(gray_image, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
-
         mask = np.zeros_like(image)
 
         for (x, y, w, h) in faces:
@@ -218,62 +144,50 @@ class ImageParser:
 
     def bilateral_filter_image(self, image, d=9, sigmaColor=75, sigmaSpace=75):
         return cv2.bilateralFilter(image, d, sigmaColor, sigmaSpace)
-
-    def optimize_image(self, img):
-        # Detect faces using dlib
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        faces = self.face_detector(gray)
-
-        if len(faces) == 0:
-            print("No faces detected")
-            return img
         
-        # For each detected face, find landmarks and draw them
-        for face in faces:
-            landmarks = self.landmark_detector(gray, face)
-            
-            # Separate facial regions (e.g., jawline, eyebrows, etc.)
-            self.draw_feature_line(img, landmarks, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])
-            self.draw_feature_line(img, landmarks, [17, 18, 19, 20, 21])
-            self.draw_feature_line(img, landmarks, [22, 23, 24, 25, 26])
-            self.draw_feature_line(img, landmarks, [36, 37, 38, 39, 40, 41, 36])  # Left eye
-            self.draw_feature_line(img, landmarks, [42, 43, 44, 45, 46, 47, 42])  # Right eye
-            self.draw_feature_line(img, landmarks, [31, 32, 33, 34, 35])
-            self.draw_feature_line(img, landmarks, [48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 48])  # Mouth outer
-            self.draw_feature_line(img, landmarks, [60, 61, 62, 63, 64, 65, 66, 67, 60])  # Mouth inner
+     
+        
+    def enhance_faces(self, image):
+        """Apply filters and enhancements to the detected face."""
+        enhanced_image = cv2.bilateralFilter(image, d=9, sigmaColor=75, sigmaSpace=75)
+        return enhanced_image
 
-        # Return the image with the landmarks highlighted
-        return img
-    
-    def draw_feature_line(self, img, landmarks, points_indices, color=(255, 255, 2550), thickness=1):
-        points = []
-        for i in points_indices:
-            if 0 <= i < 68:  # Ensure valid indices
-                points.append((landmarks.part(i).x, landmarks.part(i).y))
-            else:
-                print(f"Warning: Landmark index {i} is out of range and will be skipped.")
+    def draw_facial_landmarks(self, image, face_rect):
+        """Draw the 68 facial landmarks using dlib's shape predictor."""
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        landmarks = self.landmark_detector(gray, face_rect)
 
-        # Draw lines connecting consecutive points
+        # Draw key features
+        self.draw_feature_line(image, landmarks, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])  # Jawline
+        self.draw_feature_line(image, landmarks, [36, 37, 38, 39, 40, 41, 36])  # Left eye
+        self.draw_feature_line(image, landmarks, [42, 43, 44, 45, 46, 47, 42])  # Right eye
+        self.draw_feature_line(image, landmarks, [48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 48])  # Mouth outer
+
+    def draw_feature_line(self, img, landmarks, points_indices, color=(255, 255, 255), thickness=1):
+        """Helper method to draw lines connecting facial landmarks."""
+        points = [(landmarks.part(i).x, landmarks.part(i).y) for i in points_indices if 0 <= i < 68]
+
         for i in range(len(points) - 1):
             cv2.line(img, points[i], points[i + 1], color, thickness)
 
     def convert_to_svg(self, image_filepath, target_width=800, target_height=800, scale_x=0.35, scale_y=0.35, min_paths=30, max_paths=90, min_contour_area=20, suffix=''):
         print("Converting current photo to SVG")
         if os.path.isfile(image_filepath):
-            # Load the image using OpenCV
             image = cv2.imread(image_filepath)
             if image is not None:
-                # Detect faces and crop around the largest face
-                image = self.crop_to_largest_face(image, target_width, target_height)
-                if image is None:
+                # Detect faces using dlib
+                gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+                faces = self.face_detector(gray_image)
+
+                if len(faces) > 0:
+                    # Use the largest detected face
+                    largest_face = max(faces, key=lambda rect: rect.width() * rect.height())
+                    image = self.crop_to_largest_face(image, largest_face, target_width, target_height)
+                else:
                     print("No face found. Proceeding with the original image.")
-                    image = cv2.imread(image_filepath)  # Reload the original image if no face is found
-                
-                # Resize the image to the target dimensions
-                image = cv2.resize(image, (target_width, target_height))
                 
                 # Optimize the image
-                opt_image = self.optimize_image(image)
+                opt_image = self.process_face_image(image)
                 optimized_image_path = image_filepath.rsplit('.', 1)[0] + '_optimized.' + image_filepath.rsplit('.', 1)[1]
                 cv2.imwrite(optimized_image_path, opt_image)
                 
