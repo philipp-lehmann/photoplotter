@@ -3,6 +3,7 @@ import os
 import dlib
 import numpy as np
 import svgwrite
+import re
 from lxml import etree
 
 class ImageParser:
@@ -183,13 +184,13 @@ class ImageParser:
         for element in root.iter("{http://www.w3.org/2000/svg}*"):
             if element.tag.endswith('polyline'):
                 points = element.get('points')
-                if points:  # Ensure there's a points attribute
-                    # Prepare the points in the format expected by svgwrite
-                    points_list = points.strip().split(" ")
-                    # Convert each point from 'x,y' to (x, y) tuple format
-                    points_tuples = [tuple(map(float, p.split(','))) for p in points_list if ',' in p]
-                    if points_tuples:  # Ensure there's at least one valid point
-                        group.add(dwg.polyline(points=points_tuples, stroke='black', fill='none'))
+                if points:
+                    points_tuples = re.findall(r'(-?\d*\.?\d+)[,\s](-?\d*\.?\d+)', points)
+                    if points_tuples:
+                        group.add(dwg.polyline(points=points_tuples, 
+                                            stroke=element.get('stroke', 'black'),
+                                            fill=element.get('fill', 'none'),
+                                            stroke_width=element.get('stroke-width', '1')))
 
         dwg.add(group)
         
