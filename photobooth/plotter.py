@@ -16,7 +16,11 @@ class Plotter:
         if self.ad.connect():
             self.ad.options.model = 2
             self.ad.options.auto_rotate = True
+            self.ad.options.pen_rate_lower = 80
+            self.ad.options.pen_rate_raise = 80
             self.ad.options.speed_pendown = 100
+            self.ad.options.speed_penup = 100
+
             self.ad.update()
             print(f"AxiDraw connected. Model: {self.ad.options.model}" )
             return True
@@ -43,6 +47,7 @@ class Plotter:
                 self.ad.update()
                 print(f"AxiDraw connected. Model: {self.ad.options.model}" )
                 self.ad.plot_setup(svg_path)
+                self.ad.options.reordering = 2
                 self.ad.plot_run()
                 
                 print("Plotting complete.")
