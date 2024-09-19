@@ -81,6 +81,8 @@ class ImageParser:
 
         # Draw key features
         self.draw_feature_line(image, landmarks, [0, 1, 2, 3, 4, 5, 6, 7, 8])  # Jawline
+        self.draw_feature_line(image, landmarks, [17, 18, 19, 20, 21])  # Left eyebrow
+        self.draw_feature_line(image, landmarks, [22, 23, 24, 25, 26])  # Right eyebrow
         self.draw_feature_line(image, landmarks, [36, 37, 38, 39])  # Left eye
         self.draw_feature_line(image, landmarks, [40, 41])  # Left eye lower
         self.draw_feature_line(image, landmarks, [42, 43, 44, 45])  # Right eye
