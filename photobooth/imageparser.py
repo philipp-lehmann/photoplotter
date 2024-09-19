@@ -80,14 +80,13 @@ class ImageParser:
         landmarks = self.landmark_detector(gray, face_rect)
 
         # Draw key features
-        self.draw_feature_line(image, landmarks, [0, 1, 2, 3, 4, 5, 6, 7, 8])  # Jawline
-        self.draw_feature_line(image, landmarks, [17, 18, 19, 20, 21])  # Left eyebrow
-        self.draw_feature_line(image, landmarks, [22, 23, 24, 25, 26])  # Right eyebrow
-        self.draw_feature_line(image, landmarks, [36, 37, 38, 39])  # Left eye
-        self.draw_feature_line(image, landmarks, [40, 41])  # Left eye lower
-        self.draw_feature_line(image, landmarks, [42, 43, 44, 45])  # Right eye
-        self.draw_feature_line(image, landmarks, [46, 47])  # Right eye
-        self.draw_feature_line(image, landmarks, [48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 48])  # Mouth outer
+        self.draw_feature_line(image, landmarks, [0, 1, 2, 3, 4, 5, 6, 7, 8])           # Jawline
+        self.draw_feature_line(image, landmarks, [17, 18, 19, 20, 21])                  # Left eyebrow
+        self.draw_feature_line(image, landmarks, [22, 23, 24, 25, 26])                  # Right eyebrow
+        self.draw_feature_line(image, landmarks, [36, 37, 38, 39])                      # Left eye
+        self.draw_feature_line(image, landmarks, [40, 41])                              # Left eye lower
+        self.draw_feature_line(image, landmarks, [42, 43, 44, 45])                      # Right eye
+        self.draw_feature_line(image, landmarks, [46, 47])                              # Right eye
         self.draw_feature_line(image, landmarks, [60, 61, 62, 63, 64, 65, 66, 67, 60])  # Mouth inner
 
     def draw_feature_line(self, img, landmarks, points_indices, color=(255, 255, 255), thickness=1):
