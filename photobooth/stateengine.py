@@ -18,7 +18,7 @@ class StateEngine:
         self.transitions = {
             "Startup": ["Waiting", "ResetPending", "Test"],
             "Waiting": ["Tracking"],
-            "Tracking": ["Working", "Processing"],
+            "Tracking": ["Working", "Tracking", "Processing"],
             "Working": ["Tracking"],
             "Processing": ["Drawing"],
             "Drawing": ["Waiting", "ResetPending"],

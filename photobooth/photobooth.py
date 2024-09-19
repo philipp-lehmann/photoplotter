@@ -45,38 +45,43 @@ class PhotoBooth:
                 self.state_engine.change_state("Processing")
             else:
                 os.remove(self.state_engine.currentPhotoPath)
-                self.state_engine.change_state("Working")
+
+                self.state_engine.workID += 1
+                if self.state_engine.workID < 2:
+                    self.state_engine.change_state("Working")
+
+                elif self.state_engine.workID > 9:
+                    random_fakephoto_number = random.randint(1, 25)
+                    parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                    self.state_engine.currentPhotoPath = os.path.join(parent_dir, f"assets/fake/fake-{random_fakephoto_number}.jpg")
+                    self.state_engine.change_state("Processing")
+                else: 
+                    print(f"Working skipped: {self.state_engine.workID}")
+                    time.sleep(random.randint(3, 9))
+                    self.state_engine.change_state("Tracking")
         else:
             print("Failed to snap photo.")
         pass
     
-    def process_working(self):
-        self.state_engine.workID += 1
-        
-        if self.state_engine.workID < 4:
-            print(f"Working started: {self.state_engine.workID}")
-            # Logic to retrieve work pattern and create output SVG
-            parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            random_svg_number = random.randint(0, 30)
-            self.state_engine.currentWorkPath = os.path.join(parent_dir, f"assets/work/work-{random_svg_number}.svg")
-                
-            # Randomly pick one photo ID from the remaining list without removing it
-            random_photo_id = random.choice(self.state_engine.photoID)
-            startX, startY = self.state_engine.get_image_params_by_id(random_photo_id - 1)
+    def process_working(self):        
+        print(f"Working started: {self.state_engine.workID}")
+        # Logic to retrieve work pattern and create output SVG
+        parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        random_svg_number = random.randint(1, 30)
+        self.state_engine.currentWorkPath = os.path.join(parent_dir, f"assets/work/work-{random_svg_number}.svg")
             
-            # Create output SVG using the randomly chosen photo ID
-            self.state_engine.currentSVGPath = self.image_parser.create_output_svg(
-                self.state_engine.currentWorkPath, "work-output-", 1.0, startX, startY, random_photo_id
-            )
-            
-            print(f"Converted Work pattern to SVG: {self.state_engine.currentSVGPath}, random: {random_photo_id}, from {self.state_engine.photoID}")
-            self.plotter.plot_image(self.state_engine.currentSVGPath)
+        # Randomly pick one photo ID from the remaining list without removing it
+        random_photo_id = random.choice(self.state_engine.photoID)
+        startX, startY = self.state_engine.get_image_params_by_id(random_photo_id - 1)
         
-        else:
-            # Sleep after working 3 times
-            print(f"Working skipped: {self.state_engine.workID}")
-            time.sleep(random.randint(3, 9))
+        # Create output SVG using the randomly chosen photo ID
+        self.state_engine.currentSVGPath = self.image_parser.create_output_svg(
+            self.state_engine.currentWorkPath, "work-output-", 1.0, startX, startY, random_photo_id
+        )
         
+        print(f"Converted Work pattern to SVG: {self.state_engine.currentSVGPath}, random: {random_photo_id}, from {self.state_engine.photoID}")
+        self.plotter.plot_image(self.state_engine.currentSVGPath)
+       
         # Change state to Tracking after the work is done
         self.state_engine.change_state("Tracking")
         pass
