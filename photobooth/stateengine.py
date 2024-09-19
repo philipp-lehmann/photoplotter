@@ -95,6 +95,7 @@ class StateEngine:
         print(f"Work ID: {self.workID}")
         
     def reset_work_id(self):
+        print(f"Reset Work ID: {self.workID} -> 0")
         self.workID = 0
       
     def get_image_params_by_id(self, id=0):
