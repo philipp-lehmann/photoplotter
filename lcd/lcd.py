@@ -3,6 +3,8 @@ import LCD_1in44
 from PIL import Image
 import paho.mqtt.client as mqtt
 import threading
+import psutil  # Import psutil to check for running processes
+import subprocess  # Import subprocess to start main.py
 
 # LCD
 LCD = LCD_1in44.LCD()
@@ -22,6 +24,22 @@ client.connect(broker_address)
 current_thread = None
 stop_event = threading.Event()
 
+# Function to check if main.py is running
+def is_main_py_running():
+    for process in psutil.process_iter(['pid', 'name', 'cmdline']):
+        if 'main.py' in process.info['cmdline']:
+            return True
+    return False
+
+# Function to start main.py if not running
+def start_main_py():
+    # Path to your virtual environment's Python interpreter and main.py script
+    venv_python = "photoplotter-env/bin/python"
+    main_script = "main.py"
+    subprocess.Popen([venv_python, main_script])
+
+
+    
 # Display images
 # ------------------------------------------------------------------------
 def display_default_image(LCD):
@@ -33,6 +51,12 @@ def display_default_image(LCD):
         LCD.LCD_ShowImage(rotated_image, 0, 0)
     except Exception as e:
         print(f"Error displaying default image: {e}")
+        
+# Function to display "Processing-9.jpg" when main.py is not running
+def display_error_image(LCD):
+    print("Displaying Processing-9.jpg as main.py is not running.")
+    state = "Processing"
+    display_image_based_on_state(LCD, state)  # This will show the 'Processing' state, which includes "Processing-9.jpg"
 
 def display_image_series(LCD, image_paths, display_time=1, loop=False):
     start_time = time.time()
@@ -133,16 +157,23 @@ def on_message(client, userdata, message):
 def publish_message(topic, message):
     client.publish(topic, message)
 
+# Button press check and trigger main.py restart
 def check_button(LCD, button_pin, button_name):
     current_time = time.time()
     if LCD.digital_read(button_pin) == 1:
         if (current_time - last_press_time[button_name]) > debounce_delay:
             last_press_time[button_name] = current_time
+            if button_name == "KEY1":  # Use KEY1 to check and start main.py
+                if not is_main_py_running():
+                    print("main.py is not running.")
+                    display_error_image(LCD)  # Display "Processing-9.jpg"
+                    start_main_py()  # Start main.py
+                else:
+                    print("main.py is already running.")
             return True
     return False
 
-# Main
-# ------------------------------------------------------------------------
+# Main logic
 def main():
     LCD.LCD_Init(Lcd_ScanDir)
     LCD.LCD_Clear()
