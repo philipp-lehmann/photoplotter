@@ -13,7 +13,6 @@ class Camera:
         self.image_parser = ImageParser()
 
     def snap_image(self, output_dir=None, filename=None, roi=[0.33, 0.33, 0.67, 0.67]):
-        time.sleep(4)
         print("Capturing image")
         
         # Set default output directory if not provided
@@ -31,7 +30,7 @@ class Camera:
             
         image_filepath = os.path.join(output_dir, image_filename)
 
-        libcamera_command = ["libcamera-still", "-o", image_filepath, "-t", "200", "-n", "--autofocus-mode", "continuous"]
+        libcamera_command = ["libcamera-still", "-o", image_filepath, "-t", "750", "-n"]
 
 
         # Set the Region of interest for autofocus if provided

@@ -20,7 +20,7 @@ class StateEngine:
             "Waiting": ["Tracking"],
             "Tracking": ["Working", "Tracking", "Processing"],
             "Working": ["Tracking"],
-            "Processing": ["Drawing"],
+            "Processing": ["Drawing", "Waiting"],
             "Drawing": ["Waiting", "ResetPending"],
             "ResetPending": ["Waiting"], 
             "Test": ["Waiting", "Drawing"]

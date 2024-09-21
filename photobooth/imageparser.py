@@ -55,17 +55,36 @@ class ImageParser:
         return enhanced_image
 
     def crop_to_largest_face(self, image, face_rect, target_width, target_height):
-        """Crop the image around the largest detected face."""
+        """Crop the image around the largest detected face to a square."""
         x, y, w, h = face_rect.left(), face_rect.top(), face_rect.width(), face_rect.height()
-        margin = int(max(w, h) * 0.60)
-        x_start = max(x - margin, 0)
-        y_start = max(y - margin, 0)
-        x_end = min(x + w + margin, image.shape[1])
-        y_end = min(y + h + margin, image.shape[0])
-
+        center_x, center_y = x + w // 2, y + h // 2
+        
+        # Determine the size of the square crop
+        crop_size = max(w, h)
+        margin = int(crop_size * 0.60)
+        crop_size += 2 * margin
+        
+        # Calculate crop boundaries
+        x_start = max(center_x - crop_size // 2, 0)
+        y_start = max(center_y - crop_size // 2, 0)
+        x_end = min(x_start + crop_size, image.shape[1])
+        y_end = min(y_start + crop_size, image.shape[0])
+        
+        # Adjust start positions if end positions exceed image boundaries
+        x_start = max(x_end - crop_size, 0)
+        y_start = max(y_end - crop_size, 0)
+        
         cropped_image = image[y_start:y_end, x_start:x_end]
+        
+        # Pad the image if it's not square (this happens when crop touches image boundaries)
+        if cropped_image.shape[0] != cropped_image.shape[1]:
+            target_shape = (crop_size, crop_size, 3)
+            padded_image = np.zeros(target_shape, dtype=np.uint8)
+            padded_image[:cropped_image.shape[0], :cropped_image.shape[1], :] = cropped_image
+            cropped_image = padded_image
+        
         return cv2.resize(cropped_image, (target_width, target_height))
-     
+
     def enhance_faces(self, image):
         enhanced_image = image
         return enhanced_image
@@ -111,6 +130,7 @@ class ImageParser:
                     largest_face = max(faces, key=lambda rect: rect.width() * rect.height())
                     image = self.crop_to_largest_face(image, largest_face, target_width, target_height)
                 else:
+                    opt_image = image
                     print("No face found. Proceeding with the original image.")
                 
                 # Optimize the image

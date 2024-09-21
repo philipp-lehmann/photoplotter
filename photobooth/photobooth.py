@@ -34,7 +34,8 @@ class PhotoBooth:
     
     def process_tracking(self):
         # Logic for "Tracking" state
-        time.sleep(1)
+        random_delay = random.randint(1, 3)
+        time.sleep(random_delay)
         image_path = self.camera.snap_image()
         if image_path:
             print(f"Tracking: Photo snapped and saved at {image_path}")
@@ -88,15 +89,40 @@ class PhotoBooth:
 
     def process_processing(self):
         # Logic for "Drawing" state
-        if self.plotter.connect_to_plotter == False: 
+        if not self.plotter.connect_to_plotter:
             time.sleep(2)
+        
+        # Convert image to SVG
         tempSVG = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath)
+        
+        # Check if the SVG file was generated
+        if not tempSVG or not os.path.isfile(tempSVG):
+            print("Error: SVG file was not created successfully.")
+            self.state_engine.change_state("Waiting")
+            return
+        
+        # Get the starting coordinates
         startX, startY = self.state_engine.get_image_params_by_id(self.state_engine.photoID[-1] - 1)
-        self.state_engine.currentSVGPath = self.image_parser.create_output_svg(tempSVG, "photo-output-", 1.0, startX, startY, self.state_engine.photoID[-1] - 1)
+
+        # Create the final output SVG file
+        self.state_engine.currentSVGPath = self.image_parser.create_output_svg(
+            tempSVG, 
+            "photo-output-", 
+            1.0, 
+            startX, 
+            startY, 
+            self.state_engine.photoID[-1] - 1
+        )
+        
+        # Check if the output SVG was created successfully
+        if not self.state_engine.currentSVGPath or not os.path.isfile(self.state_engine.currentSVGPath):
+            print("Error: Output SVG file was not created successfully.")
+            return
+
+        # Output success message and proceed to the next state
         print(f"Converted to SVG: {self.state_engine.currentSVGPath}")
         self.state_engine.change_state("Drawing")
-        pass
-    
+
     def process_drawing(self):
         if self.plotter.connect_to_plotter == False: 
             time.sleep(2)
