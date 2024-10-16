@@ -49,7 +49,7 @@ class PhotoBooth:
                 
                 if self.state_engine.workID < 2:
                     self.state_engine.change_state("Working")
-                elif self.state_engine.workID > 7:
+                elif self.state_engine.workID > 15:
                     print("Working skipped: Creating fake portrait")
                     random_fakephoto_number = random.randint(1, 50)
                     parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -68,7 +68,7 @@ class PhotoBooth:
         print(f"Working started: {self.state_engine.workID}")
         # Logic to retrieve work pattern and create output SVG
         parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        random_svg_number = random.randint(1, 30)
+        random_svg_number = random.randint(1, 36)
         self.state_engine.currentWorkPath = os.path.join(parent_dir, f"assets/work/work-{random_svg_number}.svg")
             
         # Randomly pick one photo ID from the remaining list without removing it
