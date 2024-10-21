@@ -42,6 +42,7 @@ class PhotoBooth:
             self.state_engine.currentPhotoPath = image_path
             
             if self.image_parser.detect_faces(self.state_engine.currentPhotoPath):
+                os.remove(self.state_engine.currentPhotoPath)  
                 self.state_engine.change_state("Snapping")
             else:
                 os.remove(self.state_engine.currentPhotoPath)                

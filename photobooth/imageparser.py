@@ -4,6 +4,7 @@ import dlib
 import numpy as np
 import svgwrite
 import re
+import random
 from lxml import etree
 
 class ImageParser:
@@ -98,16 +99,47 @@ class ImageParser:
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         landmarks = self.landmark_detector(gray, face_rect)
 
-        # Draw key features
-        self.draw_feature_line(image, landmarks, [0, 1, 2, 3, 4, 5, 6, 7, 8])           # Jawline
-        self.draw_feature_line(image, landmarks, [17, 18, 19, 20, 21])                  # Left eyebrow
-        self.draw_feature_line(image, landmarks, [22, 23, 24, 25, 26])                  # Right eyebrow
-        self.draw_feature_line(image, landmarks, [32, 33, 34, 35])                      # Nose
-        self.draw_feature_line(image, landmarks, [36, 37, 38, 39])                      # Left eye
-        self.draw_feature_line(image, landmarks, [40, 41])                              # Left eye lower
-        self.draw_feature_line(image, landmarks, [42, 43, 44, 45])                      # Right eye
-        self.draw_feature_line(image, landmarks, [46, 47])                              # Right eye
-        self.draw_feature_line(image, landmarks, [60, 61, 62, 63, 64, 65, 66, 67, 60])  # Mouth inner
+        # Define probabilities for each scenario
+        probability_eyebrows = 0.14 
+        probability_mouth = 0.12 
+        probability_jawline = 0.07
+        probability_eyes_1 = 0.21
+        probability_eyes_2 = 0.15
+        probability_nose_1 = 0.24
+        probability_nose_2 = 0.11
+        probability_teeth = 0.07
+
+        # Randomly decide whether to draw each feature based on probabilities
+        if random.random() < probability_jawline: #leftjaw
+            self.draw_feature_line(image, landmarks, [0, 1, 2, 3, 4, 5, 6, 7, 8])
+
+        if random.random() < probability_eyebrows: #eybrows
+            self.draw_feature_line(image, landmarks, [17, 18, 19, 20, 21])
+            self.draw_feature_line(image, landmarks, [22, 23, 24, 25, 26])
+
+        if random.random() < probability_nose_1: #roundnose
+            self.draw_feature_line(image, landmarks, [32, 33, 34, 35])
+            
+        if random.random() < probability_nose_2: #verticalnose
+            self.draw_feature_line(image, landmarks, [27, 28, 29, 30, 33])
+
+        if random.random() < probability_eyes_1: #eyes
+            self.draw_feature_line(image, landmarks, [36, 37, 38, 39])
+            self.draw_feature_line(image, landmarks, [40, 41])
+            self.draw_feature_line(image, landmarks, [42, 43, 44, 45])
+            self.draw_feature_line(image, landmarks, [46, 47])
+        
+        if random.random() < probability_eyes_2: #cross_eyes
+            self.draw_feature_line(image, landmarks, [37, 40])
+            self.draw_feature_line(image, landmarks, [41, 38])
+            self.draw_feature_line(image, landmarks, [43, 46])                     
+            self.draw_feature_line(image, landmarks, [47, 44])                     
+
+        if random.random() < probability_mouth: #mouth
+            self.draw_feature_line(image, landmarks, [60, 61, 62, 63, 64, 65, 66, 67, 60]) 
+        
+        if random.random() < probability_teeth: #teeth
+            self.draw_feature_line(image, landmarks, [61, 67, 62, 66, 63, 65])
 
     def draw_feature_line(self, img, landmarks, points_indices, color=(255, 255, 255), thickness=1):
         """Helper method to draw lines connecting facial landmarks."""
