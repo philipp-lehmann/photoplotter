@@ -92,17 +92,22 @@ def display_image_based_on_state(LCD, state):
 
     state_config = {
         "Waiting": {
-            "images": ["assets/display/Waiting-1.jpg", "assets/display/Waiting-2.jpg", "assets/display/Waiting-3.jpg"],
+            "images": ["assets/display/Waiting-0.jpg", "assets/display/Waiting-1.jpg", "assets/display/Waiting-2.jpg", "assets/display/Waiting-3.jpg", "assets/display/Waiting-4.jpg"],
             "display_time": 0.125,
             "loop": True
         },
         "Working": {
-            "images": ["assets/display/Working-1.jpg", "assets/display/Working-2.jpg", "assets/display/Working-3.jpg", "assets/display/Working-4.jpg", "assets/display/Working-5.jpg", "assets/display/Working-6.jpg", "assets/display/Working-7.jpg", "assets/display/Working-8.jpg"],
+            "images": ["assets/display/Working-0.jpg", "assets/display/Working-1.jpg", "assets/display/Working-2.jpg", "assets/display/Working-3.jpg", "assets/display/Working-4.jpg", "assets/display/Working-5.jpg", "assets/display/Working-6.jpg", "assets/display/Working-7.jpg", "assets/display/Working-8.jpg", "assets/display/Working-9.jpg"],
             "display_time": 0.125,
             "loop": True
         },
         "Tracking": {
-            "images": ["assets/display/Tracking-1.jpg", "assets/display/Tracking-2.jpg", "assets/display/Tracking-3.jpg", "assets/display/Tracking-4.jpg", "assets/display/Tracking-5.jpg", "assets/display/Tracking-6.jpg", "assets/display/Tracking-7.jpg", "assets/display/Tracking-8.jpg"],
+            "images": ["assets/display/Tracking-0.jpg", "assets/display/Tracking-1.jpg", "assets/display/Tracking-2.jpg", "assets/display/Tracking-3.jpg", "assets/display/Tracking-4.jpg", "assets/display/Tracking-5.jpg", "assets/display/Tracking-6.jpg", "assets/display/Tracking-7.jpg", "assets/display/Tracking-8.jpg", "assets/display/Tracking-9.jpg"],
+            "display_time": 0.125,
+            "loop": True
+        },
+        "Snapping": {
+            "images": ["assets/display/Snapping-0.jpg", "assets/display/Snapping-1.jpg", "assets/display/Snapping-2.jpg", "assets/display/Snapping-3.jpg", "assets/display/Snapping-4.jpg", "assets/display/Snapping-5.jpg", "assets/display/Snapping-6.jpg", "assets/display/Snapping-7.jpg", "assets/display/Snapping-8.jpg", "assets/display/Snapping-9.jpg"],
             "display_time": 0.125,
             "loop": True
         },

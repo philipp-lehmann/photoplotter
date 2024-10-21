@@ -42,7 +42,7 @@ class PhotoBooth:
             self.state_engine.currentPhotoPath = image_path
             
             if self.image_parser.detect_faces(self.state_engine.currentPhotoPath):
-                self.state_engine.change_state("Processing")
+                self.state_engine.change_state("Snapping")
             else:
                 os.remove(self.state_engine.currentPhotoPath)                
                 self.state_engine.workID += 1
@@ -63,6 +63,21 @@ class PhotoBooth:
         else:
             print("Failed to snap photo.")
         pass
+    
+    def process_snapping(self):
+        # Logic for "Snapping" state
+        random_delay = random.randint(1, 3)
+        time.sleep(random_delay)
+        image_path = self.camera.snap_image()
+        
+        if image_path:
+            print(f"Snapping: Photo snapped and saved at {image_path}")
+            self.state_engine.currentPhotoPath = image_path
+            self.state_engine.change_state("Processing")
+        else:
+            print("Failed to snap photo.")
+            self.state_engine.change_state("Tracking")
+            pass
     
     def process_working(self):        
         print(f"Working started: {self.state_engine.workID}")
@@ -159,6 +174,7 @@ class PhotoBooth:
             "Waiting": self.process_waiting,
             "Working": self.process_working,
             "Tracking": self.process_tracking,
+            "Snapping": self.process_snapping,
             "Processing": self.process_processing,
             "Drawing": self.process_drawing,
             "ResetPending": self.process_reset_pending,
