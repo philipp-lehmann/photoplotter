@@ -41,7 +41,16 @@ class ImageParser:
 
         if len(faces) == 0:
             print("No faces detected.")
-            return image
+
+            # Crop the image by 15% on each side
+            height, width = image.shape[:2]
+            crop_x = int(0.2 * width)  # 15% of the width
+            crop_y = int(0.2 * height)  # 15% of the height
+
+            # Perform the cropping
+            cropped_image = image[crop_y:height - crop_y, crop_x:width - crop_x]
+            enhanced_image = self.enhance_faces(cropped_image)
+            return enhanced_image
 
         # Sort faces by size (width * height) in descending order
         faces = sorted(faces, key=lambda rect: rect.width() * rect.height(), reverse=True)
@@ -49,20 +58,20 @@ class ImageParser:
         # Process up to 3 largest faces
         num_faces_to_process = min(3, len(faces))  # Process up to 3 faces
 
+        print(f"Faces found {num_faces_to_process}")
+        
         for i in range(num_faces_to_process):
             largest_face = faces[i]
 
-            # Crop the region around the face
-            cropped_image = self.crop_to_largest_face(image, largest_face, target_width, target_height)
-
-            # Enhance the cropped face (e.g., contrast, sharpness)
-            enhanced_image = self.enhance_faces(cropped_image)
-
             # Detect landmarks and draw them on the original image (not just the cropped one)
             self.draw_facial_landmarks(image, largest_face)
-
+            
+            # Crop the region around the face
+            cropped_image = self.crop_to_largest_face(image, largest_face, target_width, target_height)
+            
         # Return the original image with landmarks drawn on it
-        return image
+        enhanced_image = self.enhance_faces(cropped_image)
+        return enhanced_image
 
     def crop_to_largest_face(self, image, face_rect, target_width=800, target_height=800):
         """Crop the image around the detected face to a square size."""
@@ -97,8 +106,14 @@ class ImageParser:
         return cv2.resize(cropped_image, (target_width, target_height))
 
     def enhance_faces(self, image):
-        enhanced_image = image
-        return enhanced_image
+        lab_image = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
+        l_channel, a_channel, b_channel = cv2.split(lab_image)
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+        enhanced_l_channel = clahe.apply(l_channel)
+        enhanced_lab_image = cv2.merge((enhanced_l_channel, a_channel, b_channel))
+        enhanced_image = cv2.cvtColor(enhanced_lab_image, cv2.COLOR_LAB2BGR)
+        blended_image = cv2.addWeighted(image, 0.65, enhanced_image, 0.35, 0)
+        return blended_image
 
     def draw_facial_landmarks(self, image, face_rect):
         """Draw the 68 facial landmarks using dlib's shape predictor."""
