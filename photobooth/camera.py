@@ -12,7 +12,7 @@ class Camera:
         # Assuming ImageParser is correctly implemented elsewhere
         self.image_parser = ImageParser()
 
-    def snap_image(self, output_dir=None, filename=None, roi=[0.33, 0.33, 0.67, 0.67]):
+    def snap_image(self, output_dir=None, filename=None, roi=[0.3, 0.3, 0.7, 0.7]):
         print("Capturing image")
         
         # Set default output directory if not provided
@@ -29,8 +29,11 @@ class Camera:
             image_filename = filename + ".jpg"
             
         image_filepath = os.path.join(output_dir, image_filename)
-
-        libcamera_command = ["libcamera-still", "-o", image_filepath, "-t", "750", "-n"]
+        libcamera_command = ["libcamera-still", "-o", image_filepath, "-t", "1500", "-n"]
+        libcamera_command.append("--sharpness=5")
+        libcamera_command.append("--autofocus-window=0.5,0.33,0.8,0.67")
+        libcamera_command.append("--autofocus-speed=normal")
+        libcamera_command.append("--autofocus-on-capture=1")
 
 
         # Set the Region of interest for autofocus if provided
@@ -58,6 +61,8 @@ class Camera:
             right = (width + new_size)/2
             bottom = (height + new_size)/2
 
+            print(f"Crop image: {left}, {top}, {right}, {bottom}")
+            
             img_cropped = img.crop((left, top, right, bottom))
             img_cropped.save(image_filepath)
             print(f"Image cropped to square and saved to {image_filepath}")
