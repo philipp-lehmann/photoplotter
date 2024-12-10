@@ -12,29 +12,35 @@ class Camera:
         # Assuming ImageParser is correctly implemented elsewhere
         self.image_parser = ImageParser()
 
-    def snap_image(self, output_dir=None, filename=None, roi=[0.33, 0.33, 0.67, 0.67]):
-        time.sleep(4)
+    def snap_image(self, output_dir=None, filename=None, roi=[0.3, 0.3, 0.7, 0.7]):
         print("Capturing image")
         
+        # Set default output directory if not provided
         if output_dir is None:
             output_dir = "photos/snapped"
         
+        # Create output directory if it doesn't exist
         os.makedirs(output_dir, exist_ok=True)
         
+        # Generate image file path
         if filename is None:
             image_filename = f"image_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
         else:
             image_filename = filename + ".jpg"
+            
         image_filepath = os.path.join(output_dir, image_filename)
+        libcamera_command = ["libcamera-still", "-o", image_filepath, "-t", "1500", "-n"]
+        libcamera_command.append("--sharpness=5")
+        libcamera_command.append("--autofocus-window=0.5,0.33,0.8,0.67")
+        libcamera_command.append("--autofocus-speed=normal")
+        libcamera_command.append("--autofocus-on-capture=1")
 
-        libcamera_command = ["libcamera-still", "-o", image_filepath, "-t", "500", "-n"]
 
         # Set the Region of interest for autofocus if provided
         if roi:
             # ROI should be a tuple or list [x0, y0, x1, y1]
             roi_cmd = "--roi=" + ",".join(map(str, roi))
             libcamera_command.append(roi_cmd)
-            libcamera_command.append("--autofocus-on-capture")
 
         try:
             subprocess.run(libcamera_command, check=True)
@@ -55,6 +61,8 @@ class Camera:
             right = (width + new_size)/2
             bottom = (height + new_size)/2
 
+            print(f"Crop image: {left}, {top}, {right}, {bottom}")
+            
             img_cropped = img.crop((left, top, right, bottom))
             img_cropped.save(image_filepath)
             print(f"Image cropped to square and saved to {image_filepath}")
