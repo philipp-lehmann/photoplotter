@@ -36,9 +36,9 @@ photoplotter/
 │   └── imageparser.py
 │   
 └── photos/
-		└── current/
-	  └── snapped/
-	  └── traced/
+	└── current/
+	└── snapped/
+	└── traced/
 
 ```
 
@@ -59,6 +59,11 @@ photoplotter/
 - Use facetracking instead of button input
 
 This project aims to combine the nostalgic charm of traditional photobooths with modern digital technology, offering a fun and interactive experience for users of all ages.
+
+**State-Engine**
+- The project uses a state-engine.
+![State engine for this branch](doc/state-engine-kunstlokal.jpg)
+
 
 ## Startup
 

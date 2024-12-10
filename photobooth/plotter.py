@@ -16,7 +16,10 @@ class Plotter:
         if self.ad.connect():
             self.ad.options.model = 2
             self.ad.options.auto_rotate = True
+            self.ad.options.pen_rate_lower = 80
+            self.ad.options.pen_rate_raise = 80
             self.ad.options.speed_pendown = 100
+            self.ad.options.speed_penup = 100
             self.ad.update()
             print(f"AxiDraw connected. Model: {self.ad.options.model}" )
             return True
@@ -38,7 +41,6 @@ class Plotter:
         if os.path.exists(svg_path):
             if self.plotter_found:
                 print("Plotter: Plotting image.")
-
                 self.ad.options.model = 2
                 self.ad.update()
                 print(f"AxiDraw connected. Model: {self.ad.options.model}" )
