@@ -112,7 +112,7 @@ class ImageParser:
         enhanced_l_channel = clahe.apply(l_channel)
         enhanced_lab_image = cv2.merge((enhanced_l_channel, a_channel, b_channel))
         enhanced_image = cv2.cvtColor(enhanced_lab_image, cv2.COLOR_LAB2BGR)
-        blended_image = cv2.addWeighted(image, 0.65, enhanced_image, 0.35, 0)
+        blended_image = cv2.addWeighted(image, 0.8, enhanced_image, 0.2, 0)
         return blended_image
 
     def draw_facial_landmarks(self, image, face_rect):
@@ -125,14 +125,14 @@ class ImageParser:
         landmarks = self.landmark_detector(gray, face_rect)
 
         # Define probabilities for each scenario
-        probability_eyebrows = 0.14 
-        probability_mouth = 0.12 
-        probability_jawline = 0.07
-        probability_eyes_1 = 0.21
-        probability_eyes_2 = 0.15
-        probability_nose_1 = 0.24
-        probability_nose_2 = 0.11
-        probability_teeth = 0.07
+        probability_eyebrows = 0.24 
+        probability_mouth = 0.22 
+        probability_jawline = 0.27
+        probability_eyes_1 = 0.31
+        probability_eyes_2 = 0.35
+        probability_nose_1 = 0.34
+        probability_nose_2 = 0.21
+        probability_teeth = 0.17
 
         # Randomly decide whether to draw each feature based on probabilities
         if random.random() < probability_jawline: #leftjaw
