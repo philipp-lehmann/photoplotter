@@ -103,6 +103,34 @@ pip install dlib
 python -m pip install https://software-download.bantamtools.com/nd/api/nextdraw_api.zip
 ```
 
+
+## Services
+```
+// Create .service files
+# Disable autostart
+sudo systemctl stop photoplotter_lcd.service
+sudo systemctl stop photoplotter_main.service
+
+sudo systemctl disable photoplotter_lcd.service
+sudo systemctl disable photoplotter_main.service
+
+
+# Enable autostart
+sudo systemctl start photoplotter_lcd.service
+sudo systemctl start photoplotter_main.service
+
+sudo systemctl enable photoplotter_lcd.service
+sudo systemctl enable photoplotter_main.service
+
+# Check status
+sudo systemctl status photoplotter_lcd.service
+sudo systemctl status photoplotter_main.service
+
+
+# Zip & download with right click in vs code
+zip -r photos.zip photos
+```
+
 <aside>
 ⚠️ After reinstallation make sure plotter sizes are correct in `axidraw_conf.py`
 </aside>
