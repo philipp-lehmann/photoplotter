@@ -1,30 +1,30 @@
 import os
-import time
-from pyaxidraw import axidraw
+from nextdraw import NextDraw
 
 class Plotter:
     def __init__(self):
         print("Starting Plotter ...")
-        self.startPositionX = 0
-        self.startPositionY = 0
-        self.ad = axidraw.AxiDraw()
-        self.ad.interactive()
-        self.plotter_found = self.connect_to_plotter()
+        self.nd1 = NextDraw()
+        # self.nd1.interactive()
+        # self.nd1.options.homing = False 
+        # self.plotter_found = self.connect_to_plotter()
 
     def connect_to_plotter(self):
-        """Attempt to connect to the AxiDraw plotter."""
-        if self.ad.connect():
-            self.ad.options.model = 2
-            self.ad.options.auto_rotate = True
-            self.ad.options.pen_rate_lower = 80
-            self.ad.options.pen_rate_raise = 80
-            self.ad.options.speed_pendown = 100
-            self.ad.options.speed_penup = 100
-            self.ad.update()
-            print(f"AxiDraw connected. Model: {self.ad.options.model}" )
+        """Attempt to connect to the NextDraw plotter."""
+        if self.nd1.connect():
+            self.nd1.options.model = 2
+            self.nd1.options.auto_rotate = True
+            self.nd1.options.pen_rate_lower = 80
+            self.nd1.options.pen_rate_raise = 80
+            self.nd1.options.speed_pendown = 100
+            self.nd1.options.speed_penup = 100
+            self.nd1.options.penlift = 3
+            
+            self.nd1.update()
+            print(f"NextDraw connected. Model: {self.nd1.options.model}")
             return True
         else:
-            print("AxiDraw not found. Entering simulation mode.")
+            print("NextDraw not found. Entering simulation mode.")
             return False
 
     def return_home(self):
@@ -41,15 +41,16 @@ class Plotter:
         if os.path.exists(svg_path):
             if self.plotter_found:
                 print("Plotter: Plotting image.")
-                self.ad.options.model = 2
-                self.ad.update()
-                print(f"AxiDraw connected. Model: {self.ad.options.model}" )
-                self.ad.plot_setup(svg_path)
-                self.ad.plot_run()
+                self.nd1.options.model = 2
+                self.nd1.update()
+                print(f"NextDraw connected. Model: {self.nd1.options.model}" )
+                print(f"NextDraw connected. Model: {self.nd1.options.model}" )
+                self.nd1.plot_setup(svg_path)
+                self.nd1.plot_run()
                 
                 print("Plotting complete.")
             else:
-                print("AxiDraw not found.")
+                print("NextDraw not found.")
         else:
             print("SVG file not found.")
         
