@@ -1,7 +1,7 @@
-from .stateengine import StateEngine
-from .camera import Camera
-from .plotter import Plotter
-from .imageparser import ImageParser
+from photobooth.stateengine import StateEngine
+from photobooth.camera import Camera
+from photobooth.plotter import Plotter
+from photobooth.imageparser import ImageParser
 import time
 import os
 import random

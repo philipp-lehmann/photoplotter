@@ -98,8 +98,9 @@ pip install Pillow
 pip install lxml
 pip install numpy
 pip install paho-mqtt
+pip install dlib
 
-python -m pip install https://cdn.evilmadscientist.com/dl/ad/public/AxiDraw_API.zip
+python -m pip install https://software-download.bantamtools.com/nd/api/nextdraw_api.zip
 ```
 
 <aside>
