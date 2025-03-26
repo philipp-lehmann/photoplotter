@@ -5,23 +5,31 @@ class Plotter:
     def __init__(self):
         print("Starting Plotter ...")
         self.nd1 = NextDraw()
-        self.nd1.interactive()  # Start interactive mode
-        
-        # Skip homing
-        self.nd1.options.homing = False  # Make sure automatic homing is off
+        self.nd1.interactive() 
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        config_path = os.path.join(current_dir, "nextdraw_conf.py")
+        self.nd1.load_config(config_path)
+ 
+        self.plotter_found = self.connect_to_plotter()
 
         if self.nd1.connect():
             print("Plotter connected successfully.")
+            print(f"NextDraw connected. Model: {self.nd1.options.model}" )
+
         else:
             print("Failed to connect to the plotter.")
             quit()
+            
+        self.nd1.plot_setup()
+        self.nd1.options.mode = "find_home"
+        self.nd1.plot_run()
 
-    def plot(self):
-        """Test simple plot movements."""
-        self.nd1.moveto(1, 1)
-        self.nd1.lineto(2, 1)
-        self.nd1.moveto(0, 0)
-        self.nd1.disconnect()
+    # def plot(self):
+    #     """Test simple plot movements."""
+    #     self.nd1.moveto(1, 1)
+    #     self.nd1.lineto(2, 1)
+    #     self.nd1.moveto(0, 0)
+    #     self.nd1.disconnect()
         
     def connect_to_plotter(self):
         """Attempt to connect to the NextDraw plotter."""
@@ -55,10 +63,6 @@ class Plotter:
         if os.path.exists(svg_path):
             if self.plotter_found:
                 print("Plotter: Plotting image.")
-                self.nd1.options.model = 2
-                self.nd1.update()
-                print(f"NextDraw connected. Model: {self.nd1.options.model}" )
-                print(f"NextDraw connected. Model: {self.nd1.options.model}" )
                 self.nd1.plot_setup(svg_path)
                 self.nd1.plot_run()
                 
@@ -69,7 +73,3 @@ class Plotter:
             print("SVG file not found.")
         
         
-        
-# Run the plotter
-plotter = Plotter()
-plotter.plot()
