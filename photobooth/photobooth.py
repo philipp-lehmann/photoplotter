@@ -4,6 +4,7 @@ from .plotter import Plotter
 from .imageparser import ImageParser
 import time
 import os
+import sys
 import random
 
 class PhotoBooth:
@@ -160,10 +161,19 @@ class PhotoBooth:
     
     def process_test(self):
         # Logic for "Waiting" state
+        
         parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        self.state_engine.currentPhotoPath = os.path.join(parent_dir, f"photos/snapped/image_20240906_214205.jpg")
-        self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath, min_contour_area=5, suffix='-5')
-        time.sleep(10)
+        print(parent_dir)
+        
+        for i in range(1, 6):
+            pathFragments = [os.path.dirname(os.path.dirname(os.path.abspath(__file__))), f"/photos/test/", f"{i}", '.jpg']
+            self.state_engine.currentPhotoPath = "".join(pathFragments)
+            self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath, min_contour_area=5, suffix='-5')
+            time.sleep(1)
+        
+        
+        print("done")
+        sys.exit()
         pass
     
 
@@ -183,7 +193,7 @@ class PhotoBooth:
         }
         
         # self.state_engine.client.subscribe("#")
-        self.state_engine.client.on_message = self.state_engine.on_message
+        # self.state_engine.client.on_message = self.state_engine.on_message
         
         try:
             while True:

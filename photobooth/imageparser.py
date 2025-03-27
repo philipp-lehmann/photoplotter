@@ -174,7 +174,7 @@ class ImageParser:
             cv2.line(img, points[i], points[i + 1], color, thickness)
 
     def convert_to_svg(self, image_filepath, target_width=800, target_height=800, scale_x=0.35, scale_y=0.35, min_paths=30, max_paths=90, min_contour_area=20, suffix=''):
-        print("Converting current photo to SVG")
+        print(f"Converting  {image_filepath}")
         if os.path.isfile(image_filepath):
             image = cv2.imread(image_filepath)
             if image is not None:
