@@ -173,7 +173,7 @@ class ImageParser:
         for i in range(len(points) - 1):
             cv2.line(img, points[i], points[i + 1], color, thickness)
 
-    def convert_to_svg(self, image_filepath, target_width=800, target_height=800, scale_x=0.35, scale_y=0.35, min_paths=30, max_paths=90, min_contour_area=20, suffix=''):
+    def convert_to_svg(self, image_filepath, target_width=800, target_height=800, scale_x=0.35, scale_y=0.35, min_paths=30, max_paths=90, min_contour_area=20, suffix='', method=1):
         print(f"Converting  {image_filepath}")
         if os.path.isfile(image_filepath):
             image = cv2.imread(image_filepath)
@@ -191,42 +191,45 @@ class ImageParser:
                     print("No face found. Proceeding with the original image.")
                 
                 # Optimize the image
+                # Optimize the image
                 opt_image = self.process_face_image(image)
                 optimized_image_path = image_filepath.rsplit('.', 1)[0] + '_optimized.' + image_filepath.rsplit('.', 1)[1]
                 cv2.imwrite(optimized_image_path, opt_image)
-                
-                # Convert the optimized image to SVG
-                gray_image = cv2.cvtColor(opt_image, cv2.COLOR_BGR2GRAY)
-                edges = cv2.Canny(gray_image, threshold1=80, threshold2=200)
-                contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+                # Convert the optimized image to binary for closed contour extraction
+                gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+                # Initialize empty list for contours
+                contours = []
+
+                if method == 1:  # Edge-based method
+                    edges = cv2.Canny(gray_image, threshold1=80, threshold2=200)
+                    contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                elif method == 2:  # Binary-based method
+                    _, binary = cv2.threshold(gray_image, 127, 255, cv2.THRESH_BINARY)
+                    contours, _ = cv2.findContours(binary, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+                elif method == 3:  # Merge both methods
+                    # Edge-based contours
+                    edges = cv2.Canny(gray_image, threshold1=80, threshold2=200)
+                    edge_contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+                    # Binary-based contours
+                    _, binary = cv2.threshold(gray_image, 127, 255, cv2.THRESH_BINARY)
+                    binary_contours, _ = cv2.findContours(binary, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+                    # Merge contours
+                    contours = edge_contours + binary_contours
+                    
+                    
+                # Filter for meaningful closed contours
                 filtered_contours = [contour for contour in contours if cv2.contourArea(contour) > min_contour_area]
                 simplified_contours = [cv2.approxPolyDP(contour, 1, True) for contour in filtered_contours]
 
-                # Optimization loop for paths
-                num_paths = 0
-                trials = 0
-                lower_threshold = 80
-                upper_threshold = 200
-                epsilon = 1
-
-                while num_paths < min_paths or num_paths > max_paths:
-                    dwg = svgwrite.Drawing(size=(target_width, target_height))
-                    num_paths = self.add_contours_to_svg(dwg, simplified_contours, scale_x, scale_y)
-
-                    if num_paths < min_paths or num_paths > max_paths:
-                        lower_threshold, upper_threshold, epsilon = self.adjust_thresholds(
-                            num_paths, min_paths, max_paths, lower_threshold, upper_threshold, epsilon, trials)
-                        edges = cv2.Canny(gray_image, lower_threshold, upper_threshold)
-                        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                        simplified_contours = [cv2.approxPolyDP(contour, epsilon, True) for contour in contours]
-
-                    trials += 1
-                    if trials > self.maxTrials:
-                        break
-
+                
                 # Sort contours by distance from center and limit paths if necessary
                 image_center = np.array([target_width // 2, target_height // 2])
                 sorted_contours = sorted(simplified_contours, key=lambda c: np.linalg.norm(np.mean(np.squeeze(c), axis=0) - image_center))
+
 
                 simplified_contours = sorted_contours[:max_paths] if len(sorted_contours) > max_paths else sorted_contours
                 dwg = svgwrite.Drawing(size=(target_width, target_height))

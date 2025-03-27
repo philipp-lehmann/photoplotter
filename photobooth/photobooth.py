@@ -168,7 +168,9 @@ class PhotoBooth:
         for i in range(1, 6):
             pathFragments = [os.path.dirname(os.path.dirname(os.path.abspath(__file__))), f"/photos/test/", f"{i}", '.jpg']
             self.state_engine.currentPhotoPath = "".join(pathFragments)
-            self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath, min_contour_area=5, suffix='-5')
+            self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath, min_contour_area=5, suffix='-edge', method=1)
+            self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath, min_contour_area=5, suffix='-binary', method=2)
+            self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath, min_contour_area=5, suffix='-both', method=3)
             time.sleep(1)
         
         
