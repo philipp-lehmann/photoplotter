@@ -26,7 +26,8 @@ class ImageParser:
             return None
         
         # Detect faces
-        gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        opt_image = cv2.medianBlur(image, 5)
+        gray_image = cv2.cvtColor(opt_image, cv2.COLOR_BGR2GRAY)
         return gray_image
 
 
@@ -213,23 +214,20 @@ class ImageParser:
                 optimized_image_path = image_filepath.rsplit('.', 1)[0] + '_optimized.' + image_filepath.rsplit('.', 1)[1]
                 cv2.imwrite(optimized_image_path, opt_image)
 
-                # Convert the optimized image to binary for closed contour extraction
-                gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-
                 # Initialize empty list for contours
                 contours = []
 
                 # Extract contours based on the selected method
                 if method == 1:  # Edge-based method
-                    edges = cv2.Canny(gray_image, threshold1=80, threshold2=200)
+                    edges = cv2.Canny(opt_image, threshold1=80, threshold2=200)
                     contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
                 elif method == 2:  # Binary-based method
-                    _, binary = cv2.threshold(gray_image, 127, 255, cv2.THRESH_BINARY)
+                    _, binary = cv2.threshold(opt_image, 127, 255, cv2.THRESH_BINARY)
                     contours, _ = cv2.findContours(binary, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
                 elif method == 3:  # Merge both methods
-                    edges = cv2.Canny(gray_image, threshold1=80, threshold2=200)
+                    edges = cv2.Canny(opt_image, threshold1=80, threshold2=200)
                     edge_contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                    _, binary = cv2.threshold(gray_image, 127, 255, cv2.THRESH_BINARY)
+                    _, binary = cv2.threshold(opt_image, 127, 255, cv2.THRESH_BINARY)
                     binary_contours, _ = cv2.findContours(binary, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
                     contours = edge_contours + binary_contours
 
