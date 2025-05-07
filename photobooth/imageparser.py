@@ -193,8 +193,8 @@ class ImageParser:
             cv2.line(img, points[i], points[i + 1], color, thickness)
 
     def convert_to_svg(self, image_filepath, target_width=800, target_height=800, scale_x=0.35, scale_y=0.35, min_paths=30, max_paths=300, min_contour_area=20, suffix='', method=1):
-        """Convert input image to svg with parameters"""
-        print(f"Converting  {image_filepath}")
+        """Convert input image to svg with parameters."""
+        print(f"Converting {image_filepath}")
         if os.path.isfile(image_filepath):
             image = cv2.imread(image_filepath)
             if image is not None:
@@ -204,10 +204,8 @@ class ImageParser:
 
                 if len(faces) > 0:
                     # Use the largest detected face
-                    # largest_face = max(faces, key=lambda rect: rect.width() * rect.height())
                     image = self.crop_all_faces(image, faces, target_width, target_height)
                 else:
-                    opt_image = image
                     print("No face found. Proceeding with the original image.")
                 
                 # Optimize the image
@@ -221,6 +219,7 @@ class ImageParser:
                 # Initialize empty list for contours
                 contours = []
 
+                # Extract contours based on the selected method
                 if method == 1:  # Edge-based method
                     edges = cv2.Canny(gray_image, threshold1=80, threshold2=200)
                     contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -228,44 +227,94 @@ class ImageParser:
                     _, binary = cv2.threshold(gray_image, 127, 255, cv2.THRESH_BINARY)
                     contours, _ = cv2.findContours(binary, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
                 elif method == 3:  # Merge both methods
-                    # Edge-based contours
                     edges = cv2.Canny(gray_image, threshold1=80, threshold2=200)
                     edge_contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-                    # Binary-based contours
                     _, binary = cv2.threshold(gray_image, 127, 255, cv2.THRESH_BINARY)
                     binary_contours, _ = cv2.findContours(binary, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-
-                    # Merge contours
                     contours = edge_contours + binary_contours
-                    
-                    
-                # Filter for meaningful closed contours
-                filtered_contours = [contour for contour in contours if cv2.contourArea(contour) > min_contour_area]
-                simplified_contours = [cv2.approxPolyDP(contour, 1, True) for contour in filtered_contours]
 
-                
-                # Sort contours by distance from center and limit paths if necessary
+                # Filter and simplify contours
+                filtered_contours = [c for c in contours if cv2.contourArea(c) > min_contour_area]
+                simplified_contours = [cv2.approxPolyDP(c, 1, True) for c in filtered_contours]
                 image_center = np.array([target_width // 2, target_height // 2])
                 sorted_contours = sorted(simplified_contours, key=lambda c: np.linalg.norm(np.mean(np.squeeze(c), axis=0) - image_center))
+                simplified_contours = sorted_contours[:max_paths]
 
-
-                simplified_contours = sorted_contours[:max_paths] if len(sorted_contours) > max_paths else sorted_contours
+                # Create SVG
                 dwg = svgwrite.Drawing(size=(target_width, target_height))
                 self.add_contours_to_svg(dwg, simplified_contours, scale_x, scale_y)
-
-                # Save the SVG
                 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
                 output_dir = os.path.join(parent_dir, "photos/traced")
                 os.makedirs(output_dir, exist_ok=True)
-                
                 svg_filename = os.path.splitext(os.path.basename(image_filepath))[0] + suffix + '.svg'
                 svg_filepath = os.path.join(output_dir, svg_filename)
                 dwg.saveas(svg_filepath)
-                
-                return svg_filepath
+
+                # Process the SVG
+                x_grid = self.generate_dynamic_grid()
+                y_grid = self.generate_dynamic_grid()
+                processed_svg_filepath = svg_filepath.rsplit('.', 1)[0] + '_aligned.svg'
+                self.align_svg_to_points(svg_filepath, processed_svg_filepath, x_grid, y_grid)
+
+                print(f"Processed SVG saved at: {processed_svg_filepath}")
+                return processed_svg_filepath
 
         return None
+    
+    def generate_dynamic_grid(self, min_value=0, max_value=280, num_points=70, center=140.0):
+        """Generate a dynamic grid with higher density near the center and map values to the specified range."""
+        
+        # Generate original grid values (e.g., cubic scaling)
+        values = np.linspace(-1, 1, num_points)
+        original_dynamic_values = center + (max_value - min_value) * values**3
+        
+        # Calculate the min and max of the original dynamic grid values
+        original_min = np.min(original_dynamic_values)
+        original_max = np.max(original_dynamic_values)
+        
+        # Map original values to the target range [min_value, max_value]
+        mapped_dynamic_values = [
+            min_value + (val - original_min) / (original_max - original_min) * (max_value - min_value)
+            for val in original_dynamic_values
+        ]        
+        return sorted(mapped_dynamic_values)
+    
+    
+    @staticmethod
+    def align_to_dynamic_grid(value, grid):
+        """Find the closest value in the dynamic grid."""
+        return min(grid, key=lambda x: abs(x - value))
+
+    
+    def align_svg_to_points(self, input_file, output_file, x_grid, y_grid):
+        """Process SVG by aligning points to a dynamic grid using lxml.etree."""
+        # Parse the SVG file
+        parser = etree.XMLParser(remove_blank_text=True)
+        tree = etree.parse(input_file, parser)
+        root = tree.getroot()
+
+        # Define the SVG namespace
+        namespace = {'svg': 'http://www.w3.org/2000/svg'}
+
+        # Process all polyline and polygon elements
+        for poly in root.xpath(".//svg:polyline | .//svg:polygon", namespaces=namespace):
+            points = poly.get("points")
+            if points:
+                new_points = []
+                for point in points.split():
+                    try:
+                        x, y = map(float, point.split(","))
+                        x_aligned = self.align_to_dynamic_grid(x, x_grid)
+                        y_aligned = self.align_to_dynamic_grid(y, y_grid)
+                        new_points.append(f"{x_aligned},{y_aligned}")
+                    except ValueError:
+                        continue  # Skip malformed points
+                poly.set("points", " ".join(new_points))
+
+        # Save the modified SVG file
+        tree.write(output_file, pretty_print=True, xml_declaration=True, encoding="UTF-8")
+        print(f"Processed SVG saved as {output_file}")
+        return output_file
 
     def create_output_svg(self, image_svg_path, imgname = 'image', scale_factor = 0.8, offset_x=0, offset_y=0, id=0):
         """Create output image on artboard with id for output position"""
@@ -307,7 +356,7 @@ class ImageParser:
         dwg.saveas(output_svg_path)
 
         return output_svg_path
-
+    
     @staticmethod
     def add_contours_to_svg(dwg, contours, scale_x, scale_y):
         # Implementation for adding contours to the SVG with styling
