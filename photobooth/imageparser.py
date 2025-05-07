@@ -193,6 +193,7 @@ class ImageParser:
             cv2.line(img, points[i], points[i + 1], color, thickness)
 
     def convert_to_svg(self, image_filepath, target_width=800, target_height=800, scale_x=0.35, scale_y=0.35, min_paths=30, max_paths=300, min_contour_area=20, suffix='', method=1):
+        """Convert input image to svg with parameters"""
         print(f"Converting  {image_filepath}")
         if os.path.isfile(image_filepath):
             image = cv2.imread(image_filepath)
@@ -267,6 +268,7 @@ class ImageParser:
         return None
 
     def create_output_svg(self, image_svg_path, imgname = 'image', scale_factor = 0.8, offset_x=0, offset_y=0, id=0):
+        """Create output image on artboard with id for output position"""
         # Load the original SVG content from a file
         with open(image_svg_path, 'rb') as file:  # Note 'rb' mode for reading as bytes
             svg_data = file.read()
@@ -320,7 +322,6 @@ class ImageParser:
     @staticmethod
     def adjust_thresholds(num_paths, min_paths, max_paths, lower_threshold, upper_threshold, epsilon, trial):
         # Adjusts the thresholds based on the number of paths
-        
         if num_paths < min_paths:
             lower_threshold -= 5
             upper_threshold -= 10 
