@@ -1,20 +1,31 @@
-import cv2
 import os
+import re
+import random
+
+import cv2
 import dlib
 import numpy as np
 import svgwrite
-import re
-import random
+import torch
+from torchvision import transforms
 from lxml import etree
 
 class ImageParser:
     def __init__(self):
         self.maxTrials = 10
+        print("Starting ImageParser ...")
+
         # Initialize dlib face detector and shape predictor (68 landmarks)
         self.face_detector = dlib.get_frontal_face_detector()
         base_path = os.path.dirname(os.path.abspath(__file__))
         predictor_path = os.path.join(base_path, 'shape_predictor', 'shape_predictor_68_face_landmarks.dat')
-        self.landmark_detector = dlib.shape_predictor(predictor_path)
+
+        # Validate file paths
+        if not os.path.exists(predictor_path):
+            raise FileNotFoundError(f"Shape predictor file not found: {predictor_path}")
+        
+        # Load shape predictor
+        self.landmark_detector = dlib.shape_predictor(predictor_path)     
         print("Starting ImageParser ...")
         pass    
     
@@ -192,6 +203,70 @@ class ImageParser:
 
         for i in range(len(points) - 1):
             cv2.line(img, points[i], points[i + 1], color, thickness)
+            
+    def generate_depth_map(self, image):
+        """Generate a depth map for the image."""
+        # Load the pre-trained depth estimation model (MiDaS or EfficientMon)
+        # Example: Use a pre-trained MiDaS model or EfficientMon here
+        model_type = "MiDaS_small"
+        model = torch.hub.load("intel-isl/MiDaS", model_type, pretrained=True)
+        transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Resize((256, 256)),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        ])
+
+        image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        input_tensor = transform(image_rgb).unsqueeze(0)  # Add batch dimension
+        with torch.no_grad():
+            depth_map = model(input_tensor)
+
+        depth_map = depth_map.squeeze().cpu().numpy()  # Remove batch dimension and convert to numpy
+        depth_map_normalized = cv2.normalize(depth_map, None, 0, 255, cv2.NORM_MINMAX)  # Normalize to 0-255
+        return np.uint8(depth_map_normalized)
+    
+    def enhance_foreground(self, image, depth_map, contrast_factor=2.0, background_factor=0.5):
+        """
+        Enhance the foreground of the image based on a depth map.
+        The foreground contrast is enhanced, and the background is darkened.
+
+        Parameters:
+            image (ndarray): The original grayscale image.
+            depth_map (ndarray): The depth map of the image.
+            contrast_factor (float): Factor to enhance contrast in the foreground.
+            background_factor (float): Factor to darken the background.
+
+        Returns:
+            result (ndarray): The processed image with enhanced foreground and darkened background.
+        """
+        # Convert the depth map to a float and normalize to [0, 1]
+        depth_map_normalized = cv2.normalize(depth_map, None, 0, 1, cv2.NORM_MINMAX)
+
+        # Create a mask for the foreground (near objects, typically with lower depth values)
+        foreground_mask = (depth_map_normalized >= 0.5).astype(np.uint8) 
+        background_mask = (depth_map_normalized < 0.5).astype(np.uint8) 
+
+        # Enhance foreground contrast using CLAHE (Contrast Limited Adaptive Histogram Equalization)
+        clahe = cv2.createCLAHE(clipLimit=contrast_factor, tileGridSize=(8, 8))
+        enhanced_image = clahe.apply(image)  # Applying CLAHE on grayscale image directly
+
+        # Darken the background: Reduce the brightness of background pixels
+        image_background_darker = image * background_factor  # Dim the background
+
+        # Ensure the image background is clipped to 0-255 range (if necessary)
+        image_background_darker = np.clip(image_background_darker, 0, 255).astype(np.uint8)
+
+        # Combine the results: Blend the enhanced foreground and darkened background
+        result = np.zeros_like(image, dtype=np.uint8)
+
+        # Apply enhanced foreground to the result where the foreground mask is 1
+        result[foreground_mask == 1] = enhanced_image[foreground_mask == 1]
+
+        # Apply darkened background to the result where the background mask is 1
+        result[background_mask == 1] = image_background_darker[background_mask == 1]
+
+        return result
+
 
     def convert_to_svg(self, image_filepath, target_width=800, target_height=800, scale_x=0.35, scale_y=0.35, min_paths=30, max_paths=300, min_contour_area=20, suffix='', method=1):
         """Convert input image to svg with parameters."""
@@ -211,11 +286,22 @@ class ImageParser:
                 
                 # Optimize the image
                 opt_image = self.process_face_image(image)
+                # optimized_image_path = image_filepath.rsplit('.', 1)[0] + '_optimized.' + image_filepath.rsplit('.', 1)[1]
+                # cv2.imwrite(optimized_image_path, opt_image)
+                
+                # Generate depth map and integrate it with the image
+                depth_map = self.generate_depth_map(image)
+                depth_map = cv2.resize(depth_map, (opt_image.shape[1], opt_image.shape[0]))
+
+                # Apply the depth map to the optimized image
+                opt_image = self.enhance_foreground(opt_image, depth_map)
                 optimized_image_path = image_filepath.rsplit('.', 1)[0] + '_optimized.' + image_filepath.rsplit('.', 1)[1]
                 cv2.imwrite(optimized_image_path, opt_image)
-
+                
                 # Initialize empty list for contours
                 contours = []
+                
+                
 
                 # Extract contours based on the selected method
                 if method == 1:  # Edge-based method
