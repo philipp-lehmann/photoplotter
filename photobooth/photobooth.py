@@ -160,21 +160,26 @@ class PhotoBooth:
         pass
     
     def process_test(self):
-        # Logic for "Waiting" state
-        
+        # Base directory
         parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        print(parent_dir)
+        photos_dir = os.path.join(parent_dir, "photos/test")
         
-        for i in range(1, 6):
-            pathFragments = [os.path.dirname(os.path.dirname(os.path.abspath(__file__))), f"/photos/test/", f"{i}", '.jpg']
-            self.state_engine.currentPhotoPath = "".join(pathFragments)
-            self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath, min_contour_area=5, suffix='-edge', method=1)
-            self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath, min_contour_area=5, suffix='-binary', method=2)
-            self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath, min_contour_area=5, suffix='-both', method=3)
-            time.sleep(1)
+        # Find all .jpg files in the directory
+        jpg_files = [f for f in os.listdir(photos_dir) if f.endswith('.jpg') and not f.endswith('_optimized.jpg')]
         
-        
-        print("done")
+        # Process each .jpg file
+        for jpg_file in jpg_files:
+            self.state_engine.currentPhotoPath = os.path.join(photos_dir, jpg_file)
+            
+            # Convert to SVG with various methods
+            self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(
+                self.state_engine.currentPhotoPath, min_contour_area=5, suffix='-edge', method=1)
+            self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(
+                self.state_engine.currentPhotoPath, min_contour_area=5, suffix='-binary', method=2)
+            self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(
+                self.state_engine.currentPhotoPath, min_contour_area=5, suffix='-both', method=3)
+                    
+        print("All JPG files processed.")
         sys.exit()
         pass
     

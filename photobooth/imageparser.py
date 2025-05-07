@@ -18,16 +18,6 @@ class ImageParser:
         print("Starting ImageParser ...")
         pass    
     
-    def detect_faces(self, image_filepath):
-        """Quick method to check if a face is present in the image"""
-        image = cv2.imread(image_filepath)
-        if image is None:
-            print("Failed to load image.")
-            return False
-        
-        gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        faces = self.face_detector(gray_image)
-        return len(faces) > 0
     
     def process_face_image(self, image, target_width=800, target_height=800):
         """Optimized method that detects, crops, enhances the face and draws facial features"""
@@ -37,50 +27,72 @@ class ImageParser:
         
         # Detect faces
         gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        faces = self.face_detector(gray_image)
+        return gray_image
 
-        if len(faces) == 0:
-            print("No faces detected.")
 
-            # Crop the image by 15% on each side
-            height, width = image.shape[:2]
-            crop_x = int(0.2 * width)  # 15% of the width
-            crop_y = int(0.2 * height)  # 15% of the height
+    def crop_all_faces(self, image, faces, target_width=800, target_height=800, padding=1500):
+        """Crop the image to a bounding rectangle encompassing all faces and resize it."""
+        # Check if 'faces' is a single rectangle or a collection of rectangles
+        if isinstance(faces, dlib.rectangle):
+            faces = [faces]  # Wrap it in a list
+        elif not isinstance(faces, (dlib.rectangles, list)):
+            raise TypeError("'faces' must be a dlib.rectangle or dlib.rectangles object.")
 
-            # Perform the cropping
-            cropped_image = image[crop_y:height - crop_y, crop_x:width - crop_x]
-            enhanced_image = self.enhance_faces(cropped_image)
-            return enhanced_image
-
-        # Sort faces by size (width * height) in descending order
-        faces = sorted(faces, key=lambda rect: rect.width() * rect.height(), reverse=True)
-
-        # Process up to 3 largest faces
-        num_faces_to_process = min(3, len(faces))  # Process up to 3 faces
-
-        print(f"Faces found {num_faces_to_process}")
+        # Initialize bounding box coordinates
+        min_x, min_y = float('inf'), float('inf')
+        max_x, max_y = float('-inf'), float('-inf')
         
-        for i in range(num_faces_to_process):
-            largest_face = faces[i]
-
-            # Detect landmarks and draw them on the original image (not just the cropped one)
-            self.draw_facial_landmarks(image, largest_face)
-            
-            # Crop the region around the face
-            cropped_image = self.crop_to_largest_face(image, largest_face, target_width, target_height)
-            
-        # Return the original image with landmarks drawn on it
-        enhanced_image = self.enhance_faces(cropped_image)
-        return enhanced_image
+        # Calculate the encompassing bounding box
+        for face in faces:
+            min_x = min(min_x, face.left())
+            min_y = min(min_y, face.top())
+            max_x = max(max_x, face.right())
+            max_y = max(max_y, face.bottom())
+        
+        # Add padding
+        min_x = max(0, min_x - padding)
+        min_y = max(0, min_y - padding)
+        max_x = min(image.shape[1], max_x + padding)
+        max_y = min(image.shape[0], max_y + padding)
+        
+        # Adjust bounding box to a square
+        width = max_x - min_x
+        height = max_y - min_y
+        
+        if width > height:
+            diff = width - height
+            min_y = max(0, min_y - diff // 2)
+            max_y = min(image.shape[0], max_y + diff - (min_y == 0) * diff)
+        elif height > width:
+            diff = height - width
+            min_x = max(0, min_x - diff // 2)
+            max_x = min(image.shape[1], max_x + diff - (min_x == 0) * diff)
+        
+        # Final bounding box dimensions
+        width = max_x - min_x
+        height = max_y - min_y
+        
+        assert width == height, "Bounding box must be square."
+        
+        # Crop the image
+        cropped_image = image[min_y:max_y, min_x:max_x]
+        
+        # Resize the cropped image to the target size
+        resized_image = cv2.resize(cropped_image, (target_width, target_height), interpolation=cv2.INTER_AREA)
+        
+        return resized_image
 
     def crop_to_largest_face(self, image, face_rect, target_width=800, target_height=800):
-        """Crop the image around the detected face to a square size."""
+        """
+        NOT IN USE: This function is no longer active.
+        Crop the image around the detected face to a square size.
+        """
         x, y, w, h = face_rect.left(), face_rect.top(), face_rect.width(), face_rect.height()
         center_x, center_y = x + w // 2, y + h // 2
 
         # Determine the size of the square crop
         crop_size = max(w, h)
-        margin = int(crop_size * 0.60)  # Add some margin around the face
+        margin = int(crop_size * 0.14)  # Add some margin around the face
         crop_size += 2 * margin
 
         # Calculate crop boundaries
@@ -106,6 +118,10 @@ class ImageParser:
         return cv2.resize(cropped_image, (target_width, target_height))
 
     def enhance_faces(self, image):
+        """
+        NOT IN USE: This function is no longer active.
+        Increase the contrast of the input image
+        """
         lab_image = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
         l_channel, a_channel, b_channel = cv2.split(lab_image)
         clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
@@ -116,7 +132,10 @@ class ImageParser:
         return blended_image
 
     def draw_facial_landmarks(self, image, face_rect):
-        """Draw the 68 facial landmarks using dlib's shape predictor."""
+        """
+        NOT IN USE: This function is no longer active.
+        Draw the 68 facial landmarks using dlib's shape predictor.
+        """
         if image is None or image.size == 0:
             print("Error: Image is empty or not loaded properly.")
             return
@@ -173,7 +192,7 @@ class ImageParser:
         for i in range(len(points) - 1):
             cv2.line(img, points[i], points[i + 1], color, thickness)
 
-    def convert_to_svg(self, image_filepath, target_width=800, target_height=800, scale_x=0.35, scale_y=0.35, min_paths=30, max_paths=90, min_contour_area=20, suffix='', method=1):
+    def convert_to_svg(self, image_filepath, target_width=800, target_height=800, scale_x=0.35, scale_y=0.35, min_paths=30, max_paths=300, min_contour_area=20, suffix='', method=1):
         print(f"Converting  {image_filepath}")
         if os.path.isfile(image_filepath):
             image = cv2.imread(image_filepath)
@@ -184,13 +203,12 @@ class ImageParser:
 
                 if len(faces) > 0:
                     # Use the largest detected face
-                    largest_face = max(faces, key=lambda rect: rect.width() * rect.height())
-                    image = self.crop_to_largest_face(image, largest_face, target_width, target_height)
+                    # largest_face = max(faces, key=lambda rect: rect.width() * rect.height())
+                    image = self.crop_all_faces(image, faces, target_width, target_height)
                 else:
                     opt_image = image
                     print("No face found. Proceeding with the original image.")
                 
-                # Optimize the image
                 # Optimize the image
                 opt_image = self.process_face_image(image)
                 optimized_image_path = image_filepath.rsplit('.', 1)[0] + '_optimized.' + image_filepath.rsplit('.', 1)[1]
