@@ -18,7 +18,6 @@ class Plotter:
 
         else:
             print("Failed to connect to the plotter.")
-            quit()
             
         self.nd1.plot_setup()
         self.nd1.options.mode = "find_home"
