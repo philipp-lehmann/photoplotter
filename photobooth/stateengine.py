@@ -5,8 +5,8 @@ import random
 class StateEngine:
     def __init__(self):
         # State
-        self.debugmode = False
-        self.state = "Startup"
+        self.debugmode = True
+        self.state = "Test"
         self.currentPhotoPath = ""
         self.currentWorkPath = ""
         self.currentSVGPath = ""
@@ -28,9 +28,9 @@ class StateEngine:
         }
         
         # MQTT
-        self.broker_address = "localhost"
-        self.client = mqtt.Client("StateEngine_Client")
-        self.client.on_connect = self.on_connect
+        # self.broker_address = "localhost"
+        # self.client = mqtt.Client("StateEngine_Client")
+        # self.client.on_connect = self.on_connect
         
         if self.debugmode:
             print("Starting Debugmode...")

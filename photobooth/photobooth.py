@@ -4,6 +4,7 @@ from photobooth.plotter import Plotter
 from photobooth.imageparser import ImageParser
 import time
 import os
+import sys
 import random
 
 class PhotoBooth:
@@ -93,7 +94,7 @@ class PhotoBooth:
         
         # Create output SVG using the randomly chosen photo ID
         self.state_engine.currentSVGPath = self.image_parser.create_output_svg(
-            self.state_engine.currentWorkPath, "work-output-", 1.0, startX, startY, random_photo_id
+            self.state_engine.currentWorkPath, "work-output-", 0.35, startX, startY, random_photo_id
         )
         
         print(f"Converted Work pattern to SVG: {self.state_engine.currentSVGPath}, random: {random_photo_id}, from {self.state_engine.photoID}")
@@ -122,12 +123,7 @@ class PhotoBooth:
 
         # Create the final output SVG file
         self.state_engine.currentSVGPath = self.image_parser.create_output_svg(
-            tempSVG, 
-            "photo-output-", 
-            1.0, 
-            startX, 
-            startY, 
-            self.state_engine.photoID[-1] - 1
+            tempSVG, "photo-output-", 0.35, startX, startY, self.state_engine.photoID[-1] - 1
         )
         
         # Check if the output SVG was created successfully
@@ -159,11 +155,44 @@ class PhotoBooth:
         pass
     
     def process_test(self):
-        # Logic for "Waiting" state
+        # Base directory
         parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        self.state_engine.currentPhotoPath = os.path.join(parent_dir, f"photos/snapped/image_20240906_214205.jpg")
-        self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath, min_contour_area=5, suffix='-5')
-        time.sleep(10)
+        photos_dir = os.path.join(parent_dir, "photos/test")
+        
+        # Find all .jpg files in the directory
+        jpg_files = [f for f in os.listdir(photos_dir) if f.endswith('.jpg') and not f.endswith('_optimized.jpg')]
+        
+        # Initialize the rolling ID
+        rolling_id = 0
+
+        # Process each .jpg file
+        for jpg_file in jpg_files:
+            self.state_engine.currentPhotoPath = os.path.join(photos_dir, jpg_file)
+
+            # Convert to SVG with various methods
+            # self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(
+            #     self.state_engine.currentPhotoPath, scale_x=1.0, scale_y=1.0, min_contour_area=5, suffix='-edge', method=1)
+            # self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(
+            #     self.state_engine.currentPhotoPath, scale_x=1.0, scale_y=1.0, min_contour_area=5, suffix='-binary', method=2)
+            self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(
+                self.state_engine.currentPhotoPath, scale_x=1.0, scale_y=1.0, min_contour_area=5, suffix='-both', method=3)
+            
+            # Create the final output SVG file using the rolling ID
+            startX, startY = self.state_engine.get_image_params_by_id(rolling_id)
+            self.state_engine.currentSVGPath = self.image_parser.create_output_svg(
+                self.state_engine.currentSVGPath, "photo-output-", 0.35, startX, startY, rolling_id
+            )
+
+            # Update rolling ID, ensuring it wraps between 0 and 15
+            rolling_id = (rolling_id + 1) % 16
+
+
+        output_directory = os.path.join(parent_dir, "photos/current")
+        combined_file_path = os.path.join(parent_dir, "photos/output/photo-collection.svg")
+        self.image_parser.collect_all_paths(output_directory, combined_file_path)
+                    
+        print("All JPG files processed.")
+        sys.exit()
         pass
     
 
@@ -183,7 +212,7 @@ class PhotoBooth:
         }
         
         # self.state_engine.client.subscribe("#")
-        self.state_engine.client.on_message = self.state_engine.on_message
+        # self.state_engine.client.on_message = self.state_engine.on_message
         
         try:
             while True:
