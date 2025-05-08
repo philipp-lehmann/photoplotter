@@ -173,11 +173,11 @@ class PhotoBooth:
             
             # Convert to SVG with various methods
             self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(
-                self.state_engine.currentPhotoPath, min_contour_area=5, suffix='-edge', method=1)
+                self.state_engine.currentPhotoPath, scale_x=1.0, scale_y=1.0, min_contour_area=5, suffix='-edge', method=1)
             self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(
-                self.state_engine.currentPhotoPath, min_contour_area=5, suffix='-binary', method=2)
+                self.state_engine.currentPhotoPath, scale_x=1.0, scale_y=1.0, min_contour_area=5, suffix='-binary', method=2)
             self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(
-                self.state_engine.currentPhotoPath, min_contour_area=5, suffix='-both', method=3)
+                self.state_engine.currentPhotoPath, scale_x=1.0, scale_y=1.0, min_contour_area=5, suffix='-both', method=3)
                     
         print("All JPG files processed.")
         sys.exit()

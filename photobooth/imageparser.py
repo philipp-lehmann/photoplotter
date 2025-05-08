@@ -345,7 +345,7 @@ class ImageParser:
 
         return None
     
-    def generate_dynamic_grid(self, min_value=0, max_value=280, num_points=70, center=140.0):
+    def generate_dynamic_grid(self, min_value=0, max_value=800, num_points=70, center=400.0):
         """Generate a dynamic grid with higher density near the center and map values to the specified range."""
         
         # Generate original grid values (e.g., cubic scaling)
