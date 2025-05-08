@@ -268,7 +268,7 @@ class ImageParser:
         return result
 
 
-    def convert_to_svg(self, image_filepath, target_width=800, target_height=800, scale_x=0.35, scale_y=0.35, min_paths=30, max_paths=300, min_contour_area=20, suffix='', method=1):
+    def convert_to_svg(self, image_filepath, target_width=800, target_height=800, scale_x=1.0, scale_y=1.0, min_paths=30, max_paths=250, min_contour_area=20, suffix='', method=1):
         """Convert input image to svg with parameters."""
         print(f"Converting {image_filepath}")
         if os.path.isfile(image_filepath):
@@ -300,8 +300,6 @@ class ImageParser:
                 
                 # Initialize empty list for contours
                 contours = []
-                
-                
 
                 # Extract contours based on the selected method
                 if method == 1:  # Edge-based method
@@ -397,10 +395,10 @@ class ImageParser:
 
         # Save the modified SVG file
         tree.write(output_file, pretty_print=True, xml_declaration=True, encoding="UTF-8")
-        print(f"Processed SVG saved as {output_file}")
+        print(f"Aligned SVG saved as {output_file}")
         return output_file
 
-    def create_output_svg(self, image_svg_path, imgname = 'image', scale_factor = 0.8, offset_x=0, offset_y=0, id=0):
+    def create_output_svg(self, image_svg_path, imgname = 'image', scale_factor = 0.35, offset_x=0, offset_y=0, id=0):
         """Create output image on artboard with id for output position"""
         # Load the original SVG content from a file
         with open(image_svg_path, 'rb') as file:  # Note 'rb' mode for reading as bytes
@@ -441,6 +439,66 @@ class ImageParser:
 
         return output_svg_path
     
+    
+    def collect_all_paths(self, input_directory, output_file):
+        """
+        Combines all SVG files in the input directory by taking the <svg> tag from the first file
+        and appending all content from all files to it.
+
+        Parameters:
+        - input_directory (str): Directory containing SVG files to combine.
+        - output_file (str): Path for the output combined SVG file.
+        """
+        """
+        Combines all SVG files in the input directory by taking the <svg> tag from the first file
+        and appending all content from all files to it, ensuring proper structure.
+
+        Parameters:
+        - input_directory (str): Directory containing SVG files to combine.
+        - output_file (str): Path for the output combined SVG file.
+        """
+        # Get all SVG files in the directory, sorted alphabetically
+        svg_files = sorted(f for f in os.listdir(input_directory) if f.endswith('.svg'))
+        if not svg_files:
+            print("No SVG files found in the directory.")
+            return
+
+        # Parse the first file to use its <svg> structure
+        first_svg_path = os.path.join(input_directory, svg_files[0])
+        with open(first_svg_path, 'rb') as file:
+            first_svg_data = file.read()
+        first_root = etree.fromstring(first_svg_data)
+        namespace = {'svg': "http://www.w3.org/2000/svg"}
+        
+        # Remove any content inside the first <svg> tag (except attributes)
+        for child in list(first_root):
+            first_root.remove(child)
+
+        # Append contents from all files
+        for filename in svg_files:
+            file_path = os.path.join(input_directory, filename)
+            with open(file_path, 'rb') as file:
+                svg_data = file.read()
+            root = etree.fromstring(svg_data)
+
+            # Append all children of the current SVG (excluding the outer <svg> tag)
+            for child in root:
+                if child.tag.endswith('g'):  # Handle <g> tags explicitly
+                    if len(child):  # Check if the <g> tag has children
+                        first_root.append(child)
+                    else:
+                        # If <g> is self-closing, convert to open-close format
+                        g = etree.Element('g', attrib=child.attrib)
+                        first_root.append(g)
+                else:
+                    first_root.append(child)
+
+        # Save the combined SVG to the output file
+        with open(output_file, 'wb') as file:
+            file.write(etree.tostring(first_root, pretty_print=True))
+
+        print(f"Combined SVG saved to {output_file}")
+        
     @staticmethod
     def add_contours_to_svg(dwg, contours, scale_x, scale_y):
         # Implementation for adding contours to the SVG with styling
