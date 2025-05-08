@@ -29,19 +29,43 @@ class ImageParser:
         print("Starting ImageParser ...")
         pass    
     
-    
-    def process_face_image(self, image, target_width=800, target_height=800):
-        """Optimized method that detects, crops, enhances the face and draws facial features"""
-        if image is None:
-            print("Failed to load image.")
+    def convert_to_svg(self, image_filepath, target_width=800, target_height=800, scale_x=1.0, scale_y=1.0, min_paths=30, max_paths=250, min_contour_area=20, suffix='', method=1):
+        """Convert input image to SVG with parameters."""
+        print(f"Converting {image_filepath}")
+        if not os.path.isfile(image_filepath):
+            print(f"File {image_filepath} does not exist.")
             return None
         
-        # Detect faces
-        opt_image = cv2.medianBlur(image, 5)
-        gray_image = cv2.cvtColor(opt_image, cv2.COLOR_BGR2GRAY)
-        return gray_image
-
-
+        image = cv2.imread(image_filepath)
+        if image is None:
+            print("Image loading failed.")
+            return None
+        
+        image = self.handle_faces(image, target_width, target_height)
+        opt_image = self.process_face_image(image)
+        opt_image = self.generate_and_apply_depth_map(image, opt_image)
+        self.save_optimized_image(image_filepath, opt_image)
+        
+        contours = self.extract_contours(opt_image, method, min_contour_area)
+        contours = self.sort_and_limit_contours(contours, target_width, target_height, max_paths)
+        
+        svg_filepath = self.create_svg(image_filepath, contours, target_width, target_height, scale_x, scale_y, suffix)
+        processed_svg_filepath = self.process_svg(svg_filepath)
+        
+        print(f"Processed SVG saved at: {processed_svg_filepath}")
+        return processed_svg_filepath
+    
+    
+    # ----- Face Detection -----
+    def handle_faces(self, image, target_width, target_height):
+        """Detect and crop faces from the image or return the original."""
+        gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        faces = self.face_detector(gray_image)
+        if faces:
+            return self.crop_all_faces(image, faces, target_width, target_height)
+        print("No face found. Proceeding with the original image.")
+        return image
+    
     def crop_all_faces(self, image, faces, target_width=800, target_height=800, padding=1500):
         """Crop the image to a bounding rectangle encompassing all faces and resize it."""
         # Check if 'faces' is a single rectangle or a collection of rectangles
@@ -93,7 +117,329 @@ class ImageParser:
         resized_image = cv2.resize(cropped_image, (target_width, target_height), interpolation=cv2.INTER_AREA)
         
         return resized_image
+    
+    def process_face_image(self, image, target_width=800, target_height=800):
+        """Optimized method that detects, crops, enhances the face and draws facial features"""
+        if image is None:
+            print("Failed to load image.")
+            return None
+        
+        # Detect faces
+        opt_image = cv2.medianBlur(image, 5)
+        gray_image = cv2.cvtColor(opt_image, cv2.COLOR_BGR2GRAY)
+        return gray_image
 
+
+    # ----- Depth Map -----
+    def generate_and_apply_depth_map(self, image, opt_image):
+        """Generate a depth map and apply it to the optimized image."""
+        depth_map = self.generate_depth_map(image)
+        depth_map = cv2.resize(depth_map, (opt_image.shape[1], opt_image.shape[0]))
+        if depth_map is not None:
+            opt_image = self.enhance_foreground(opt_image, depth_map)
+            return opt_image
+        else:
+            print("Depth map generation failed, proceeding without enhancement.")
+            return opt_image
+        
+    def generate_depth_map(self, image):
+        """Generate a depth map for the image."""
+        # Load the pre-trained depth estimation model (MiDaS or EfficientMon)
+        # Example: Use a pre-trained MiDaS model or EfficientMon here
+        model_type = "MiDaS_small"
+        model = torch.hub.load("intel-isl/MiDaS", model_type, pretrained=True)
+        transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Resize((256, 256)),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        ])
+
+        image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        input_tensor = transform(image_rgb).unsqueeze(0)  # Add batch dimension
+        with torch.no_grad():
+            depth_map = model(input_tensor)
+
+        depth_map = depth_map.squeeze().cpu().numpy()  # Remove batch dimension and convert to numpy
+        depth_map_normalized = cv2.normalize(depth_map, None, 0, 255, cv2.NORM_MINMAX)  # Normalize to 0-255
+        return np.uint8(depth_map_normalized)
+    
+    def enhance_foreground(self, image, depth_map, contrast_factor=2.0, background_factor=0.5):
+        """
+        Enhance the foreground of the image based on a depth map.
+        The foreground contrast is enhanced, and the background is darkened.
+
+        Parameters:
+            image (ndarray): The original grayscale image.
+            depth_map (ndarray): The depth map of the image.
+            contrast_factor (float): Factor to enhance contrast in the foreground.
+            background_factor (float): Factor to darken the background.
+
+        Returns:
+            result (ndarray): The processed image with enhanced foreground and darkened background.
+        """
+        # Convert the depth map to a float and normalize to [0, 1]
+        depth_map_normalized = cv2.normalize(depth_map, None, 0, 1, cv2.NORM_MINMAX)
+
+        # Create a mask for the foreground (near objects, typically with lower depth values)
+        foreground_mask = (depth_map_normalized >= 0.5).astype(np.uint8) 
+        background_mask = (depth_map_normalized < 0.5).astype(np.uint8) 
+
+        # Enhance foreground contrast using CLAHE (Contrast Limited Adaptive Histogram Equalization)
+        clahe = cv2.createCLAHE(clipLimit=contrast_factor, tileGridSize=(8, 8))
+        enhanced_image = clahe.apply(image)  # Applying CLAHE on grayscale image directly
+
+        # Darken the background: Reduce the brightness of background pixels
+        image_background_darker = image * background_factor  # Dim the background
+
+        # Ensure the image background is clipped to 0-255 range (if necessary)
+        image_background_darker = np.clip(image_background_darker, 0, 255).astype(np.uint8)
+
+        # Combine the results: Blend the enhanced foreground and darkened background
+        result = np.zeros_like(image, dtype=np.uint8)
+
+        # Apply enhanced foreground to the result where the foreground mask is 1
+        result[foreground_mask == 1] = enhanced_image[foreground_mask == 1]
+
+        # Apply darkened background to the result where the background mask is 1
+        result[background_mask == 1] = image_background_darker[background_mask == 1]
+        return result
+
+    # ----- Save image -----     
+    def save_optimized_image(self, image_filepath, opt_image):
+        """Save the optimized image and return the path."""
+        optimized_image_path = image_filepath.rsplit('.', 1)[0] + '_optimized.' + image_filepath.rsplit('.', 1)[1]
+        cv2.imwrite(optimized_image_path, opt_image)
+        return optimized_image_path
+
+     # ----- Contours -----  
+    def extract_contours(self, opt_image, method, min_contour_area):
+        """Extract contours based on the selected method."""
+        contours = []
+        if method == 1:  # Edge-based
+            edges = cv2.Canny(opt_image, threshold1=80, threshold2=200)
+            contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        elif method == 2:  # Binary-based
+            _, binary = cv2.threshold(opt_image, 127, 255, cv2.THRESH_BINARY)
+            contours, _ = cv2.findContours(binary, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        elif method == 3:  # Merge both
+            edges = cv2.Canny(opt_image, threshold1=80, threshold2=200)
+            edge_contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            _, binary = cv2.threshold(opt_image, 127, 255, cv2.THRESH_BINARY)
+            binary_contours, _ = cv2.findContours(binary, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+            contours = edge_contours + binary_contours
+        return [c for c in contours if cv2.contourArea(c) > min_contour_area]
+
+    def sort_and_limit_contours(self, contours, target_width, target_height, max_paths):
+        """Sort and limit the number of contours to a specified maximum."""
+        image_center = np.array([target_width // 2, target_height // 2])
+        sorted_contours = sorted(contours, key=lambda c: np.linalg.norm(np.mean(np.squeeze(c), axis=0) - image_center))
+        return sorted_contours[:max_paths]
+
+    # ----- SVG Handling -----  
+    def create_svg(self, image_filepath, contours, target_width, target_height, scale_x, scale_y, suffix):
+        """Create an SVG file from contours."""
+        dwg = svgwrite.Drawing(size=(target_width, target_height))
+        self.add_contours_to_svg(dwg, contours, scale_x, scale_y)
+        parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        output_dir = os.path.join(parent_dir, "photos/traced")
+        os.makedirs(output_dir, exist_ok=True)
+        svg_filename = os.path.splitext(os.path.basename(image_filepath))[0] + suffix + '.svg'
+        svg_filepath = os.path.join(output_dir, svg_filename)
+        dwg.saveas(svg_filepath)
+        return svg_filepath
+    
+    
+    @staticmethod
+    def add_contours_to_svg(dwg, contours, scale_x, scale_y):
+        # Implementation for adding contours to the SVG with styling
+        num_paths = 0
+        for contour in contours:
+            # Convert contour points to a format suitable for svgwrite and apply scaling
+            points = [(point[0][0] * scale_x, point[0][1] * scale_y) for point in contour]
+            dwg.add(dwg.polyline(points, fill="none", stroke="#aaa", stroke_width="1"))
+            num_paths += 1
+        return num_paths
+
+    @staticmethod
+    def adjust_thresholds(num_paths, min_paths, max_paths, lower_threshold, upper_threshold, epsilon, trial):
+        # Adjusts the thresholds based on the number of paths
+        if num_paths < min_paths:
+            lower_threshold -= 5
+            upper_threshold -= 10 
+            epsilon *= 0.85 
+        elif num_paths > max_paths:
+            lower_threshold += 5 
+            upper_threshold += 15 
+            epsilon *= 1.15
+            
+        return lower_threshold, upper_threshold, epsilon
+
+    def process_svg(self, svg_filepath):
+        """Process the SVG file to align it to dynamic grid points."""
+        x_grid = self.generate_dynamic_grid()
+        y_grid = self.generate_dynamic_grid()
+        processed_svg_filepath = svg_filepath.rsplit('.', 1)[0] + '_aligned.svg'
+        self.align_svg_to_points(svg_filepath, processed_svg_filepath, x_grid, y_grid)
+        return processed_svg_filepath
+    
+    def generate_dynamic_grid(self, min_value=0, max_value=800, num_points=70, center=400.0):
+        """Generate a dynamic grid with higher density near the center and map values to the specified range."""
+        
+        # Generate original grid values (e.g., cubic scaling)
+        values = np.linspace(-1, 1, num_points)
+        original_dynamic_values = center + (max_value - min_value) * values**3
+        
+        # Calculate the min and max of the original dynamic grid values
+        original_min = np.min(original_dynamic_values)
+        original_max = np.max(original_dynamic_values)
+        
+        # Map original values to the target range [min_value, max_value]
+        mapped_dynamic_values = [
+            min_value + (val - original_min) / (original_max - original_min) * (max_value - min_value)
+            for val in original_dynamic_values
+        ]        
+        return sorted(mapped_dynamic_values)
+    
+    
+    @staticmethod
+    def align_to_dynamic_grid(value, grid):
+        """Find the closest value in the dynamic grid."""
+        return min(grid, key=lambda x: abs(x - value))
+
+    
+    def align_svg_to_points(self, input_file, output_file, x_grid, y_grid):
+        """Process SVG by aligning points to a dynamic grid using lxml.etree."""
+        # Parse the SVG file
+        parser = etree.XMLParser(remove_blank_text=True)
+        tree = etree.parse(input_file, parser)
+        root = tree.getroot()
+
+        # Define the SVG namespace
+        namespace = {'svg': 'http://www.w3.org/2000/svg'}
+
+        # Process all polyline and polygon elements
+        for poly in root.xpath(".//svg:polyline | .//svg:polygon", namespaces=namespace):
+            points = poly.get("points")
+            if points:
+                new_points = []
+                for point in points.split():
+                    try:
+                        x, y = map(float, point.split(","))
+                        x_aligned = self.align_to_dynamic_grid(x, x_grid)
+                        y_aligned = self.align_to_dynamic_grid(y, y_grid)
+                        new_points.append(f"{x_aligned},{y_aligned}")
+                    except ValueError:
+                        continue  # Skip malformed points
+                poly.set("points", " ".join(new_points))
+
+        # Save the modified SVG file
+        tree.write(output_file, pretty_print=True, xml_declaration=True, encoding="UTF-8")
+        print(f"Aligned SVG saved as {output_file}")
+        return output_file
+    
+    # ----- SVG Output -----  
+    def create_output_svg(self, image_svg_path, imgname = 'image', scale_factor = 0.35, offset_x=0, offset_y=0, id=0):
+        """Create output image on artboard with id for output position"""
+        # Load the original SVG content from a file
+        with open(image_svg_path, 'rb') as file:  # Note 'rb' mode for reading as bytes
+            svg_data = file.read()
+
+        # Parse the original SVG
+        root = etree.fromstring(svg_data)
+
+        # Create a new SVG drawing with svgwrite, setting the artboard size to 420x297mm (check size)
+        dwg = svgwrite.Drawing(size=('1587', '1122'))
+
+        # Transform and position the image
+        group = dwg.g(id="all_paths", transform=f"translate({offset_x}, {offset_y}) scale({scale_factor})")
+        # dwg.add(dwg.rect(insert=(0, 0), size=('1587', '1122px'), fill='white'))
+
+        for element in root.iter("{http://www.w3.org/2000/svg}*"):
+            if element.tag.endswith('polyline'):
+                points = element.get('points')
+                if points:
+                    points_tuples = re.findall(r'(-?\d*\.?\d+)[,\s](-?\d*\.?\d+)', points)
+                    if points_tuples:
+                        group.add(dwg.polyline(points=points_tuples, 
+                                            stroke=element.get('stroke', 'black'),
+                                            fill=element.get('fill', 'none'),
+                                            stroke_width=element.get('stroke-width', '1')))
+
+        dwg.add(group)
+        
+         # Use an absolute path for the output directory
+        parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        output_dir = os.path.join(parent_dir, "photos/current")  # Join it with your relative path
+        os.makedirs(output_dir, exist_ok=True)  # Create the directory if it doesn't exist
+        
+        # svg_filename = os.path.splitext(os.path.basename(image_svg_path))[0] + str(id) + '.svg'
+        svg_filename = imgname + str(id) + '.svg'
+        output_svg_path = os.path.join(output_dir, svg_filename)  # This is your absolute path for the SVG file
+        dwg.saveas(output_svg_path)
+
+        return output_svg_path
+    
+    # ----- SVG Collection -----  
+    def collect_all_paths(self, input_directory, output_file):
+        """
+        Combines all SVG files in the input directory by taking the <svg> tag from the first file
+        and appending all content from all files to it.
+
+        Parameters:
+        - input_directory (str): Directory containing SVG files to combine.
+        - output_file (str): Path for the output combined SVG file.
+        """
+        """
+        Combines all SVG files in the input directory by taking the <svg> tag from the first file
+        and appending all content from all files to it, ensuring proper structure.
+
+        Parameters:
+        - input_directory (str): Directory containing SVG files to combine.
+        - output_file (str): Path for the output combined SVG file.
+        """
+        # Get all SVG files in the directory, sorted alphabetically
+        svg_files = sorted(f for f in os.listdir(input_directory) if f.endswith('.svg'))
+        if not svg_files:
+            print("No SVG files found in the directory.")
+            return
+
+        # Parse the first file to use its <svg> structure
+        first_svg_path = os.path.join(input_directory, svg_files[0])
+        with open(first_svg_path, 'rb') as file:
+            first_svg_data = file.read()
+        first_root = etree.fromstring(first_svg_data)
+        namespace = {'svg': "http://www.w3.org/2000/svg"}
+        
+        # Remove any content inside the first <svg> tag (except attributes)
+        for child in list(first_root):
+            first_root.remove(child)
+
+        # Append contents from all files
+        for filename in svg_files:
+            file_path = os.path.join(input_directory, filename)
+            with open(file_path, 'rb') as file:
+                svg_data = file.read()
+            root = etree.fromstring(svg_data)
+
+            # Append all children of the current SVG (excluding the outer <svg> tag)
+            for child in root:
+                if child.tag.endswith('g'):  # Handle <g> tags explicitly
+                    if len(child):  # Check if the <g> tag has children
+                        first_root.append(child)
+                    else:
+                        # If <g> is self-closing, convert to open-close format
+                        g = etree.Element('g', attrib=child.attrib)
+                        first_root.append(g)
+                else:
+                    first_root.append(child)
+
+        # Save the combined SVG to the output file
+        with open(output_file, 'wb') as file:
+            file.write(etree.tostring(first_root, pretty_print=True))
+
+        print(f"Combined SVG saved to {output_file}")   
+    
+    # ----- NOT IN USE -----
     def crop_to_largest_face(self, image, face_rect, target_width=800, target_height=800):
         """
         NOT IN USE: This function is no longer active.
@@ -203,323 +549,3 @@ class ImageParser:
 
         for i in range(len(points) - 1):
             cv2.line(img, points[i], points[i + 1], color, thickness)
-            
-    def generate_depth_map(self, image):
-        """Generate a depth map for the image."""
-        # Load the pre-trained depth estimation model (MiDaS or EfficientMon)
-        # Example: Use a pre-trained MiDaS model or EfficientMon here
-        model_type = "MiDaS_small"
-        model = torch.hub.load("intel-isl/MiDaS", model_type, pretrained=True)
-        transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Resize((256, 256)),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-        ])
-
-        image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        input_tensor = transform(image_rgb).unsqueeze(0)  # Add batch dimension
-        with torch.no_grad():
-            depth_map = model(input_tensor)
-
-        depth_map = depth_map.squeeze().cpu().numpy()  # Remove batch dimension and convert to numpy
-        depth_map_normalized = cv2.normalize(depth_map, None, 0, 255, cv2.NORM_MINMAX)  # Normalize to 0-255
-        return np.uint8(depth_map_normalized)
-    
-    def enhance_foreground(self, image, depth_map, contrast_factor=2.0, background_factor=0.5):
-        """
-        Enhance the foreground of the image based on a depth map.
-        The foreground contrast is enhanced, and the background is darkened.
-
-        Parameters:
-            image (ndarray): The original grayscale image.
-            depth_map (ndarray): The depth map of the image.
-            contrast_factor (float): Factor to enhance contrast in the foreground.
-            background_factor (float): Factor to darken the background.
-
-        Returns:
-            result (ndarray): The processed image with enhanced foreground and darkened background.
-        """
-        # Convert the depth map to a float and normalize to [0, 1]
-        depth_map_normalized = cv2.normalize(depth_map, None, 0, 1, cv2.NORM_MINMAX)
-
-        # Create a mask for the foreground (near objects, typically with lower depth values)
-        foreground_mask = (depth_map_normalized >= 0.5).astype(np.uint8) 
-        background_mask = (depth_map_normalized < 0.5).astype(np.uint8) 
-
-        # Enhance foreground contrast using CLAHE (Contrast Limited Adaptive Histogram Equalization)
-        clahe = cv2.createCLAHE(clipLimit=contrast_factor, tileGridSize=(8, 8))
-        enhanced_image = clahe.apply(image)  # Applying CLAHE on grayscale image directly
-
-        # Darken the background: Reduce the brightness of background pixels
-        image_background_darker = image * background_factor  # Dim the background
-
-        # Ensure the image background is clipped to 0-255 range (if necessary)
-        image_background_darker = np.clip(image_background_darker, 0, 255).astype(np.uint8)
-
-        # Combine the results: Blend the enhanced foreground and darkened background
-        result = np.zeros_like(image, dtype=np.uint8)
-
-        # Apply enhanced foreground to the result where the foreground mask is 1
-        result[foreground_mask == 1] = enhanced_image[foreground_mask == 1]
-
-        # Apply darkened background to the result where the background mask is 1
-        result[background_mask == 1] = image_background_darker[background_mask == 1]
-
-        return result
-
-
-    def convert_to_svg(self, image_filepath, target_width=800, target_height=800, scale_x=1.0, scale_y=1.0, min_paths=30, max_paths=250, min_contour_area=20, suffix='', method=1):
-        """Convert input image to svg with parameters."""
-        print(f"Converting {image_filepath}")
-        if os.path.isfile(image_filepath):
-            image = cv2.imread(image_filepath)
-            if image is not None:
-                # Detect faces using dlib
-                gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-                faces = self.face_detector(gray_image)
-
-                if len(faces) > 0:
-                    # Use the largest detected face
-                    image = self.crop_all_faces(image, faces, target_width, target_height)
-                else:
-                    print("No face found. Proceeding with the original image.")
-                
-                # Optimize the image
-                opt_image = self.process_face_image(image)
-                # optimized_image_path = image_filepath.rsplit('.', 1)[0] + '_optimized.' + image_filepath.rsplit('.', 1)[1]
-                # cv2.imwrite(optimized_image_path, opt_image)
-                
-                # Generate depth map and integrate it with the image
-                depth_map = self.generate_depth_map(image)
-                depth_map = cv2.resize(depth_map, (opt_image.shape[1], opt_image.shape[0]))
-
-                # Apply the depth map to the optimized image
-                opt_image = self.enhance_foreground(opt_image, depth_map)
-                optimized_image_path = image_filepath.rsplit('.', 1)[0] + '_optimized.' + image_filepath.rsplit('.', 1)[1]
-                cv2.imwrite(optimized_image_path, opt_image)
-                
-                # Initialize empty list for contours
-                contours = []
-
-                # Extract contours based on the selected method
-                if method == 1:  # Edge-based method
-                    edges = cv2.Canny(opt_image, threshold1=80, threshold2=200)
-                    contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                elif method == 2:  # Binary-based method
-                    _, binary = cv2.threshold(opt_image, 127, 255, cv2.THRESH_BINARY)
-                    contours, _ = cv2.findContours(binary, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-                elif method == 3:  # Merge both methods
-                    edges = cv2.Canny(opt_image, threshold1=80, threshold2=200)
-                    edge_contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                    _, binary = cv2.threshold(opt_image, 127, 255, cv2.THRESH_BINARY)
-                    binary_contours, _ = cv2.findContours(binary, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-                    contours = edge_contours + binary_contours
-
-                # Filter and simplify contours
-                filtered_contours = [c for c in contours if cv2.contourArea(c) > min_contour_area]
-                simplified_contours = [cv2.approxPolyDP(c, 1, True) for c in filtered_contours]
-                image_center = np.array([target_width // 2, target_height // 2])
-                sorted_contours = sorted(simplified_contours, key=lambda c: np.linalg.norm(np.mean(np.squeeze(c), axis=0) - image_center))
-                simplified_contours = sorted_contours[:max_paths]
-
-                # Create SVG
-                dwg = svgwrite.Drawing(size=(target_width, target_height))
-                self.add_contours_to_svg(dwg, simplified_contours, scale_x, scale_y)
-                parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                output_dir = os.path.join(parent_dir, "photos/traced")
-                os.makedirs(output_dir, exist_ok=True)
-                svg_filename = os.path.splitext(os.path.basename(image_filepath))[0] + suffix + '.svg'
-                svg_filepath = os.path.join(output_dir, svg_filename)
-                dwg.saveas(svg_filepath)
-
-                # Process the SVG
-                x_grid = self.generate_dynamic_grid()
-                y_grid = self.generate_dynamic_grid()
-                processed_svg_filepath = svg_filepath.rsplit('.', 1)[0] + '_aligned.svg'
-                self.align_svg_to_points(svg_filepath, processed_svg_filepath, x_grid, y_grid)
-
-                print(f"Processed SVG saved at: {processed_svg_filepath}")
-                return processed_svg_filepath
-
-        return None
-    
-    def generate_dynamic_grid(self, min_value=0, max_value=800, num_points=70, center=400.0):
-        """Generate a dynamic grid with higher density near the center and map values to the specified range."""
-        
-        # Generate original grid values (e.g., cubic scaling)
-        values = np.linspace(-1, 1, num_points)
-        original_dynamic_values = center + (max_value - min_value) * values**3
-        
-        # Calculate the min and max of the original dynamic grid values
-        original_min = np.min(original_dynamic_values)
-        original_max = np.max(original_dynamic_values)
-        
-        # Map original values to the target range [min_value, max_value]
-        mapped_dynamic_values = [
-            min_value + (val - original_min) / (original_max - original_min) * (max_value - min_value)
-            for val in original_dynamic_values
-        ]        
-        return sorted(mapped_dynamic_values)
-    
-    
-    @staticmethod
-    def align_to_dynamic_grid(value, grid):
-        """Find the closest value in the dynamic grid."""
-        return min(grid, key=lambda x: abs(x - value))
-
-    
-    def align_svg_to_points(self, input_file, output_file, x_grid, y_grid):
-        """Process SVG by aligning points to a dynamic grid using lxml.etree."""
-        # Parse the SVG file
-        parser = etree.XMLParser(remove_blank_text=True)
-        tree = etree.parse(input_file, parser)
-        root = tree.getroot()
-
-        # Define the SVG namespace
-        namespace = {'svg': 'http://www.w3.org/2000/svg'}
-
-        # Process all polyline and polygon elements
-        for poly in root.xpath(".//svg:polyline | .//svg:polygon", namespaces=namespace):
-            points = poly.get("points")
-            if points:
-                new_points = []
-                for point in points.split():
-                    try:
-                        x, y = map(float, point.split(","))
-                        x_aligned = self.align_to_dynamic_grid(x, x_grid)
-                        y_aligned = self.align_to_dynamic_grid(y, y_grid)
-                        new_points.append(f"{x_aligned},{y_aligned}")
-                    except ValueError:
-                        continue  # Skip malformed points
-                poly.set("points", " ".join(new_points))
-
-        # Save the modified SVG file
-        tree.write(output_file, pretty_print=True, xml_declaration=True, encoding="UTF-8")
-        print(f"Aligned SVG saved as {output_file}")
-        return output_file
-
-    def create_output_svg(self, image_svg_path, imgname = 'image', scale_factor = 0.35, offset_x=0, offset_y=0, id=0):
-        """Create output image on artboard with id for output position"""
-        # Load the original SVG content from a file
-        with open(image_svg_path, 'rb') as file:  # Note 'rb' mode for reading as bytes
-            svg_data = file.read()
-
-        # Parse the original SVG
-        root = etree.fromstring(svg_data)
-
-        # Create a new SVG drawing with svgwrite, setting the artboard size to 420x297mm (check size)
-        dwg = svgwrite.Drawing(size=('1587', '1122'))
-
-        # Transform and position the image
-        group = dwg.g(id="all_paths", transform=f"translate({offset_x}, {offset_y}) scale({scale_factor})")
-        # dwg.add(dwg.rect(insert=(0, 0), size=('1587', '1122px'), fill='white'))
-
-        for element in root.iter("{http://www.w3.org/2000/svg}*"):
-            if element.tag.endswith('polyline'):
-                points = element.get('points')
-                if points:
-                    points_tuples = re.findall(r'(-?\d*\.?\d+)[,\s](-?\d*\.?\d+)', points)
-                    if points_tuples:
-                        group.add(dwg.polyline(points=points_tuples, 
-                                            stroke=element.get('stroke', 'black'),
-                                            fill=element.get('fill', 'none'),
-                                            stroke_width=element.get('stroke-width', '1')))
-
-        dwg.add(group)
-        
-         # Use an absolute path for the output directory
-        parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        output_dir = os.path.join(parent_dir, "photos/current")  # Join it with your relative path
-        os.makedirs(output_dir, exist_ok=True)  # Create the directory if it doesn't exist
-        
-        # svg_filename = os.path.splitext(os.path.basename(image_svg_path))[0] + str(id) + '.svg'
-        svg_filename = imgname + str(id) + '.svg'
-        output_svg_path = os.path.join(output_dir, svg_filename)  # This is your absolute path for the SVG file
-        dwg.saveas(output_svg_path)
-
-        return output_svg_path
-    
-    
-    def collect_all_paths(self, input_directory, output_file):
-        """
-        Combines all SVG files in the input directory by taking the <svg> tag from the first file
-        and appending all content from all files to it.
-
-        Parameters:
-        - input_directory (str): Directory containing SVG files to combine.
-        - output_file (str): Path for the output combined SVG file.
-        """
-        """
-        Combines all SVG files in the input directory by taking the <svg> tag from the first file
-        and appending all content from all files to it, ensuring proper structure.
-
-        Parameters:
-        - input_directory (str): Directory containing SVG files to combine.
-        - output_file (str): Path for the output combined SVG file.
-        """
-        # Get all SVG files in the directory, sorted alphabetically
-        svg_files = sorted(f for f in os.listdir(input_directory) if f.endswith('.svg'))
-        if not svg_files:
-            print("No SVG files found in the directory.")
-            return
-
-        # Parse the first file to use its <svg> structure
-        first_svg_path = os.path.join(input_directory, svg_files[0])
-        with open(first_svg_path, 'rb') as file:
-            first_svg_data = file.read()
-        first_root = etree.fromstring(first_svg_data)
-        namespace = {'svg': "http://www.w3.org/2000/svg"}
-        
-        # Remove any content inside the first <svg> tag (except attributes)
-        for child in list(first_root):
-            first_root.remove(child)
-
-        # Append contents from all files
-        for filename in svg_files:
-            file_path = os.path.join(input_directory, filename)
-            with open(file_path, 'rb') as file:
-                svg_data = file.read()
-            root = etree.fromstring(svg_data)
-
-            # Append all children of the current SVG (excluding the outer <svg> tag)
-            for child in root:
-                if child.tag.endswith('g'):  # Handle <g> tags explicitly
-                    if len(child):  # Check if the <g> tag has children
-                        first_root.append(child)
-                    else:
-                        # If <g> is self-closing, convert to open-close format
-                        g = etree.Element('g', attrib=child.attrib)
-                        first_root.append(g)
-                else:
-                    first_root.append(child)
-
-        # Save the combined SVG to the output file
-        with open(output_file, 'wb') as file:
-            file.write(etree.tostring(first_root, pretty_print=True))
-
-        print(f"Combined SVG saved to {output_file}")
-        
-    @staticmethod
-    def add_contours_to_svg(dwg, contours, scale_x, scale_y):
-        # Implementation for adding contours to the SVG with styling
-        num_paths = 0
-        for contour in contours:
-            # Convert contour points to a format suitable for svgwrite and apply scaling
-            points = [(point[0][0] * scale_x, point[0][1] * scale_y) for point in contour]
-            dwg.add(dwg.polyline(points, fill="none", stroke="#aaa", stroke_width="1"))
-            num_paths += 1
-        return num_paths
-
-    @staticmethod
-    def adjust_thresholds(num_paths, min_paths, max_paths, lower_threshold, upper_threshold, epsilon, trial):
-        # Adjusts the thresholds based on the number of paths
-        if num_paths < min_paths:
-            lower_threshold -= 5
-            upper_threshold -= 10 
-            epsilon *= 0.85 
-        elif num_paths > max_paths:
-            lower_threshold += 5 
-            upper_threshold += 15 
-            epsilon *= 1.15
-            
-        return lower_threshold, upper_threshold, epsilon
