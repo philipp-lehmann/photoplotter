@@ -313,8 +313,8 @@ class ImageParser:
         # print("Using Depth Map Density method for point generation.")
         # grid_points = self.generate_depth_based_points(depth_map)
         
-        processed_svg_filepath = svg_filepath.rsplit('.', 1)[0] + '_aligned.svg'
-        self.align_svg_to_points(svg_filepath, processed_svg_filepath, grid_points)
+        aligned_svg_filepath = svg_filepath.rsplit('.', 1)[0] + '_aligned.svg'
+        self.align_svg_to_points(svg_filepath, aligned_svg_filepath, grid_points)
         
         cleaned_svg_filepath = self.remove_duplicate_segments(aligned_svg_filepath)
         return cleaned_svg_filepath
@@ -455,7 +455,37 @@ class ImageParser:
                 if not neighbor_found:
                     add_point(nx, ny)
         return points
+    
+    def generate_depth_based_points(self, depth_map, target_points=2000, min_points_per_region=1, max_points_per_region=10):
+        """Generate points with density based on the depth map."""
+        height, width = depth_map.shape
+        points = []
+        radius_map = cv2.normalize(1 / (depth_map + 1e-5), None, 5, 50, cv2.NORM_MINMAX)  # Inverse depth for density
 
+        # Generate points with depth-based density
+        for y in range(height):
+            for x in range(width):
+                radius = int(radius_map[y, x])
+                num_points = int(np.interp(radius, [5, 50], [max_points_per_region, min_points_per_region]))
+                
+                for _ in range(num_points):
+                    offset_x = random.uniform(-radius, radius)
+                    offset_y = random.uniform(-radius, radius)
+                    if offset_x**2 + offset_y**2 <= radius**2:  # Stay within the circular region
+                        new_x = x + offset_x
+                        new_y = y + offset_y
+                        if 0 <= new_x < width and 0 <= new_y < height:
+                            points.append((new_x, new_y))
+
+        # Normalize total number of points to the target
+        if len(points) > target_points:
+            points = random.sample(points, target_points)
+
+        print(f"Generated {len(points)} points based on depth map (target was {target_points}).")
+        return points
+    
+    
+    # ----- SVG Align and Cleanup -----  
     def align_svg_to_points(self, input_file, output_file, grid_points):
         """Process SVG by aligning points to a dynamic grid using lxml.etree."""
         # Parse the SVG file
@@ -531,35 +561,6 @@ class ImageParser:
         tree.write(output_file, pretty_print=True, xml_declaration=True, encoding="UTF-8")
         print(f"Aligned SVG saved as {output_file}")
         return output_file
-    
-    def generate_depth_based_points(self, depth_map, target_points=2000, min_points_per_region=1, max_points_per_region=10):
-        """Generate points with density based on the depth map."""
-        height, width = depth_map.shape
-        points = []
-        radius_map = cv2.normalize(1 / (depth_map + 1e-5), None, 5, 50, cv2.NORM_MINMAX)  # Inverse depth for density
-
-        # Generate points with depth-based density
-        for y in range(height):
-            for x in range(width):
-                radius = int(radius_map[y, x])
-                num_points = int(np.interp(radius, [5, 50], [max_points_per_region, min_points_per_region]))
-                
-                for _ in range(num_points):
-                    offset_x = random.uniform(-radius, radius)
-                    offset_y = random.uniform(-radius, radius)
-                    if offset_x**2 + offset_y**2 <= radius**2:  # Stay within the circular region
-                        new_x = x + offset_x
-                        new_y = y + offset_y
-                        if 0 <= new_x < width and 0 <= new_y < height:
-                            points.append((new_x, new_y))
-
-        # Normalize total number of points to the target
-        if len(points) > target_points:
-            points = random.sample(points, target_points)
-
-        print(f"Generated {len(points)} points based on depth map (target was {target_points}).")
-        return points
-
 
     def remove_duplicate_segments(self, svg_filepath):
         """Remove duplicate line segments from polylines in an SVG file."""
@@ -609,9 +610,8 @@ class ImageParser:
             polyline.set('points', new_points)
 
         # Save the cleaned SVG
-        cleaned_svg_filepath = svg_filepath.rsplit('.', 1)[0] + '_cleaned.svg'
-        tree.write(cleaned_svg_filepath)
-        return cleaned_svg_filepath
+        tree.write(svg_filepath)
+        return svg_filepath
 
     
     # ----- SVG Output -----  
