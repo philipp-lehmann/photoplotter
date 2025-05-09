@@ -315,7 +315,9 @@ class ImageParser:
         
         processed_svg_filepath = svg_filepath.rsplit('.', 1)[0] + '_aligned.svg'
         self.align_svg_to_points(svg_filepath, processed_svg_filepath, grid_points)
-        return processed_svg_filepath
+        
+        cleaned_svg_filepath = self.remove_duplicate_segments(aligned_svg_filepath)
+        return cleaned_svg_filepath
 
     def generate_dynamic_points(self, min_value=0, max_value=800, num_points=70, center=400.0, plateau_radius=50, randomness_factor=0.1):
         """Generate a dynamic grid as an array of (x, y) points with higher density near the center, 
@@ -557,6 +559,59 @@ class ImageParser:
 
         print(f"Generated {len(points)} points based on depth map (target was {target_points}).")
         return points
+
+
+    def remove_duplicate_segments(self, svg_filepath):
+        """Remove duplicate line segments from polylines in an SVG file."""
+        import xml.etree.ElementTree as ET
+
+        def parse_points(points_str):
+            """Parse the points attribute into a list of (x, y) tuples."""
+            points = points_str.strip().split()
+            return [tuple(map(float, point.split(','))) for point in points]
+
+        def format_points(points):
+            """Format a list of (x, y) tuples into a points attribute string."""
+            return ' '.join(f"{x},{y}" for x, y in points)
+
+        def get_line_key(point1, point2):
+            """Generate a unique key for a line segment based on its endpoints."""
+            return tuple(sorted([point1, point2]))
+
+        tree = ET.parse(svg_filepath)
+        root = tree.getroot()
+
+        seen_segments = set()
+        new_polylines = []
+
+        for polyline in root.findall('.//{http://www.w3.org/2000/svg}polyline'):
+            points = parse_points(polyline.attrib.get('points', ''))
+            unique_points = []
+
+            for i in range(len(points) - 1):
+                segment_key = get_line_key(points[i], points[i + 1])
+                if segment_key not in seen_segments:
+                    seen_segments.add(segment_key)
+                    if not unique_points or unique_points[-1] != points[i]:
+                        unique_points.append(points[i])
+                    unique_points.append(points[i + 1])
+
+            if unique_points:
+                # Avoid duplicates at the start of the next polyline
+                unique_points = [unique_points[0]] + [
+                    pt for i, pt in enumerate(unique_points[1:], start=1)
+                    if pt != unique_points[i - 1]
+                ]
+                new_polylines.append((polyline, format_points(unique_points)))
+
+        # Update polylines in the tree
+        for polyline, new_points in new_polylines:
+            polyline.set('points', new_points)
+
+        # Save the cleaned SVG
+        cleaned_svg_filepath = svg_filepath.rsplit('.', 1)[0] + '_cleaned.svg'
+        tree.write(cleaned_svg_filepath)
+        return cleaned_svg_filepath
 
     
     # ----- SVG Output -----  
