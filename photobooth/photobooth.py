@@ -155,6 +155,8 @@ class PhotoBooth:
         pass
     
     def process_test(self):
+        
+        print("🚩 Starting test")
         # Base directory
         parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         photos_dir = os.path.join(parent_dir, "photos/test")
@@ -162,7 +164,6 @@ class PhotoBooth:
         # Find all .jpg files in the directory
         jpg_files = [f for f in os.listdir(photos_dir) if f.endswith('.jpg') and not f.endswith('_optimized.jpg')]
         
-        # Initialize the rolling ID
         # Initialize the array of IDs
         id_array = [0, 1, 2, 3, 5, 6, 7, 8, 10, 11, 12, 13]
         id_index = 0  # Index to track the current position in the array
@@ -215,7 +216,7 @@ class PhotoBooth:
         }
         
         # self.state_engine.client.subscribe("#")
-        # self.state_engine.client.on_message = self.state_engine.on_message
+        self.state_engine.client.on_message = self.state_engine.on_message
         
         try:
             while True:

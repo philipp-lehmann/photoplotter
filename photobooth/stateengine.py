@@ -5,8 +5,8 @@ import random
 class StateEngine:
     def __init__(self):
         # State
-        self.debugmode = True
-        self.state = "Test"
+        self.debugmode = False
+        self.state = "Startup"
         self.currentPhotoPath = ""
         self.currentWorkPath = ""
         self.currentSVGPath = ""
@@ -28,9 +28,9 @@ class StateEngine:
         }
         
         # MQTT
-        # self.broker_address = "localhost"
-        # self.client = mqtt.Client("StateEngine_Client")
-        # self.client.on_connect = self.on_connect
+        self.broker_address = "localhost"
+        self.client = mqtt.Client("StateEngine_Client")
+        self.client.on_connect = self.on_connect
         
         if self.debugmode:
             print("Starting Debugmode...")
@@ -81,10 +81,10 @@ class StateEngine:
     def reset_photo_id(self):
         triplets = [
             [1, 6, 11],
-            [2, 7, 12],
-            [3, 8, 13],
-            [4, 9, 14],
-            [5, 10, 15]
+            [2, 7, 12]
+            # [3, 8, 13],
+            # [4, 9, 14],
+            # [5, 10, 15]
         ]
         for triplet in triplets:
             random.shuffle(triplet)

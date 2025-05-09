@@ -9,11 +9,9 @@ import svgwrite
 import torch
 from torchvision import transforms
 from lxml import etree
-from scipy.spatial import cKDTree
 
 class ImageParser:
     def __init__(self):
-        self.maxTrials = 10
         print("Starting ImageParser ...")
 
         # Initialize dlib face detector and shape predictor (68 landmarks)
@@ -27,8 +25,18 @@ class ImageParser:
         
         # Load shape predictor
         self.landmark_detector = dlib.shape_predictor(predictor_path)     
-        print("Starting ImageParser ...")
         pass    
+    
+    def detect_faces(self, image_filepath):
+        """Used when snapping an image. Quick method to check if a face is present in the image"""
+        image = cv2.imread(image_filepath)
+        if image is None:
+            print("Failed to load image.")
+            return False
+        
+        gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        faces = self.face_detector(gray_image)
+        return len(faces) > 0
     
     def convert_to_svg(self, image_filepath, target_width=800, target_height=800, scale_x=1.0, scale_y=1.0, min_paths=30, max_paths=250, min_contour_area=20, suffix='', method=1):
         """Convert input image to SVG with parameters."""
