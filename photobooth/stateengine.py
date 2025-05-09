@@ -28,9 +28,12 @@ class StateEngine:
         }
         
         # MQTT
-        self.broker_address = "localhost"
-        self.client = mqtt.Client("StateEngine_Client")
-        self.client.on_connect = self.on_connect
+        try:
+            self.broker_address = "localhost"
+            self.client = mqtt.Client("StateEngine_Client")
+            self.client.on_connect = self.on_connect
+        except AttributeError:
+            pass
         
         if self.debugmode:
             print("Starting Debugmode...")

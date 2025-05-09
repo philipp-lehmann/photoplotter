@@ -94,7 +94,7 @@ class PhotoBooth:
         
         # Create output SVG using the randomly chosen photo ID
         self.state_engine.currentSVGPath = self.image_parser.create_output_svg(
-            self.state_engine.currentWorkPath, "work-output-", 0.35, startX, startY, random_photo_id
+            self.state_engine.currentWorkPath, "work-output-", offset_x=startX, offset_y=startY, id=random_photo_id
         )
         
         print(f"Converted Work pattern to SVG: {self.state_engine.currentSVGPath}, random: {random_photo_id}, from {self.state_engine.photoID}")
@@ -123,7 +123,7 @@ class PhotoBooth:
 
         # Create the final output SVG file
         self.state_engine.currentSVGPath = self.image_parser.create_output_svg(
-            tempSVG, "photo-output-", 0.35, startX, startY, self.state_engine.photoID[-1] - 1
+            tempSVG, "photo-output-", offset_x=startX, offset_y=startY, id=self.state_engine.photoID[-1] - 1
         )
         
         # Check if the output SVG was created successfully
@@ -174,17 +174,17 @@ class PhotoBooth:
 
             # Convert to SVG with various methods
             # self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(
-            #     self.state_engine.currentPhotoPath, scale_x=1.0, scale_y=1.0, min_contour_area=5, suffix='-edge', method=1)
+            #     self.state_engine.currentPhotoPath, scale_x=1.0, scale_y=1.0, min_contour_area=5, suffix='_edge', method=1)
             # self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(
-            #     self.state_engine.currentPhotoPath, scale_x=1.0, scale_y=1.0, min_contour_area=5, suffix='-binary', method=2)
+            #     self.state_engine.currentPhotoPath, scale_x=1.0, scale_y=1.0, min_contour_area=5, suffix='_binary', method=2)
             self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(
-                self.state_engine.currentPhotoPath, scale_x=1.0, scale_y=1.0, min_contour_area=5, suffix='-both', method=3)
+                self.state_engine.currentPhotoPath, scale_x=1.0, scale_y=1.0, min_contour_area=5, suffix='', method=3)
             
             # Create the final output SVG file using the rolling ID
             current_id = id_array[id_index]
             startX, startY = self.state_engine.get_image_params_by_id(current_id)
             self.state_engine.currentSVGPath = self.image_parser.create_output_svg(
-                self.state_engine.currentSVGPath, "photo-output-", 0.35, startX, startY, current_id
+                self.state_engine.currentSVGPath, "photo-output-", offset_x=startX, offset_y=startY, id=current_id
             )
 
             # Update rolling ID, ensuring it wraps between 0 and 15
@@ -215,8 +215,11 @@ class PhotoBooth:
             "Test": self.process_test,
         }
         
-        # self.state_engine.client.subscribe("#")
-        self.state_engine.client.on_message = self.state_engine.on_message
+        try:
+            self.state_engine.client.subscribe("#")
+            self.state_engine.client.on_message = self.state_engine.on_message
+        except AttributeError:
+            pass 
         
         try:
             while True:

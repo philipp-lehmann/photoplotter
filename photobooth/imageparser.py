@@ -615,7 +615,7 @@ class ImageParser:
 
     
     # ----- SVG Output -----  
-    def create_output_svg(self, image_svg_path, imgname = 'image', scale_factor = 0.35, offset_x=0, offset_y=0, id=0):
+    def create_output_svg(self, image_svg_path, imgname = 'image', scale_factor = 0.33, offset_x=0, offset_y=0, id=0):
         """Create output image on artboard with id for output position"""
         # Load the original SVG content from a file
         with open(image_svg_path, 'rb') as file:  # Note 'rb' mode for reading as bytes
