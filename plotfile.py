@@ -1,19 +1,16 @@
 import os
-from nextdraw import NextDraw
+from photobooth.plotter import Plotter
+
+plotter = Plotter()
 
 # File
-file_name = "photo-output-1.svg"
+file_name = "photo-output-3.svg"
 
-# Construct the path
-base_path = os.path.dirname(os.path.abspath(__file__))
-base_dir = os.path.join(base_path, "photos", "current")
-file_path = os.path.join(base_dir, file_name)
+# Paths
+current_dir = os.path.dirname(os.path.abspath(__file__))
+file_path = os.path.join(current_dir, "photos", "current", file_name)
+config_path = os.path.join(current_dir, "photobooth", "nextdraw_conf.py")
 
 # Pass the constructed path
 print(file_path)
-nd1 = NextDraw()
-
-            
-nd1.plot_setup(file_path)
-nd1.plot_run()
-
+plotter.plot_image(file_path)

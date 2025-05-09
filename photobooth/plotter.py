@@ -20,7 +20,6 @@ class Plotter:
             print("Failed to connect to the plotter.")
             
         self.nd1.plot_setup()
-        self.nd1.options.mode = "find_home"
         self.nd1.plot_run()
 
     # def plot(self):
