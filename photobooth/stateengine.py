@@ -6,7 +6,7 @@ class StateEngine:
     def __init__(self):
         # State
         self.debugmode = False
-        self.state = "Startup"
+        self.state = "Test"
         self.currentPhotoPath = ""
         self.currentWorkPath = ""
         self.currentSVGPath = ""
