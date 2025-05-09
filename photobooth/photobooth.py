@@ -163,7 +163,9 @@ class PhotoBooth:
         jpg_files = [f for f in os.listdir(photos_dir) if f.endswith('.jpg') and not f.endswith('_optimized.jpg')]
         
         # Initialize the rolling ID
-        rolling_id = 0
+        # Initialize the array of IDs
+        id_array = [0, 1, 2, 3, 5, 6, 7, 8, 10, 11, 12, 13]
+        id_index = 0  # Index to track the current position in the array
 
         # Process each .jpg file
         for jpg_file in jpg_files:
@@ -178,13 +180,14 @@ class PhotoBooth:
                 self.state_engine.currentPhotoPath, scale_x=1.0, scale_y=1.0, min_contour_area=5, suffix='-both', method=3)
             
             # Create the final output SVG file using the rolling ID
-            startX, startY = self.state_engine.get_image_params_by_id(rolling_id)
+            current_id = id_array[id_index]
+            startX, startY = self.state_engine.get_image_params_by_id(current_id)
             self.state_engine.currentSVGPath = self.image_parser.create_output_svg(
-                self.state_engine.currentSVGPath, "photo-output-", 0.35, startX, startY, rolling_id
+                self.state_engine.currentSVGPath, "photo-output-", 0.35, startX, startY, current_id
             )
 
             # Update rolling ID, ensuring it wraps between 0 and 15
-            rolling_id = (rolling_id + 1) % 16
+            id_index = (id_index + 1) % len(id_array)
 
 
         output_directory = os.path.join(parent_dir, "photos/current")
