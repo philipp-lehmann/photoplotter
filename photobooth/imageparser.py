@@ -9,6 +9,7 @@ import numpy as np
 import svgwrite
 import torch
 from torchvision import transforms
+from scipy.spatial import cKDTree
 from lxml import etree
 
 # ----- PROFILE / OPTIMIZATION -----
@@ -508,15 +509,14 @@ class ImageParser:
     @profile
     def align_svg_to_points(self, input_file, output_file, grid_points):
         """Process SVG by aligning points to a dynamic grid using lxml.etree."""
-        # Parse the SVG file
         parser = etree.XMLParser(remove_blank_text=True)
         tree = etree.parse(input_file, parser)
         root = tree.getroot()
 
-        # Define the SVG namespace
-        namespace = {'svg': 'http://www.w3.org/2000/svg'}
+        # Build KD-Tree for faster nearest-point lookup
+        kdtree = self.precompute_kdtree(grid_points)
 
-        # Process all polyline and polygon elements
+        namespace = {'svg': 'http://www.w3.org/2000/svg'}
         for poly in root.xpath(".//svg:polyline | .//svg:polygon", namespaces=namespace):
             points = poly.get("points")
             if points:
@@ -524,17 +524,23 @@ class ImageParser:
                 for point in points.split():
                     try:
                         x, y = map(float, point.split(","))
-                        aligned_point = self.align_to_dynamic_grid((x, y), grid_points)
+                        aligned_point = self.align_to_dynamic_grid_kdtree((x, y), kdtree)
                         new_points.append(f"{aligned_point[0]},{aligned_point[1]}")
                     except ValueError:
                         continue  # Skip malformed points
                 poly.set("points", " ".join(new_points))
 
-        # Save the modified SVG file
         tree.write(output_file, pretty_print=True, xml_declaration=True, encoding="UTF-8")
         print(f"Aligned SVG saved as {output_file}")
         return output_file
     
+    def precompute_kdtree(self, grid_points):
+        return cKDTree(grid_points)
+
+    def align_to_dynamic_grid_kdtree(self, point, kdtree):
+        _, idx = kdtree.query(point)
+        return kdtree.data[idx]
+
     def align_svg_to_points_advanced(self, input_file, output_file, grid_points, center=(400.0, 400.0), plateau_radius=50, randomness_factor=0.0):
         """Process SVG by aligning points to a dynamic grid using a plateau and increasing randomness toward the edges."""
         # Parse the SVG file
