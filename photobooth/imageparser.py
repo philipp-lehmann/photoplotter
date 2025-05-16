@@ -18,7 +18,17 @@ def profile(func):
         start_time = time.time()
         result = func(*args, **kwargs)
         duration = time.time() - start_time
-        print(f"\033[1;31m⏲ {func.__name__}\033[0m took {duration:.2f} seconds")
+
+        # Bar settings
+        unit = 0.05  # seconds per '='
+        max_len = 20  # max number of '=' in bar
+        num_eq = min(int(duration / unit), max_len)
+        num_dash = max_len - num_eq
+
+        # ANSI color for yellow: \033[33m
+        bar = f"\033[33m{'=' * num_eq}\033[0m{'-' * num_dash}"
+
+        print(f"\033[1;31m⏲ {func.__name__}\033[0m took {duration:.2f} seconds [{bar}]")
         return result
     return wrapper
 
