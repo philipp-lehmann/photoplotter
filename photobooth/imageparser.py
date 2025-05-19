@@ -77,10 +77,19 @@ class ImageParser:
         opt_image, depth_map = self.generate_and_apply_depth_map(image, opt_image)
         self.save_optimized_image(image_filepath, opt_image, depth_map)
         
-        contours = self.extract_contours(opt_image, method, min_contour_area)
-        contours = self.sort_and_limit_contours(contours, target_width, target_height, max_paths)
+        # Extract contours from the optimized image
+        image_contours = self.extract_contours(opt_image, method, min_contour_area)
+        image_contours = self.sort_and_limit_contours(image_contours, target_width, target_height, max_paths)
         
-        svg_filepath = self.create_svg(image_filepath, contours, target_width, target_height, scale_x, scale_y, suffix)
+        # Extract contours from the depth map
+        depth_map_contours = self.extract_contours(depth_map, method, min_contour_area)
+        depth_map_contours = self.sort_and_limit_contours(depth_map_contours, target_width, target_height, max_paths)
+        
+        # Merge contours
+        merged_contours = image_contours + depth_map_contours
+        
+        # Create and process the SVG
+        svg_filepath = self.create_svg(image_filepath, merged_contours, target_width, target_height, scale_x, scale_y, suffix)
         processed_svg_filepath = self.process_svg(svg_filepath, depth_map)
         
         print(f"Processed SVG saved at: {processed_svg_filepath}")
@@ -177,6 +186,7 @@ class ImageParser:
         else:
             print("Depth map generation failed, proceeding without enhancement.")
             return opt_image, None  
+        
     def generate_depth_map(self, image):
         """Generate a depth map for the image."""
         # Load the pre-trained depth estimation model (MiDaS or EfficientMon)
