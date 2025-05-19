@@ -28,7 +28,7 @@ def profile(func):
         # ANSI color for yellow: \033[33m
         bar = f"\033[33m{'=' * num_eq}\033[0m{'-' * num_dash}"
 
-        print(f"\033[1;31m⏲ {func.__name__}\033[0m took {duration:.2f} seconds [{bar}]")
+        print(f"[{bar}] \033[1;33m⏲ {func.__name__}\033[0m took {duration:.2f} seconds")
         return result
     return wrapper
 
@@ -49,7 +49,6 @@ class ImageParser:
         self.landmark_detector = dlib.shape_predictor(predictor_path)     
         pass    
     
-    @profile
     def detect_faces(self, image_filepath):
         """Used when snapping an image. Quick method to check if a face is present in the image"""
         image = cv2.imread(image_filepath)
@@ -61,7 +60,6 @@ class ImageParser:
         faces = self.face_detector(gray_image)
         return len(faces) > 0
     
-    @profile
     def convert_to_svg(self, image_filepath, target_width=800, target_height=800, scale_x=1.0, scale_y=1.0, min_paths=30, max_paths=250, min_contour_area=20, suffix='', method=1):
         """Convert input image to SVG with parameters."""
         print(f"Converting {image_filepath}")
@@ -178,8 +176,7 @@ class ImageParser:
             return opt_image, depth_map
         else:
             print("Depth map generation failed, proceeding without enhancement.")
-            return opt_image, None
-        
+            return opt_image, None  
     def generate_depth_map(self, image):
         """Generate a depth map for the image."""
         # Load the pre-trained depth estimation model (MiDaS or EfficientMon)
@@ -258,6 +255,7 @@ class ImageParser:
         return optimized_image_path, None
 
     # ----- Contours -----  
+    @profile
     def extract_contours(self, opt_image, method, min_contour_area):
         """Extract contours based on the selected method."""
         contours = []
