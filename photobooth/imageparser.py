@@ -336,11 +336,16 @@ class ImageParser:
         cleaned_svg_filepath = self.remove_duplicate_segments(aligned_svg_filepath)
         return cleaned_svg_filepath
 
-    @profile
-    def generate_dynamic_points(self, min_value=0, max_value=800, num_points=70, center=400.0, plateau_radius=50, randomness_factor=0.1):
-        """Generate a dynamic grid as an array of (x, y) points with higher density near the center, 
-        a plateau region, and increasing randomness towards the edges."""
-        
+    def generate_dynamic_points(self, min_value=0, max_value=800, num_points_mean=70, num_points_std=10, center=400.0, plateau_radius=50, randomness_factor=0.1):
+        """Generate a dynamic grid as an array of (x, y) points with higher density near the center,
+        a plateau region, and increasing randomness towards the edges.
+
+        num_points is sampled from a Gaussian distribution clipped between 40 and 100.
+        """
+        # Sample num_points from a Gaussian distribution and clip between 40 and 100
+        num_points = int(np.clip(np.random.normal(loc=num_points_mean, scale=num_points_std), 40, 100))
+        print(f"Generated grid with \033[1;31m{num_points}\033[0m points.")
+
         # Generate cubic-scaled values for x and y
         values = np.linspace(-1, 1, num_points)
         scaled_values = center + (max_value - min_value) * values**3
