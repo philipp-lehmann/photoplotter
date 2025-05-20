@@ -16,18 +16,35 @@ class ImageParser:
     def __init__(self):
         print("Starting ImageParser ...")
 
-        # Initialize dlib face detector and shape predictor (68 landmarks)
+        # Initialize dlib face detector and shape predictor
         self.face_detector = dlib.get_frontal_face_detector()
         base_path = os.path.dirname(os.path.abspath(__file__))
-        predictor_path = os.path.join(base_path, 'shape_predictor', 'shape_predictor_68_face_landmarks.dat')
-
-        # Validate file paths
-        if not os.path.exists(predictor_path):
-            raise FileNotFoundError(f"Shape predictor file not found: {predictor_path}")
         
-        # Load shape predictor
-        self.landmark_detector = dlib.shape_predictor(predictor_path)     
-        pass    
+        # Loading 68 face landmarks model
+        predictor_path = os.path.join(base_path, 'shape_predictor', 'shape_predictor_68_face_landmarks.dat')
+        self.landmark_detector = dlib.shape_predictor(predictor_path)
+
+        # Initialize MiDaS model for depth estimation
+        model_type = "MiDaS_small"
+        model_path = os.path.join(base_path, 'midas', 'midas_small.pth')
+
+        if not os.path.exists(model_path):
+            print("Model not found locally. Downloading...")
+            self.model = torch.hub.load("intel-isl/MiDaS", model_type, pretrained=False, trust_repo=True)
+            os.makedirs(os.path.dirname(model_path), exist_ok=True)
+            torch.save(self.model.state_dict(), model_path)
+        else:
+            print("Loading model from local path...")
+            self.model = torch.hub.load("intel-isl/MiDaS", model_type, pretrained=False, trust_repo=True)
+            self.model.load_state_dict(torch.load(model_path))
+
+        self.model.eval()
+
+        self.transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Resize((256, 256)),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        ])
     
     def detect_faces(self, image_filepath):
         """Used when snapping an image. Quick method to check if a face is present in the image"""
@@ -168,24 +185,14 @@ class ImageParser:
             return opt_image, None  
         
     def generate_depth_map(self, image):
-        """Generate a depth map for the image."""
-        # Load the pre-trained depth estimation model (MiDaS or EfficientMon)
-        # Example: Use a pre-trained MiDaS model or EfficientMon here
-        model_type = "MiDaS_small"
-        model = torch.hub.load("intel-isl/MiDaS", model_type, pretrained=True)
-        transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Resize((256, 256)),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-        ])
-
         image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        input_tensor = transform(image_rgb).unsqueeze(0)  # Add batch dimension
-        with torch.no_grad():
-            depth_map = model(input_tensor)
+        input_tensor = self.transform(image_rgb).unsqueeze(0)
 
-        depth_map = depth_map.squeeze().cpu().numpy()  # Remove batch dimension and convert to numpy
-        depth_map_normalized = cv2.normalize(depth_map, None, 0, 255, cv2.NORM_MINMAX)  # Normalize to 0-255
+        with torch.no_grad():
+            depth_map = self.model(input_tensor)
+
+        depth_map = depth_map.squeeze().cpu().numpy()
+        depth_map_normalized = cv2.normalize(depth_map, None, 0, 255, cv2.NORM_MINMAX)
         return np.uint8(depth_map_normalized)
     
     def enhance_foreground(self, image, depth_map, contrast_factor=2.0, background_factor=0.5):
