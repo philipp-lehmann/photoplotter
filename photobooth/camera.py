@@ -45,7 +45,8 @@ class Camera:
         try:
             subprocess.run(libcamera_command, check=True)
             print(f"Image saved to {image_filepath}")
-            self.crop_to_square(image_filepath)
+            # Not in use: Crop to square
+            # self.crop_to_square(image_filepath)
             return image_filepath
         except subprocess.CalledProcessError as e:
             print(f"Error capturing image: {e}")
