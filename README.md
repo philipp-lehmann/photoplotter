@@ -99,6 +99,10 @@ pip install lxml
 pip install numpy
 pip install paho-mqtt
 pip install dlib
+pip install scipy
+pip install torch
+pip install torch torchvision
+
 
 python -m pip install https://software-download.bantamtools.com/nd/api/nextdraw_api.zip
 ```
