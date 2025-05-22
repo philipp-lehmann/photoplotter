@@ -19,7 +19,7 @@ class PhotoBooth:
     # ------------------------------------------------------------------------
     def process_startup(self):
         # Logic for "Startup" state
-        time.sleep(4)
+        time.sleep(1)
         if self.plotter.plotter_found:
             self.state_engine.change_state("ResetPending")
             print("Waiting for reset")
@@ -68,8 +68,7 @@ class PhotoBooth:
     
     def process_snapping(self):
         # Logic for "Snapping" state
-        random_delay = random.randint(1, 3)
-        time.sleep(random_delay)
+        time.sleep(1)
         image_path = self.camera.snap_image()
         
         if image_path:
@@ -107,7 +106,7 @@ class PhotoBooth:
     def process_processing(self):
         # Logic for "Drawing" state
         if not self.plotter.connect_to_plotter:
-            time.sleep(2)
+            time.sleep(1)
         
         # Convert image to SVG
         tempSVG = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath)
@@ -137,7 +136,7 @@ class PhotoBooth:
 
     def process_drawing(self):
         if self.plotter.connect_to_plotter == False: 
-            time.sleep(2)
+            time.sleep(1)
         print(f"Drawing: Connecting with penplotter {self.state_engine.currentSVGPath}")
         self.plotter.plot_image(self.state_engine.currentSVGPath)
         self.state_engine.update_photo_id()

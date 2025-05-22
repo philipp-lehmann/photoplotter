@@ -152,7 +152,7 @@ class StateEngine:
             print("Reset confirmed")
             self.reset_photo_id()  # Reset and shuffle photo IDs
             self.change_state("Waiting")
-            time.sleep(3)
+            time.sleep(1)
         else:
             pass
         
