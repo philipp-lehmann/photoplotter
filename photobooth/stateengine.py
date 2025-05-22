@@ -1,12 +1,12 @@
 import paho.mqtt.client as mqtt
 import time
 import random
+import os
 
 class StateEngine:
     def __init__(self):
         # State
-        self.debugmode = False
-        self.state = "Test"
+        self.state = "Startup"
         self.currentPhotoPath = ""
         self.currentWorkPath = ""
         self.currentSVGPath = ""
@@ -23,26 +23,23 @@ class StateEngine:
             "Snapping": ["Tracking", "Processing"],
             "Processing": ["Drawing", "Waiting"],
             "Drawing": ["Waiting", "ResetPending"],
-            "ResetPending": ["Waiting"], 
+            "ResetPending": ["Waiting"],
             "Test": ["Waiting", "Drawing"]
         }
-        
-        # MQTT
-        try:
+
+        if self.is_running_on_raspberry_pi():
+            print(f"\033[1;33m📱 Raspberry Pi found: Connecting to broker\033[0m.")
             self.broker_address = "localhost"
             self.client = mqtt.Client("StateEngine_Client")
             self.client.on_connect = self.on_connect
-        except AttributeError:
-            pass
-        
-        if self.debugmode:
-            print("Starting Debugmode...")
-            self.photoID = [1]  # For debug mode, only one photoID
-        else:
             self.client.connect(self.broker_address)
             self.client.subscribe("lcd/buttons")
             self.client.loop_start()
             self.client.on_message = self.on_message
+            print("MQTT broker started.")
+        else:
+            print(f"\033[1;32m🖥️ Raspberry Pi not found: Entering test mode\033[0m.")
+            self.state = "Test"
         
         print("Starting StateEngine ...")
         self.reset_photo_id()  # Shuffle the photoID list on startup
@@ -84,10 +81,10 @@ class StateEngine:
     def reset_photo_id(self):
         triplets = [
             [1, 6, 11],
-            [2, 7, 12]
-            # [3, 8, 13],
-            # [4, 9, 14],
-            # [5, 10, 15]
+            [2, 7, 12],
+            [3, 8, 13],
+            [4, 9, 14],
+            [5, 10, 15]
         ]
         for triplet in triplets:
             random.shuffle(triplet)
@@ -161,3 +158,15 @@ class StateEngine:
         
     def publish_message(self, topic, message):
         self.client.publish(topic, message)
+        
+        
+    # OS
+    # ------------------------------------------------------------------------ 
+    @staticmethod
+    def is_running_on_raspberry_pi():
+        try:
+            with open("/proc/cpuinfo", "r") as f:
+                cpuinfo = f.read()
+                return "Raspberry Pi" in cpuinfo
+        except FileNotFoundError:
+            return False
