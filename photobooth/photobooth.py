@@ -190,8 +190,8 @@ class PhotoBooth:
             id_index = (id_index + 1) % len(id_array)
 
 
-        output_directory = os.path.join(parent_dir, "photos/current")
-        combined_file_path = os.path.join(parent_dir, "photos/output/photo-collection.svg")
+        output_directory = os.path.join(parent_dir, "photos/output")
+        combined_file_path = os.path.join(parent_dir, "photos/collection/photo-collection.svg")
         self.image_parser.collect_all_paths(output_directory, combined_file_path)
                     
         print("All JPG files processed.")

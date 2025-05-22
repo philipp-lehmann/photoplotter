@@ -622,7 +622,7 @@ class ImageParser:
         
          # Use an absolute path for the output directory
         parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        output_dir = os.path.join(parent_dir, "photos/current")  # Join it with your relative path
+        output_dir = os.path.join(parent_dir, "photos/output")  # Join it with your relative path
         os.makedirs(output_dir, exist_ok=True)  # Create the directory if it doesn't exist
         
         # svg_filename = os.path.splitext(os.path.basename(image_svg_path))[0] + str(id) + '.svg'
