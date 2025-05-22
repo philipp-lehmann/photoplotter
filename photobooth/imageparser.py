@@ -252,7 +252,6 @@ class ImageParser:
         return optimized_image_path, None
 
     # ----- Contours -----  
-    @profile
     def extract_contours(self, opt_image, method, min_contour_area):
         """Extract contours based on the selected method."""
         contours = []
@@ -300,20 +299,6 @@ class ImageParser:
             dwg.add(dwg.polyline(points, fill="none", stroke="#aaa", stroke_width="1"))
             num_paths += 1
         return num_paths
-
-    @staticmethod
-    def adjust_thresholds(num_paths, min_paths, max_paths, lower_threshold, upper_threshold, epsilon, trial):
-        # Adjusts the thresholds based on the number of paths
-        if num_paths < min_paths:
-            lower_threshold -= 5
-            upper_threshold -= 10 
-            epsilon *= 0.85 
-        elif num_paths > max_paths:
-            lower_threshold += 5 
-            upper_threshold += 15 
-            epsilon *= 1.15
-            
-        return lower_threshold, upper_threshold, epsilon
 
     # ----- SVG Processing -----  
     @profile
@@ -534,7 +519,7 @@ class ImageParser:
                 for point in points.split():
                     try:
                         x, y = map(float, point.split(","))
-                        aligned_point = self.align_to_dynamic_grid_kdtree((x, y), kdtree)
+                        aligned_point = self.align_to_dynamic_grid((x, y), kdtree)
                         new_points.append(f"{aligned_point[0]},{aligned_point[1]}")
                     except ValueError:
                         continue  # Skip malformed points
@@ -547,56 +532,9 @@ class ImageParser:
     def precompute_kdtree(self, grid_points):
         return cKDTree(grid_points)
 
-    def align_to_dynamic_grid_kdtree(self, point, kdtree):
+    def align_to_dynamic_grid(self, point, kdtree):
         _, idx = kdtree.query(point)
         return kdtree.data[idx]
-
-    def align_svg_to_points_advanced(self, input_file, output_file, grid_points, center=(400.0, 400.0), plateau_radius=50, randomness_factor=0.0):
-        """Process SVG by aligning points to a dynamic grid using a plateau and increasing randomness toward the edges."""
-        # Parse the SVG file
-        parser = etree.XMLParser(remove_blank_text=True)
-        tree = etree.parse(input_file, parser)
-        root = tree.getroot()
-
-        # Define the SVG namespace
-        namespace = {'svg': 'http://www.w3.org/2000/svg'}
-
-        def compute_randomness_factor(point, center, plateau_radius, max_distance):
-            """Compute the randomness factor based on the distance from the center."""
-            distance = ((point[0] - center[0])**2 + (point[1] - center[1])**2)**0.5
-            if distance <= plateau_radius:
-                return randomness_factor  # Minimal randomness near the center
-            edge_factor = min(1.0, (distance - plateau_radius) / (max_distance - plateau_radius))
-            return randomness_factor + (1 - randomness_factor) * edge_factor
-
-        # Determine the maximum possible distance for normalization
-        max_distance = ((max(grid_points, key=lambda p: p[0])[0] - center[0])**2 +
-                        (max(grid_points, key=lambda p: p[1])[1] - center[1])**2)**0.5
-
-        # Process all polyline and polygon elements
-        for poly in root.xpath(".//svg:polyline | .//svg:polygon", namespaces=namespace):
-            points = poly.get("points")
-            if points:
-                new_points = []
-                for point in points.split():
-                    try:
-                        x, y = map(float, point.split(","))
-                        # Compute randomness factor based on distance from the center
-                        current_randomness = compute_randomness_factor((x, y), center, plateau_radius, max_distance)
-                        if random.random() > current_randomness:
-                            aligned_point = self.align_to_dynamic_grid((x, y), grid_points)
-                            new_points.append(f"{aligned_point[0]},{aligned_point[1]}")
-                        else:
-                            # Keep the point unchanged (introducing randomness)
-                            new_points.append(f"{x},{y}")
-                    except ValueError:
-                        continue  # Skip malformed points
-                poly.set("points", " ".join(new_points))
-
-        # Save the modified SVG file
-        tree.write(output_file, pretty_print=True, xml_declaration=True, encoding="UTF-8")
-        print(f"Aligned SVG saved as {output_file}")
-        return output_file
 
     @profile
     def remove_duplicate_segments(self, svg_filepath):
@@ -694,29 +632,9 @@ class ImageParser:
 
         return output_svg_path
     
-    @staticmethod
-    def align_to_dynamic_grid(value, grid_points):
-        """Find the closest (x, y) pair in the dynamic grid."""
-        return min(grid_points, key=lambda p: (p[0] - value[0])**2 + (p[1] - value[1])**2)
-    
     # ----- SVG Collection -----  
     def collect_all_paths(self, input_directory, output_file):
-        """
-        Combines all SVG files in the input directory by taking the <svg> tag from the first file
-        and appending all content from all files to it.
-
-        Parameters:
-        - input_directory (str): Directory containing SVG files to combine.
-        - output_file (str): Path for the output combined SVG file.
-        """
-        """
-        Combines all SVG files in the input directory by taking the <svg> tag from the first file
-        and appending all content from all files to it, ensuring proper structure.
-
-        Parameters:
-        - input_directory (str): Directory containing SVG files to combine.
-        - output_file (str): Path for the output combined SVG file.
-        """
+        """Combines all SVG files in the input directory. """
         # Get all SVG files in the directory, sorted alphabetically
         svg_files = sorted(f for f in os.listdir(input_directory) if f.endswith('.svg'))
         if not svg_files:
