@@ -36,8 +36,10 @@ photoplotter/
 │   └── imageparser.py
 │   
 └── photos/
-	└── current/
+	└── output/
+	└── collection/
 	└── snapped/
+	└── test/
 	└── traced/
 
 ```
@@ -47,6 +49,7 @@ photoplotter/
 - Users interact with the photobooth by following on-screen instructions.
 - They can capture photos using the integrated camera.
 - The captured photos are processed, saved and plotted.
+- When not connected to Pi the app goes into test mode and collects all images in the test folder.
 
 **Goals:**
 
@@ -56,7 +59,9 @@ photoplotter/
 
 **Ideas:**
 
-- Use facetracking instead of button input
+- Add reprint functionality
+- Style picker logic
+- Configuration for output sizes
 
 This project aims to combine the nostalgic charm of traditional photobooths with modern digital technology, offering a fun and interactive experience for users of all ages.
 
