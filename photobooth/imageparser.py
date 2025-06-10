@@ -105,7 +105,7 @@ class ImageParser:
         return image
     
     @profile
-    def crop_all_faces(self, image, faces, target_width=400, target_height=400, padding=1500):
+    def crop_all_faces(self, image, faces, target_width=400, target_height=400, padding=350):
         """Crop the image to a bounding rectangle encompassing all faces and resize it."""
         
         # Check if 'faces' is a single rectangle or a collection of rectangles and print detected faces
