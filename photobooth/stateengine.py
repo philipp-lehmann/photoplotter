@@ -80,11 +80,9 @@ class StateEngine:
 
     def reset_photo_id(self):
         triplets = [
-            [1, 6, 11],
-            [2, 7, 12],
-            [3, 8, 13],
-            [4, 9, 14],
-            [5, 10, 15]
+            [1, 2, 3, 4, 5],
+            [6, 7, 8, 9, 10],
+            [11, 12, 13, 14, 15]
         ]
         for triplet in triplets:
             random.shuffle(triplet)
@@ -142,17 +140,21 @@ class StateEngine:
         # Handle messages received on subscribed topics
         print(f"Received message on topic '{msg.topic}': {msg.payload.decode()}")
         
+        # Manually handle reset
+        allowed_keys = ["KEY1", "KEY2", "KEY3", "UP", "DOWN", "LEFT", "RIGHT"]
+        if msg.payload.decode() in allowed_keys:
+            if self.state == "ResetPending":
+                print("Reset confirmed")
+                self.reset_photo_id()  # Reset and shuffle photo IDs
+                self.change_state("Waiting")
+                time.sleep(1)
+        
         # Handler for each state
         if self.state == "Waiting":
             self.reset_work_id()
             self.change_state("Tracking")
         elif self.state == "Working":
             self.change_state("Tracking")
-        elif self.state == "ResetPending":
-            print("Reset confirmed")
-            self.reset_photo_id()  # Reset and shuffle photo IDs
-            self.change_state("Waiting")
-            time.sleep(1)
         else:
             pass
         

@@ -25,6 +25,7 @@ class PhotoBooth:
             print("Waiting for reset")
         else:
             self.state_engine.change_state("Waiting")
+            print("No plotter found")
         pass
     
     def process_waiting(self):

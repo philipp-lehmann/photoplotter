@@ -168,13 +168,6 @@ def check_button(LCD, button_pin, button_name):
     if LCD.digital_read(button_pin) == 1:
         if (current_time - last_press_time[button_name]) > debounce_delay:
             last_press_time[button_name] = current_time
-            if button_name == "KEY1":  # Use KEY1 to check and start main.py
-                if not is_main_py_running():
-                    print("main.py is not running.")
-                    display_error_image(LCD)  # Display "Processing-9.jpg"
-                    start_main_py()  # Start main.py
-                else:
-                    print("main.py is already running.")
             return True
     return False
 

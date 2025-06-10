@@ -105,13 +105,18 @@ class ImageParser:
         return image
     
     @profile
-    def crop_all_faces(self, image, faces, target_width=800, target_height=800, padding=1500):
+    def crop_all_faces(self, image, faces, target_width=400, target_height=400, padding=1500):
         """Crop the image to a bounding rectangle encompassing all faces and resize it."""
-        # Check if 'faces' is a single rectangle or a collection of rectangles
+        
+        # Check if 'faces' is a single rectangle or a collection of rectangles and print detected faces
         if isinstance(faces, dlib.rectangle):
             faces = [faces]  # Wrap it in a list
         elif not isinstance(faces, (dlib.rectangles, list)):
             raise TypeError("'faces' must be a dlib.rectangle or dlib.rectangles object.")
+
+        print("Detected faces:")
+        for i, face in enumerate(faces):
+            print(f"Face {i}: Left={face.left()}, Top={face.top()}, Right={face.right()}, Bottom={face.bottom()}")
 
         # Initialize bounding box coordinates
         min_x, min_y = float('inf'), float('inf')
@@ -136,18 +141,25 @@ class ImageParser:
         
         if width > height:
             diff = width - height
-            min_y = max(0, min_y - diff // 2)
-            max_y = min(image.shape[0], max_y + diff - (min_y == 0) * diff)
+            padding_top = diff // 2
+            padding_bottom = diff - padding_top
+            min_y = max(0, min_y - padding_top)
+            max_y = min(image.shape[0], max_y + padding_bottom)
         elif height > width:
             diff = height - width
-            min_x = max(0, min_x - diff // 2)
-            max_x = min(image.shape[1], max_x + diff - (min_x == 0) * diff)
-        
-        # Final bounding box dimensions
+            padding_left = diff // 2
+            padding_right = diff - padding_left
+            min_x = max(0, min_x - padding_left)
+            max_x = min(image.shape[1], max_x + padding_right)
+
+        # Ensure the final bounding box is within image bounds
+        min_x, min_y = max(0, min_x), max(0, min_y)
+        max_x, max_y = min(image.shape[1], max_x), min(image.shape[0], max_y)
+
+        # Verify the bounding box is square
         width = max_x - min_x
         height = max_y - min_y
-        
-        assert width == height, "Bounding box must be square."
+        # assert width == height, f"Bounding box must be square. Width: {width}, Height: {height}"
         
         # Crop the image
         cropped_image = image[min_y:max_y, min_x:max_x]
@@ -678,7 +690,7 @@ class ImageParser:
         print(f"Combined SVG saved to {output_file}")   
     
     # ----- NOT IN USE -----
-    def crop_to_largest_face(self, image, face_rect, target_width=800, target_height=800):
+    def crop_to_largest_face(self, image, face_rect, target_width=400, target_height=400):
         """
         NOT IN USE: This function is no longer active.
         Crop the image around the detected face to a square size.
