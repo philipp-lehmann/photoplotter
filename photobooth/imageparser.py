@@ -57,7 +57,7 @@ class ImageParser:
         faces = self.face_detector(gray_image)
         return len(faces) > 0
     
-    def convert_to_svg(self, image_filepath, target_width=800, target_height=800, scale_x=1.0, scale_y=1.0, min_paths=30, max_paths=250, min_contour_area=20, suffix='', method=1):
+    def convert_to_svg(self, image_filepath, target_width=800, target_height=800, scale_x=1.0, scale_y=1.0, min_paths=30, max_paths=250, min_contour_area=20, suffix='', method=1, apply_depthmap=True):
         """Convert input image to SVG with parameters."""
         print(f"Converting {image_filepath}")
         if not os.path.isfile(image_filepath):
@@ -71,7 +71,12 @@ class ImageParser:
         
         image = self.handle_faces(image, target_width, target_height)
         opt_image = self.process_face_image(image)
-        opt_image, depth_map = self.generate_and_apply_depth_map(image, opt_image)
+        depth_map = None
+        
+        if apply_depthmap:
+            opt_image, depth_map = self.generate_and_apply_depth_map(image, opt_image)
+        
+        # Save optimized images
         self.save_optimized_image(image_filepath, opt_image, depth_map)
         
         # Extract contours from the optimized image
@@ -320,6 +325,7 @@ class ImageParser:
         # Set the point generation methed here...
         grid_points = self.generate_dynamic_points()
 
+        # Todo: Make sure depth_map = None is handled correctly
         # method = random.choice(["dynamic_grid", "poisson_disk", "depth_map_density", "quad_tree"])
         # if method == "dynamic_grid":
         #     print("Using Dynamic Grid method for point generation.")
