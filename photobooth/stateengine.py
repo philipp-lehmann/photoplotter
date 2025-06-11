@@ -23,7 +23,8 @@ class StateEngine:
             "Snapping": ["Tracking", "Processing"],
             "Processing": ["Drawing", "Waiting"],
             "Drawing": ["Waiting", "ResetPending"],
-            "ResetPending": ["Waiting"],
+            "ResetPending": ["Waiting", "Template"],
+            "Template": ["ResetPending"],
             "Test": ["Waiting", "Drawing"]
         }
 
@@ -141,12 +142,19 @@ class StateEngine:
         print(f"Received message on topic '{msg.topic}': {msg.payload.decode()}")
         
         # Manually handle reset
-        allowed_keys = ["KEY1", "KEY2", "KEY3", "UP", "DOWN", "LEFT", "RIGHT"]
-        if msg.payload.decode() in allowed_keys:
+        reset_keys = ["KEY2", "KEY3", "UP", "DOWN", "LEFT", "RIGHT"]
+        if msg.payload.decode() in reset_keys:
             if self.state == "ResetPending":
                 print("Reset confirmed")
                 self.reset_photo_id()  # Reset and shuffle photo IDs
                 self.change_state("Waiting")
+                time.sleep(1)
+                
+        template_keys = ["KEY1"]
+        if msg.payload.decode() in reset_keys:
+            if self.state == "ResetPending":
+                print("Applying template")
+                self.change_state("Template")
                 time.sleep(1)
         
         # Handler for each state

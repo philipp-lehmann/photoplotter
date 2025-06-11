@@ -154,6 +154,14 @@ class PhotoBooth:
         # Logic for "ResetPending" state
         pass
     
+    def process_template(self):
+        print("🚩 Starting template")
+        parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        self.state_engine.currentSVGPath = os.path.join(parent_dir, f"assets/template/photo-template.svg")
+        self.plotter.plot_image(self.state_engine.currentSVGPath)
+        self.state_engine.change_state("ResetPending")
+    
+    
     def process_test(self):
         
         print("🚩 Starting test")
@@ -212,6 +220,7 @@ class PhotoBooth:
             "Processing": self.process_processing,
             "Drawing": self.process_drawing,
             "ResetPending": self.process_reset_pending,
+            "Template": self.process_template,
             "Test": self.process_test,
         }
         

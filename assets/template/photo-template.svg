@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 1190.6 841.9">
+  <defs>
+    <style>
+      .cls-1 {
+        fill: #fff;
+        stroke: #1d1d1b;
+        stroke-miterlimit: 10;
+      }
+    </style>
+  </defs>
+  <!-- Generator: Adobe Illustrator 28.6.0, SVG Export Plug-In . SVG Version: 1.2.0 Build 709)  -->
+  <g>
+    <g id="Ebene_1">
+      <g id="Ebene_2">
+        <rect class="cls-1" x="17" y="17" width="215.4" height="215.4"/>
+        <rect class="cls-1" x="245.9" y="17" width="215.4" height="215.4"/>
+        <rect class="cls-1" x="474.8" y="17" width="215.4" height="215.4"/>
+        <rect class="cls-1" x="703.7" y="17" width="215.4" height="215.4"/>
+        <rect class="cls-1" x="932.6" y="17" width="215.4" height="215.4"/>
+        <rect class="cls-1" x="17" y="284.9" width="215.4" height="215.4"/>
+        <rect class="cls-1" x="245.9" y="284.9" width="215.4" height="215.4"/>
+        <rect class="cls-1" x="474.8" y="284.9" width="215.4" height="215.4"/>
+        <rect class="cls-1" x="703.7" y="284.9" width="215.4" height="215.4"/>
+        <rect class="cls-1" x="932.6" y="284.9" width="215.4" height="215.4"/>
+        <rect class="cls-1" x="17" y="549.9" width="215.4" height="215.4"/>
+        <rect class="cls-1" x="245.9" y="549.9" width="215.4" height="215.4"/>
+        <rect class="cls-1" x="474.8" y="549.9" width="215.4" height="215.4"/>
+        <rect class="cls-1" x="703.7" y="549.9" width="215.4" height="215.4"/>
+        <rect class="cls-1" x="932.6" y="549.9" width="215.4" height="215.4"/>
+      </g>
+      <path class="cls-1" d="M0,0"/>
+      <path class="cls-1" d="M1190.6,0"/>
+      <path class="cls-1" d="M1190.6,841.9"/>
+      <path class="cls-1" d="M0,841.9"/>
+    </g>
+  </g>
+</svg>

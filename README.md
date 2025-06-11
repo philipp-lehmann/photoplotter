@@ -67,7 +67,7 @@ This project aims to combine the nostalgic charm of traditional photobooths with
 
 **State-Engine**
 - The project uses a state-engine.
-![State engine for this branch](doc/state-engine-kunstlokal.jpg)
+![State engine for this branch](doc/state-engine-stadtfest.jpg)
 
 
 ## Startup
