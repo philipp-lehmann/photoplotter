@@ -7,6 +7,7 @@ class StateEngine:
     def __init__(self):
         # State
         self.state = "Startup"
+        self.reprint = False
         self.currentPhotoPath = ""
         self.currentWorkPath = ""
         self.currentSVGPath = ""
@@ -137,34 +138,36 @@ class StateEngine:
         else:
             print(f"Failed to connect to MQTT broker with error code {rc}")
             
-    def on_message(self, client, userdata, msg):
-        # Handle messages received on subscribed topics
-        print(f"Received message on topic '{msg.topic}': {msg.payload.decode()}")
-        
+    def on_message(self, client, userdata, msg): 
         # Manually handle reset
+        message = msg.payload.decode()
         reset_keys = ["KEY2", "KEY3", "UP", "DOWN", "LEFT", "RIGHT"]
-        if msg.payload.decode() in reset_keys:
-            if self.state == "ResetPending":
+        template_keys = ["KEY1"]
+        
+        # Handle messages received on subscribed topics
+        print(f"Received message on topic '{msg.topic}': {message}")
+
+        if self.state == "ResetPending":
+            if message in reset_keys:
                 print("Reset confirmed")
                 self.reset_photo_id()  # Reset and shuffle photo IDs
                 self.change_state("Waiting")
-                time.sleep(1)
-                
-        template_keys = ["KEY1"]
-        if msg.payload.decode() in reset_keys:
-            if self.state == "ResetPending":
+                time.sleep(1)    
+            elif message in template_keys:
                 print("Applying template")
                 self.change_state("Template")
                 time.sleep(1)
         
         # Handler for each state
-        if self.state == "Waiting":
+        elif self.state == "Waiting":
             self.reset_work_id()
             self.change_state("Tracking")
         elif self.state == "Working":
             self.change_state("Tracking")
+        elif self.state == "Printing":
+            self.reprint = True
         else:
-            pass
+            print(f"Unexpected state: {self.state}") 
         
     def publish_message(self, topic, message):
         self.client.publish(topic, message)
