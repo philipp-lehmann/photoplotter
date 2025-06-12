@@ -1,4 +1,3 @@
-from .imageparser import ImageParser
 import subprocess
 import os
 import datetime
@@ -7,8 +6,6 @@ import datetime
 class Camera:
     def __init__(self):
         print("Starting Camera ...")
-        # Assuming ImageParser is correctly implemented elsewhere
-        self.image_parser = ImageParser()
 
     def snap_image(self, output_dir=None, filename=None, roi=None):
         print("Capturing image")
@@ -72,7 +69,3 @@ class Camera:
             img_cropped = img.crop((left, top, right, bottom))
             img_cropped.save(image_filepath)
             print(f"Image cropped to square and saved to {image_filepath}")
-
-    def process_image(self, image_filepath):
-        # Implement processing using ImageParser
-        pass
