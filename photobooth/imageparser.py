@@ -609,7 +609,7 @@ class ImageParser:
     
     # ----- SVG Output -----
     @profile  
-    def create_output_svg(self, image_svg_path, imgname = 'image', scale_factor = 0.33, offset_x=0, offset_y=0, id=0):
+    def create_output_svg(self, image_svg_path, imgname='image', scale_factor=0.33, offset_x=0, offset_y=0, id=0):
         """Create output image on artboard with id for output position"""
         # Load the original SVG content from a file
         with open(image_svg_path, 'rb') as file:  # Note 'rb' mode for reading as bytes
@@ -618,12 +618,18 @@ class ImageParser:
         # Parse the original SVG
         root = etree.fromstring(svg_data)
 
-        # Create a new SVG drawing with svgwrite, setting the artboard size to 420x297mm (check size)
-        dwg = svgwrite.Drawing(size=('1587', '1122'))
+        # Create a new SVG drawing with svgwrite, setting the desired size and viewBox
+        dwg = svgwrite.Drawing(
+            size=('1587', '841'), 
+            profile='full', 
+            viewBox='0 0 1587 841'
+        )
+        dwg.attribs.update({
+            "xmlns": "http://www.w3.org/2000/svg"
+        })
 
         # Transform and position the image
         group = dwg.g(id="all_paths", transform=f"translate({offset_x}, {offset_y}) scale({scale_factor})")
-        # dwg.add(dwg.rect(insert=(0, 0), size=('1587', '1122px'), fill='white'))
 
         for element in root.iter("{http://www.w3.org/2000/svg}*"):
             if element.tag.endswith('polyline'):

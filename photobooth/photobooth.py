@@ -160,6 +160,7 @@ class PhotoBooth:
         self.state_engine.currentSVGPath = os.path.join(parent_dir, f"assets/template/photo-template.svg")
         self.plotter.plot_image(self.state_engine.currentSVGPath)
         self.state_engine.change_state("ResetPending")
+        time.sleep(3) 
     
     
     def process_test(self):

@@ -105,8 +105,8 @@ class StateEngine:
         gutterSize = 50
 
         # Adjusted maximum dimensions to account for border
-        paperSizeX = 1587
-        paperSizeY = 1122
+        paperSizeX = 1191
+        paperSizeY = 841
         maxX = paperSizeX - (borderSize * 2)  # Maximum X dimension in mm for A3 paper
         maxY = paperSizeY - (borderSize * 2)  # Maximum Y dimension in mm for A3 paper
 
