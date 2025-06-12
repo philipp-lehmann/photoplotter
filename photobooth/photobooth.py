@@ -155,12 +155,23 @@ class PhotoBooth:
         pass
     
     def process_template(self):
-        print("🚩 Starting template")
+        print("🚩 Generate template")
         parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        self.state_engine.currentSVGPath = os.path.join(parent_dir, f"assets/template/photo-template.svg")
-        self.plotter.plot_image(self.state_engine.currentSVGPath)
-        self.state_engine.change_state("ResetPending")
-        time.sleep(3) 
+        self.currentDebugPath = os.path.join(parent_dir, f"assets/work/work-0.svg")
+        # Logic to retrieve work pattern and create output SVG
+        
+        for i in range(1, 16):
+            startX, startY = self.state_engine.get_image_params_by_id(i - 1)
+            self.state_engine.currentSVGPath = self.image_parser.create_output_svg(
+                self.currentDebugPath, "work-output-", offset_x=startX, offset_y=startY, id=i
+            )
+        
+        output_directory = os.path.join(parent_dir, "photos/output")
+        combined_file_path = os.path.join(parent_dir, "photos/collection/photo-collection.svg")
+        self.image_parser.collect_all_paths(output_directory, combined_file_path)
+        
+        sys.exit()
+        pass
     
     
     def process_test(self):
@@ -207,7 +218,7 @@ class PhotoBooth:
         print("All JPG files processed.")
         sys.exit()
         pass
-    
+        
 
     # Main loop
     # ------------------------------------------------------------------------
