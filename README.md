@@ -94,6 +94,7 @@ python main.py
 ```bash
 # Create venv
 python -m venv photoplotter-env
+source photoplotter-env/bin/activate
 
 # Install dependencies
 pip install paho-mqtt==1.5.1
@@ -107,7 +108,7 @@ pip install dlib
 pip install scipy
 pip install torch
 pip install torch torchvision
-
+pip install timm
 
 python -m pip install https://software-download.bantamtools.com/nd/api/nextdraw_api.zip
 ```
