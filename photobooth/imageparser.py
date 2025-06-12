@@ -620,9 +620,9 @@ class ImageParser:
 
         # Create a new SVG drawing with svgwrite, setting the desired size and viewBox
         dwg = svgwrite.Drawing(
-            size=('1587', '841'), 
+            size=('1191', '841'), 
             profile='full', 
-            viewBox='0 0 1587 841'
+            viewBox='0 0 1191 841'
         )
         dwg.attribs.update({
             "xmlns": "http://www.w3.org/2000/svg"
