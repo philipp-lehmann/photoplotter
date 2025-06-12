@@ -609,7 +609,7 @@ class ImageParser:
     
     # ----- SVG Output -----
     @profile  
-    def create_output_svg(self, image_svg_path, imgname='image', scale_factor=0.25, offset_x=0, offset_y=0, id=0):
+    def create_output_svg(self, image_svg_path, imgname='image', scale_factor=0.3, offset_x=0, offset_y=0, id=0, paper_width=500, paper_height=500):
         """Create output image on artboard with id for output position"""
         # Load the original SVG content from a file
         with open(image_svg_path, 'rb') as file:  # Note 'rb' mode for reading as bytes
@@ -620,9 +620,9 @@ class ImageParser:
 
         # Create a new SVG drawing with svgwrite, setting the desired size and viewBox
         dwg = svgwrite.Drawing(
-            size=('1191', '841'), 
-            profile='full', 
-            viewBox='0 0 1191 841'
+            size=(paper_width, paper_height),
+            profile='full',
+            viewBox=f'0 0 {paper_width} {paper_height}'
         )
         dwg.attribs.update({
             "xmlns": "http://www.w3.org/2000/svg"

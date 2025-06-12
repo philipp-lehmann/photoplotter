@@ -94,7 +94,7 @@ class PhotoBooth:
         
         # Create output SVG using the randomly chosen photo ID
         self.state_engine.currentSVGPath = self.image_parser.create_output_svg(
-            self.state_engine.currentWorkPath, "work-output-", offset_x=startX, offset_y=startY, id=random_photo_id
+            self.state_engine.currentWorkPath, "work-output-", offset_x=startX, offset_y=startY, id=random_photo_id, paper_width=self.state_engine.paperSizeX, paper_height=self.state_engine.paperSizeY
         )
         
         print(f"Converted Work pattern to SVG: {self.state_engine.currentSVGPath}, random: {random_photo_id}, from {self.state_engine.photoID}")
@@ -123,7 +123,7 @@ class PhotoBooth:
 
         # Create the final output SVG file
         self.state_engine.currentSVGPath = self.image_parser.create_output_svg(
-            tempSVG, "photo-output-", offset_x=startX, offset_y=startY, id=self.state_engine.photoID[-1] - 1
+            tempSVG, "photo-output-", offset_x=startX, offset_y=startY, id=self.state_engine.photoID[-1] - 1, paper_width=self.state_engine.paperSizeX, paper_height=self.state_engine.paperSizeY
         )
         
         # Check if the output SVG was created successfully
@@ -163,7 +163,7 @@ class PhotoBooth:
         for i in range(1, 16):
             startX, startY = self.state_engine.get_image_params_by_id(i - 1)
             self.state_engine.currentSVGPath = self.image_parser.create_output_svg(
-                self.currentDebugPath, "work-output-", offset_x=startX, offset_y=startY, id=i
+                self.currentDebugPath, "work-output-", offset_x=startX, offset_y=startY, id=i, paper_width=self.state_engine.paperSizeX, paper_height=self.state_engine.paperSizeY
             )
         
         output_directory = os.path.join(parent_dir, "photos/output")
@@ -204,7 +204,7 @@ class PhotoBooth:
             current_id = id_array[id_index]
             startX, startY = self.state_engine.get_image_params_by_id(current_id)
             self.state_engine.currentSVGPath = self.image_parser.create_output_svg(
-                self.state_engine.currentSVGPath, "photo-output-", offset_x=startX, offset_y=startY, id=current_id
+                self.state_engine.currentSVGPath, "photo-output-", offset_x=startX, offset_y=startY, id=current_id, paper_width=self.state_engine.paperSizeX, paper_height=self.state_engine.paperSizeY
             )
 
             # Update rolling ID, ensuring it wraps between 0 and 15

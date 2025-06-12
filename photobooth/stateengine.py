@@ -6,7 +6,7 @@ import os
 class StateEngine:
     def __init__(self):
         # State
-        self.state = "Startup"
+        self.state = "Template"
         self.reprint = False
         self.currentPhotoPath = ""
         self.currentWorkPath = ""
@@ -14,6 +14,8 @@ class StateEngine:
         self.imagesPerRow = 5
         self.imagesPerColumn = 3
         self.totalImages = self.imagesPerColumn * self.imagesPerRow
+        self.paperSizeX = 1587 #1191 multiplied by higher 96 dpi of Nextdraw
+        self.paperSizeY = 1122 #841 multiplied by higher 96 dpi of Nextdraw
         self.workID = 0
         self.photoID = list(range(1, self.totalImages + 1))  # List of positions from 1 to totalImages
         self.transitions = {
@@ -105,10 +107,8 @@ class StateEngine:
         gutterSize = 50
 
         # Adjusted maximum dimensions to account for border
-        paperSizeX = 1191
-        paperSizeY = 841
-        maxX = paperSizeX - (borderSize * 2)  # Maximum X dimension in mm for A3 paper
-        maxY = paperSizeY - (borderSize * 2)  # Maximum Y dimension in mm for A3 paper
+        maxX = self.paperSizeX - (borderSize * 2)  # Maximum X dimension in mm for A3 paper
+        maxY = self.paperSizeY - (borderSize * 2)  # Maximum Y dimension in mm for A3 paper
 
         # Total rows needed, given the total images and images per row
         totalRows = (self.totalImages + self.imagesPerRow - 1) // self.imagesPerRow
