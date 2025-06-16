@@ -6,7 +6,7 @@ import os
 class StateEngine:
     def __init__(self):
         # State
-        self.state = "Template"
+        self.state = "Startup"
         self.reprint = False
         self.currentPhotoPath = ""
         self.currentWorkPath = ""
