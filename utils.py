@@ -20,3 +20,16 @@ def profile(func):
         print(f"[{bar}] \033[1;33m⏲ {func.__name__}\033[0m took {duration:.2f} seconds")
         return result
     return wrapper
+
+def get_cpu_temp():
+    with open("/sys/class/thermal/thermal_zone0/temp", "r") as f:
+        temp_str = f.readline()
+    return int(temp_str) / 1000.0
+
+def wait_for_cooldown(threshold=74.0, check_interval=3):
+    temp = get_cpu_temp()
+    while temp > threshold:
+        print(f"CPU Temperature {temp:.2f}°C is above threshold {threshold}°C. Waiting...")
+        time.sleep(check_interval)
+        temp = get_cpu_temp()
+    print(f"CPU Temperature {temp:.2f}°C is below threshold. Continuing...")
