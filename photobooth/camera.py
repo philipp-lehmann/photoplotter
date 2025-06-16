@@ -1,6 +1,7 @@
 import subprocess
 import os
 import datetime
+from PIL import Image
 
 
 class Camera:
@@ -49,6 +50,7 @@ class Camera:
             try:
                 subprocess.run(libcamera_command, stdout=devnull, stderr=devnull, check=True)
                 print(f"Image captured and saved to {image_filepath}")
+                self.crop_to_square(image_filepath)
                 return image_filepath
             except subprocess.CalledProcessError as e:
                 print(f"Error capturing image: {e}")
