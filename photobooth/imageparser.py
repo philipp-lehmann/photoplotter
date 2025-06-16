@@ -27,6 +27,7 @@ class ImageParser:
         # Initialize MiDaS model for depth estimation
         model_type = "MiDaS_small"
         model_path = os.path.join(base_path, 'midas', 'midas_small.pth')
+        torch.set_num_threads(2)
 
         if not os.path.exists(model_path):
             print("Model not found locally. Downloading...")
@@ -42,7 +43,7 @@ class ImageParser:
 
         self.transform = transforms.Compose([
             transforms.ToTensor(),
-            transforms.Resize((192, 192)),
+            transforms.Resize((128, 128)),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ])
     
@@ -57,7 +58,7 @@ class ImageParser:
         faces = self.face_detector(gray_image)
         return len(faces) > 0
     
-    def convert_to_svg(self, image_filepath, target_width=800, target_height=800, scale_x=1.0, scale_y=1.0, min_paths=30, max_paths=250, min_contour_area=20, suffix='', method=1, apply_depthmap=False):
+    def convert_to_svg(self, image_filepath, target_width=400, target_height=400, scale_x=1.0, scale_y=1.0, min_paths=30, max_paths=250, min_contour_area=20, suffix='', method=1, apply_depthmap=False):
         """Convert input image to SVG with parameters."""
         print(f"Converting {image_filepath}")
         if not os.path.isfile(image_filepath):
@@ -69,8 +70,8 @@ class ImageParser:
             print("Image loading failed.")
             return None
         
-        image = self.handle_faces(image, target_width, target_height)
-        opt_image = self.process_face_image(image)
+        cropimage = self.handle_faces(image, target_width, target_height)
+        opt_image = self.process_face_image(cropimage)
         depth_map = None
         
         if apply_depthmap:
@@ -112,7 +113,7 @@ class ImageParser:
     @profile
     def crop_all_faces(self, image, faces, target_width=400, target_height=400, padding=350):
         """Crop the image to a bounding rectangle encompassing all faces and resize it."""
-        
+        print("😄 Crop faces")
         # Check if 'faces' is a single rectangle or a collection of rectangles and print detected faces
         if isinstance(faces, dlib.rectangle):
             faces = [faces]  # Wrap it in a list
@@ -175,7 +176,7 @@ class ImageParser:
         return resized_image
     
     @profile
-    def process_face_image(self, image, target_width=800, target_height=800):
+    def process_face_image(self, image, target_width=400, target_height=400):
         """Optimized method that detects, crops, enhances the face and draws facial features"""
         if image is None:
             print("Failed to load image.")
