@@ -49,7 +49,7 @@ class Camera:
         with open(os.devnull, 'w') as devnull:
             try:
                 subprocess.run(libcamera_command, stdout=devnull, stderr=devnull, check=True)
-                print(f"Image captured and saved to {image_filepath}")
+                print(f"🎆 Image captured and saved to {image_filepath}")
                 self.crop_to_square(image_filepath)
                 return image_filepath
             except subprocess.CalledProcessError as e:
@@ -65,9 +65,6 @@ class Camera:
             top = (height - new_size)/2
             right = (width + new_size)/2
             bottom = (height + new_size)/2
-
-            print(f"Crop image: {left}, {top}, {right}, {bottom}")
             
             img_cropped = img.crop((left, top, right, bottom))
             img_cropped.save(image_filepath)
-            print(f"Image cropped to square and saved to {image_filepath}")
