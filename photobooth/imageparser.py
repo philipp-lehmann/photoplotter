@@ -58,7 +58,7 @@ class ImageParser:
         faces = self.face_detector(gray_image)
         return len(faces) > 0
     
-    def convert_to_svg(self, image_filepath, target_width=400, target_height=400, scale_x=1.0, scale_y=1.0, min_paths=30, max_paths=250, min_contour_area=20, suffix='', method=1, apply_depthmap=True):
+    def convert_to_svg(self, image_filepath, target_width=800, target_height=800, scale_x=1.0, scale_y=1.0, min_paths=30, max_paths=250, min_contour_area=20, suffix='', method=1, apply_depthmap=True):
         """Convert input image to SVG with parameters."""
         print(f"Converting {image_filepath}")
         if not os.path.isfile(image_filepath):
@@ -107,11 +107,12 @@ class ImageParser:
         faces = self.face_detector(gray_image)
         if faces:
             return self.crop_all_faces(image, faces, target_width, target_height)
-        print("No face found. Proceeding with the original image.")
-        return image
+        
+        print("No face found. Proceeding with the resized image.")
+        return cv2.resize(image, (target_width, target_height))
     
     @profile
-    def crop_all_faces(self, image, faces, target_width=400, target_height=400, padding=350):
+    def crop_all_faces(self, image, faces, target_width=800, target_height=800, padding=350):
         """Crop the image to a bounding rectangle encompassing all faces and resize it."""
         print("😄 Crop faces")
         # Check if 'faces' is a single rectangle or a collection of rectangles and print detected faces
@@ -176,7 +177,7 @@ class ImageParser:
         return resized_image
     
     @profile
-    def process_face_image(self, image, target_width=400, target_height=400):
+    def process_face_image(self, image, target_width=800, target_height=800):
         """Optimized method that detects, crops, enhances the face and draws facial features"""
         if image is None:
             print("Failed to load image.")
@@ -705,7 +706,7 @@ class ImageParser:
         print(f"Combined SVG saved to {output_file}")   
     
     # ----- NOT IN USE -----
-    def crop_to_largest_face(self, image, face_rect, target_width=400, target_height=400):
+    def crop_to_largest_face(self, image, face_rect, target_width=800, target_height=800):
         """
         NOT IN USE: This function is no longer active.
         Crop the image around the detected face to a square size.
