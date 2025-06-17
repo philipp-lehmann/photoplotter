@@ -376,68 +376,6 @@ class ImageParser:
                         grid_points.append((x, y))
 
         return grid_points
-        
-    def generate_quad_tree_points(self, min_value=0, max_value=800, min_square_size=2, max_square_size=160, center=(400.0, 400.0), grid_resolution=20):
-        """Generate points based on a quad tree-like structure, with smaller squares in the center
-        and larger squares toward the edges, ensuring regular grid distribution."""
-        
-        # List to store generated points
-        points = []
-
-        # Determine the total area size (x and y ranges)
-        total_size = max_value - min_value
-
-        # Create a grid with specified resolution (spacing between points)
-        for x in range(min_value, max_value, grid_resolution):
-            for y in range(min_value, max_value, grid_resolution):
-                # Compute the distance from the center of the grid
-                dist_to_center = ((x - center[0])**2 + (y - center[1])**2)**0.5
-
-                # Determine the square size based on the distance to the center
-                square_size = min_square_size + (max_square_size - min_square_size) * (dist_to_center / total_size)
-                square_size = min(max_square_size, max(min_square_size, square_size))  # Clamp to min/max size
-                
-                # If this grid point is within a square's bounds, add it as a point
-                if dist_to_center <= square_size:
-                    points.append((x, y))
-
-        return points
-    
-    def generate_quad_tree_points(self, min_value=0, max_value=800, min_square_size=10, max_square_size=100, center=(400.0, 400.0)):
-        """Generate points based on a quad tree-like structure, with smaller squares in the center
-        and larger squares toward the edges."""
-        
-        def subdivide_area(x_min, y_min, x_max, y_max, level):
-            """Recursively subdivide the area to generate points."""
-            # Compute the center of the current area
-            x_center = (x_min + x_max) / 2
-            y_center = (y_min + y_max) / 2
-            
-            # Compute the distance from the center of the quad to the global center
-            dist_to_center = ((x_center - center[0])**2 + (y_center - center[1])**2)**0.5
-            
-            # Determine the size of the current square
-            square_size = min_square_size + (max_square_size - min_square_size) * (dist_to_center / (max_value - min_value))
-            square_size = min(max_square_size, max(min_square_size, square_size))  # Clamp to min/max size
-            
-            # If the current square is sufficiently small, stop subdividing and add the point
-            if (x_max - x_min) <= square_size or (y_max - y_min) <= square_size:
-                points.append((x_center, y_center))
-                return
-            
-            # Otherwise, subdivide further
-            subdivide_area(x_min, y_min, x_center, y_center, level + 1)  # Top-left
-            subdivide_area(x_center, y_min, x_max, y_center, level + 1)  # Top-right
-            subdivide_area(x_min, y_center, x_center, y_max, level + 1)  # Bottom-left
-            subdivide_area(x_center, y_center, x_max, y_max, level + 1)  # Bottom-right
-        
-        # Initialize the list of points
-        points = []
-        
-        # Start subdivision from the entire area
-        subdivide_area(min_value, min_value, max_value, max_value, level=0)
-        
-        return points
 
     def generate_poisson_disk_points(self, width=800, height=800, radius=20, k=30):
         """Generate points using Poisson Disk Sampling."""
