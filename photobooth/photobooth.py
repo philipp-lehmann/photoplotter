@@ -36,9 +36,9 @@ class PhotoBooth:
     
     def process_tracking(self):
         # Logic for "Tracking" state
-        random_delay = random.randint(1, 3)
-        time.sleep(random_delay)
+        time.sleep(2)
         image_path = self.camera.snap_image()
+        
         if image_path:
             print(f"Tracking: Photo snapped and saved at {image_path}")
             self.state_engine.currentPhotoPath = image_path
@@ -50,19 +50,12 @@ class PhotoBooth:
                 os.remove(self.state_engine.currentPhotoPath)                
                 self.state_engine.workID += 1
                 
-                if self.state_engine.workID < 2:
+                if self.state_engine.workID > 5:
                     self.state_engine.change_state("Working")
-                elif self.state_engine.workID > 15:
-                    print("Working skipped: Creating fake portrait")
-                    random_fakephoto_number = random.randint(1, 50)
-                    parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                    self.state_engine.currentPhotoPath = os.path.join(parent_dir, f"assets/fake/fake-{random_fakephoto_number}.jpg")
-                    self.state_engine.change_state("Processing")
                     self.state_engine.reset_work_id()
                 else: 
                     print(f"Working skipped: {self.state_engine.workID}")
-                    time.sleep(random.randint(1,2))
-                    self.state_engine.change_state("Tracking")
+                    time.sleep(2)
         else:
             print("Failed to snap photo.")
         pass

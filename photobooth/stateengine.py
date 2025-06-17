@@ -167,7 +167,8 @@ class StateEngine:
         elif self.state == "Printing":
             self.reprint = True
         else:
-            print(f"Unexpected state: {self.state}") 
+            #print(f"Unexpected state: {self.state}") 
+            pass
         
     def publish_message(self, topic, message):
         self.client.publish(topic, message)
