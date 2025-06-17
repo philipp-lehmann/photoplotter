@@ -660,10 +660,13 @@ class ImageParser:
         return output_svg_path
     
     # ----- SVG Collection -----  
-    def collect_all_paths(self, input_directory, output_file):
+    def collect_all_paths(self, input_directory, output_file, prefix=""):
         """Combines all SVG files in the input directory. """
         # Get all SVG files in the directory, sorted alphabetically
-        svg_files = sorted(f for f in os.listdir(input_directory) if f.endswith('.svg'))
+        svg_files = sorted(
+            f for f in os.listdir(input_directory) 
+            if f.endswith('.svg') and (f.startswith(prefix) if prefix else True)
+        )
         if not svg_files:
             print("No SVG files found in the directory.")
             return

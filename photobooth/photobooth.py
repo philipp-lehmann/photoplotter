@@ -168,8 +168,9 @@ class PhotoBooth:
         
         output_directory = os.path.join(parent_dir, "photos/output")
         combined_file_path = os.path.join(parent_dir, "photos/collection/photo-collection.svg")
-        self.image_parser.collect_all_paths(output_directory, combined_file_path)
+        self.image_parser.collect_all_paths(output_directory, combined_file_path, "work")
         
+        self.plotter.plot_image(combined_file_path)
         sys.exit()
         pass
     
@@ -213,10 +214,9 @@ class PhotoBooth:
 
         output_directory = os.path.join(parent_dir, "photos/output")
         combined_file_path = os.path.join(parent_dir, "photos/collection/photo-collection.svg")
-        self.image_parser.collect_all_paths(output_directory, combined_file_path)
+        self.image_parser.collect_all_paths(output_directory, combined_file_path, "photo")
                     
-        print("All JPG files processed.")
-        sys.exit()
+        print("All SVGs files processed.")
         pass
         
 
