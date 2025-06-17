@@ -135,13 +135,21 @@ class PhotoBooth:
         self.state_engine.update_photo_id()
 
         # Check if all spots for images have been drawn
-        if self.state_engine.photoID and not self.state_engine.reprint:
+        if self.state_engine.photoID and not self.state_engine.state == "Redrawing":
             self.state_engine.change_state("Waiting")
         elif not self.state_engine.photoID:
             self.state_engine.change_state("ResetPending")
             print(f"All photos printed, changing state to 'ResetPending'.")
-        
 
+    def process_redrawing(self):
+        # Go back to drawing or reset if no space left
+        time.sleep(3)
+        
+        if self.state_engine.photoID:
+            self.state_engine.change_state("Drawing")
+        else:
+            self.state_engine.change_state("ResetPending")
+        
     def process_reset_pending(self):
         # Logic for "ResetPending" state
         pass
@@ -223,6 +231,7 @@ class PhotoBooth:
             "Snapping": self.process_snapping,
             "Processing": self.process_processing,
             "Drawing": self.process_drawing,
+            "Redrawing": self.process_redrawing,
             "ResetPending": self.process_reset_pending,
             "Template": self.process_template,
             "Test": self.process_test,

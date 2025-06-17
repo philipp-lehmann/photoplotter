@@ -126,6 +126,11 @@ def display_image_based_on_state(LCD, state):
             "display_time": 1,
             "loop": False
         },
+        "Redrawing": {
+            "images": ["assets/display/Redrawing.jpg"],
+            "display_time": 1,
+            "loop": False
+        },
         "Test": {
             "images": ["assets/display/Test.jpg"],
             "display_time": 1,

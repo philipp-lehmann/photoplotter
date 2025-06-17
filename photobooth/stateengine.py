@@ -7,7 +7,6 @@ class StateEngine:
     def __init__(self):
         # State
         self.state = "Startup"
-        self.reprint = False
         self.currentPhotoPath = ""
         self.currentWorkPath = ""
         self.currentSVGPath = ""
@@ -25,7 +24,8 @@ class StateEngine:
             "Working": ["Tracking"],
             "Snapping": ["Tracking", "Processing"],
             "Processing": ["Drawing", "Waiting"],
-            "Drawing": ["Waiting", "ResetPending"],
+            "Drawing": ["Redrawing", "Waiting", "ResetPending"],
+            "Redrawing": ["Drawing", "ResetPending"],
             "ResetPending": ["Waiting", "Template"],
             "Template": ["ResetPending"],
             "Test": ["Waiting", "Drawing"]
@@ -143,6 +143,7 @@ class StateEngine:
         message = msg.payload.decode()
         reset_keys = ["KEY2", "KEY3", "UP", "DOWN", "LEFT", "RIGHT"]
         template_keys = ["KEY1"]
+        redraw_keys = ["KEY2"]
         
         # Handle messages received on subscribed topics
         print(f"Received message on topic '{msg.topic}': {message}")
@@ -164,8 +165,11 @@ class StateEngine:
             self.change_state("Tracking")
         elif self.state == "Working":
             self.change_state("Tracking")
-        elif self.state == "Printing":
-            self.reprint = True
+        elif self.state == "Drawing":
+            if message in redraw_keys:
+                print("Redraw triggered")
+                self.change_state("Redrawing")
+                time.sleep(1)    
         else:
             #print(f"Unexpected state: {self.state}") 
             pass
