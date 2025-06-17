@@ -60,8 +60,6 @@ class Plotter:
         
         if os.path.exists(svg_path):
             if self.plotter_found:
-                print(f"NextDraw software version: {self.nd1.pen_lifts}")
-
                 self.nd1.interactive()   
                 self.nd1.plot_setup(svg_path)
                 self.nd1.plot_run(True)

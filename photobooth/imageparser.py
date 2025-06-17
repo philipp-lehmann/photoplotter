@@ -108,13 +108,12 @@ class ImageParser:
         if faces:
             return self.crop_all_faces(image, faces, target_width, target_height)
         
-        print("No face found. Proceeding with the resized image.")
+        print("❌ No face found. Proceeding with the resized image.")
         return cv2.resize(image, (target_width, target_height))
     
     @profile
     def crop_all_faces(self, image, faces, target_width=800, target_height=800, padding=350):
         """Crop the image to a bounding rectangle encompassing all faces and resize it."""
-        print("😄 Crop faces")
         # Check if 'faces' is a single rectangle or a collection of rectangles and print detected faces
         if isinstance(faces, dlib.rectangle):
             faces = [faces]  # Wrap it in a list
@@ -123,7 +122,7 @@ class ImageParser:
 
         print("Detected faces:")
         for i, face in enumerate(faces):
-            print(f"Face {i}: Left={face.left()}, Top={face.top()}, Right={face.right()}, Bottom={face.bottom()}")
+            print(f"😄 \033[1;34mFace {i}: \033[0mLeft={face.left()}, Top={face.top()}, Right={face.right()}, Bottom={face.bottom()}")
 
         # Initialize bounding box coordinates
         min_x, min_y = float('inf'), float('inf')
