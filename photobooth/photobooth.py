@@ -85,8 +85,7 @@ class PhotoBooth:
         print(f"Working started: {self.state_engine.workID}")
         # Logic to retrieve work pattern and create output SVG
         parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        random_svg_number = random.randint(1, 36)
-        self.state_engine.currentWorkPath = os.path.join(parent_dir, f"assets/work/work-{random_svg_number}.svg")
+        self.state_engine.currentWorkPath = os.path.join(parent_dir, f"assets/work/work-1.svg")
             
         # Randomly pick one photo ID from the remaining list without removing it
         random_photo_id = random.choice(self.state_engine.photoID)
