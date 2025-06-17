@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg id="Ebene_1" xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800">
-  <polyline points="45.4558 754.959 110.473 734.966 45.4558 714.973 110.473 694.98 45.4558 674.987" fill="none" stroke="#aaa" stroke-miterlimit="10" stroke-width=".5"/>
-  <polyline points="45.4558 653.448 110.473 653.448" fill="none" stroke="#aaa" stroke-miterlimit="10" stroke-width=".5"/>
-  <polyline points="45.4558 627.21 110.473 627.21 110.473 595.834" fill="none" stroke="#aaa" stroke-miterlimit="10" stroke-width=".5"/>
+  <polyline points="0 698.488 65.0176 698.488" fill="none" stroke="#aaa" stroke-miterlimit="10" stroke-width=".5"/>
+  <polyline points="0 672.25 65.0176 672.25 65.0176 640.874" fill="none" stroke="#aaa" stroke-miterlimit="10" stroke-width=".5"/>
+  <polyline points="0 800 65.0176 780.007 -1.74786 760.014 65.0176 740.021 -3.49571 720.027" fill="none" stroke="#aaa" stroke-miterlimit="10" stroke-width=".5"/>
 </svg>
