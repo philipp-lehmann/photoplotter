@@ -332,7 +332,7 @@ class ImageParser:
         method = random.choice(["dynamic_grid", "poisson_disk", "quad_tree"])
         if method == "dynamic_grid":
             print("Using Dynamic Grid method for point generation.")
-          grid_points = self.generate_dynamic_points()
+            grid_points = self.generate_dynamic_points()
         elif method == "poisson_disk":
             print("Using Poisson Disk Sampling method for point generation.")
             grid_points = self.generate_poisson_disk_points()
