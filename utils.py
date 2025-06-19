@@ -22,9 +22,12 @@ def profile(func):
     return wrapper
 
 def get_cpu_temp():
-    with open("/sys/class/thermal/thermal_zone0/temp", "r") as f:
-        temp_str = f.readline()
-    return int(temp_str) / 1000.0
+    if is_running_on_raspberry_pi():
+        with open("/sys/class/thermal/thermal_zone0/temp", "r") as f:
+            temp_str = f.readline()
+        return int(temp_str) / 1000.0
+    else: 
+        return int(10)
 
 def wait_for_cooldown(threshold=74.0, check_interval=3):
     temp = get_cpu_temp()
@@ -33,3 +36,11 @@ def wait_for_cooldown(threshold=74.0, check_interval=3):
         time.sleep(check_interval)
         temp = get_cpu_temp()
     print(f"CPU Temperature {temp:.2f}°C is below threshold. Continuing...")
+    
+def is_running_on_raspberry_pi():
+        try:
+            with open("/proc/cpuinfo", "r") as f:
+                cpuinfo = f.read()
+                return "Raspberry Pi" in cpuinfo
+        except FileNotFoundError:
+            return False

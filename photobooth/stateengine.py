@@ -1,12 +1,12 @@
 import paho.mqtt.client as mqtt
 import time
 import random
-import os
+from utils import is_running_on_raspberry_pi
 
 class StateEngine:
     def __init__(self):
         # State
-        self.state = "Startup"
+        self.state = "Test"
         self.currentPhotoPath = ""
         self.currentWorkPath = ""
         self.currentSVGPath = ""
@@ -31,7 +31,7 @@ class StateEngine:
             "Test": ["Waiting", "Drawing"]
         }
 
-        if self.is_running_on_raspberry_pi():
+        if is_running_on_raspberry_pi():
             print(f"\033[1;33m📱 Raspberry Pi found: Connecting to broker\033[0m.")
             self.broker_address = "localhost"
             self.client = mqtt.Client("StateEngine_Client")
@@ -177,14 +177,4 @@ class StateEngine:
     def publish_message(self, topic, message):
         self.client.publish(topic, message)
         
-        
-    # OS
-    # ------------------------------------------------------------------------ 
-    @staticmethod
-    def is_running_on_raspberry_pi():
-        try:
-            with open("/proc/cpuinfo", "r") as f:
-                cpuinfo = f.read()
-                return "Raspberry Pi" in cpuinfo
-        except FileNotFoundError:
-            return False
+

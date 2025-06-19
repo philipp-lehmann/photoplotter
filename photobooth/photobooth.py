@@ -171,7 +171,6 @@ class PhotoBooth:
         self.image_parser.collect_all_paths(output_directory, combined_file_path, "work")
         
         self.plotter.plot_image(combined_file_path)
-        sys.exit()
         pass
     
     
@@ -217,6 +216,7 @@ class PhotoBooth:
         self.image_parser.collect_all_paths(output_directory, combined_file_path, "photo")
                     
         print("All SVGs files processed.")
+        sys.exit()
         pass
         
 
