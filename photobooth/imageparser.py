@@ -335,16 +335,60 @@ class ImageParser:
         elif method == "poisson_disk":
             print("Using Poisson Disk Sampling method for point generation.")
             grid_points = self.generate_poisson_disk_points()
-        
+            
         # SVG Clean up
         if grid_points:
             processed_svg_filepath = svg_filepath.rsplit('.', 1)[0] + '_processed.svg'
             self.align_svg_to_points(svg_filepath, processed_svg_filepath, grid_points)
             cleaned_svg_filepath = self.remove_duplicate_segments(processed_svg_filepath)
         else:
-            cleaned_svg_filepath = self.remove_duplicate_segments(svg_filepath)
+            cleaned_svg_filepath = self.simplify_svg(svg_filepath)
+            cleaned_svg_filepath = self.remove_duplicate_segments(cleaned_svg_filepath)
 
         return cleaned_svg_filepath
+    
+    @profile
+    def simplify_svg(self, svg_filepath):
+        """Simplify an SVG file by reducing precision and removing unnecessary elements."""
+        # Parse the SVG
+        tree = etree.parse(svg_filepath)
+        root = tree.getroot()
+
+        # Detect namespace
+        nsmap = {k if k else 'default': v for k, v in root.nsmap.items()}
+        default_ns = nsmap.get(None)  # Get the default namespace if present
+        namespace = {'ns': default_ns} if default_ns else {}  # Use prefix only if a namespace exists
+
+        # Reduce precision of polyline points
+        for polyline in root.findall('.//{}polyline'.format('ns:' if namespace else ''), namespace):
+            points = polyline.get('points')
+            if points:
+                simplified_points = self.remove_close_points(points)
+                polyline.set('points', simplified_points)
+        
+        # Remove unnecessary elements
+        xpath_expr = './/*[not(@points) and not(@d)]'
+        for elem in root.xpath(xpath_expr, namespaces=namespace):
+            parent = elem.getparent()
+            if parent is not None:
+                parent.remove(elem)
+        
+        # Save the simplified SVG
+        output_svg_filepath = svg_filepath.rsplit('.', 1)[0] + '_simplified.svg'
+        tree.write(output_svg_filepath, pretty_print=True, xml_declaration=True, encoding='UTF-8')
+        
+        return output_svg_filepath
+
+    def remove_close_points(self, points, threshold=5):
+        """Remove points that are too close to each other."""
+        coords = points.split()
+        filtered_coords = [coords[0]]  # Keep the first point
+        for i in range(1, len(coords)):
+            prev_x, prev_y = map(float, filtered_coords[-1].split(','))
+            curr_x, curr_y = map(float, coords[i].split(','))
+            if ((curr_x - prev_x)**2 + (curr_y - prev_y)**2) > threshold**2:
+                filtered_coords.append(coords[i])
+        return ' '.join(filtered_coords)
 
     def generate_dynamic_points(self, min_value=0, max_value=800, num_points_mean=70, num_points_std=10, center=400.0, plateau_radius=50, randomness_factor=0.1):
         """Generate a dynamic grid as an array of (x, y) points with higher density near the center,
