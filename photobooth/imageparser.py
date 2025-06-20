@@ -58,7 +58,7 @@ class ImageParser:
         faces = self.face_detector(gray_image)
         return len(faces) > 0
     
-    def convert_to_svg(self, image_filepath, target_width=800, target_height=800, scale_x=1.0, scale_y=1.0, min_paths=30, max_paths=250, min_contour_area=20, suffix='', method=1, apply_depthmap=True):
+    def convert_to_svg(self, image_filepath, target_width=800, target_height=800, scale_x=1.0, scale_y=1.0, min_paths=30, max_paths=250, min_contour_area=7, suffix='', method=3, apply_depthmap=True):
         """Convert input image to SVG with parameters."""
         print(f"Converting {image_filepath}")
         if not os.path.isfile(image_filepath):

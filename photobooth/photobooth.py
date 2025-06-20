@@ -197,8 +197,7 @@ class PhotoBooth:
             #     self.state_engine.currentPhotoPath, min_contour_area=5, suffix='_edge', method=1)
             # self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(
             #     self.state_engine.currentPhotoPath, min_contour_area=5, suffix='_binary', method=2)
-            self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(
-                self.state_engine.currentPhotoPath, min_contour_area=5, suffix='', method=3)
+            self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath)
             
             # Create the final output SVG file using the rolling ID
             current_id = id_array[id_index]
