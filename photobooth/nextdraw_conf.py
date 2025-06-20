@@ -35,7 +35,7 @@ handling = 1            # Handling mode (1-4). Choose your preferred option.
                             # 3: Sketching
                             # 4: Constant speed
 
-speed_pendown = 25      # Maximum plotting speed, when pen is down (1-100). Default 25
+speed_pendown = 60      # Maximum plotting speed, when pen is down (1-100). Default 25
 speed_penup = 75        # Maximum transit speed, when pen is up (1-100). Default 75
 accel = 75              # Acceleration rate factor (1-100). Default 75
 

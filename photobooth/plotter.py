@@ -62,6 +62,7 @@ class Plotter:
             if self.plotter_found:
                 self.nd1.interactive()   
                 self.nd1.plot_setup(svg_path)
+                self.nd1.options.reordering = 2
                 self.nd1.plot_run(True)
                 
                 print("Plotting complete.")
