@@ -62,7 +62,7 @@ class PhotoBooth:
     
     def process_snapping(self):
         # Logic for "Snapping" state
-        time.sleep(1)
+        time.sleep(4)
         image_path = self.camera.snap_image()
         
         if image_path:
