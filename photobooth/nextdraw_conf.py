@@ -39,7 +39,7 @@ speed_pendown = 60      # Maximum plotting speed, when pen is down (1-100). Defa
 speed_penup = 75        # Maximum transit speed, when pen is up (1-100). Default 75
 accel = 75              # Acceleration rate factor (1-100). Default 75
 
-pen_pos_up = 60         # Height of pen when raised (0-100). Default 60
+pen_pos_up = 90         # Height of pen when raised (0-100). Default 60
 pen_pos_down = 40       # Height of pen when lowered (0-100). Default 40
 
 pen_rate_raise = 75     # Rate of raising pen (1-100). Default 75

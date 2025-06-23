@@ -6,7 +6,7 @@ from utils import is_running_on_raspberry_pi
 class StateEngine:
     def __init__(self):
         # State
-        self.state = "Test"
+        self.state = "Startup"
         self.currentPhotoPath = ""
         self.currentWorkPath = ""
         self.currentSVGPath = ""

@@ -50,7 +50,7 @@ class PhotoBooth:
                 os.remove(self.state_engine.currentPhotoPath)                
                 self.state_engine.workID += 1
                 
-                if self.state_engine.workID > 5:
+                if self.state_engine.workID > 20:
                     self.state_engine.change_state("Working")
                     self.state_engine.reset_work_id()
                 else: 
