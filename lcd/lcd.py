@@ -111,7 +111,7 @@ def display_image_based_on_state(LCD, state):
             "loop": True
         },
         "Template": {
-            "images": ["assets/display/Test-0.jpg"],
+            "images": ["assets/display/Template-0.jpg"],
             "display_time": 1,
             "loop": False
         },
