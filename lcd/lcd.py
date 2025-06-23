@@ -106,9 +106,9 @@ def display_image_based_on_state(LCD, state):
             "loop": True
         },
         "ResetPending": {
-            "images": ["assets/display/ResetPending-0.jpg"],
-            "display_time": 1,
-            "loop": False
+            "images": [f"assets/display/ResetPending-{i}.jpg" for i in range(0, 8)],
+            "display_time": 0.125,
+            "loop": True
         },
         "Template": {
             "images": ["assets/display/Test-0.jpg"],
