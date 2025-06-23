@@ -81,7 +81,7 @@ def display_image_based_on_state(LCD, state):
 
     state_config = {
         "Waiting": {
-            "images": [f"assets/display/Working-{i}.jpg" for i in range(0, 5)],
+            "images": [f"assets/display/Waiting-{i}.jpg" for i in range(0, 10)],
             "display_time": 0.125,
             "loop": True
         },
@@ -101,22 +101,22 @@ def display_image_based_on_state(LCD, state):
             "loop": False
         },
         "Processing": {
-            "images": [f"assets/display/Processing-{i}.jpg" for i in range(1, 11)],
+            "images": [f"assets/display/Processing-{i}.jpg" for i in range(0, 20)],
             "display_time": 0.125,
             "loop": True
         },
         "ResetPending": {
-            "images": ["assets/display/ResetPending.jpg"],
+            "images": ["assets/display/ResetPending-0.jpg"],
             "display_time": 1,
             "loop": False
         },
         "Template": {
-            "images": ["assets/display/Test.jpg"],
+            "images": ["assets/display/Test-0.jpg"],
             "display_time": 1,
             "loop": False
         },
         "Redrawing": {
-            "images": ["assets/display/Redrawing.jpg"],
+            "images": ["assets/display/Redrawing-0.jpg"],
             "display_time": 1,
             "loop": False
         },
@@ -126,18 +126,19 @@ def display_image_based_on_state(LCD, state):
             "loop": True
         },
         "Test": {
-            "images": ["assets/display/Test.jpg"],
+            "images": ["assets/display/Test-0.jpg"],
             "display_time": 1,
             "loop": False
         },
     }
 
     num_images = 15
+    anim_steps = 5
     for i in range(1, num_images + 1):
         state_config[f"Drawing-{i}"] = {
-            "images": [f"assets/display/Drawing-{i}.jpg"],
-            "display_time": 0.1,
-            "loop": False
+            "images": [f"assets/display/Drawing-{j}.jpg" for j in range((i - 1) * anim_steps, i * anim_steps)],
+            "display_time": 0.25,
+            "loop": True
         }
 
     config = state_config.get(state)
