@@ -171,6 +171,7 @@ class PhotoBooth:
         self.image_parser.collect_all_paths(output_directory, combined_file_path, "work")
         
         self.plotter.plot_image(combined_file_path)
+        self.state_engine.change_state("ResetPending")
         pass
     
     
