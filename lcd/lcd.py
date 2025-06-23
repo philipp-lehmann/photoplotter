@@ -42,17 +42,6 @@ def start_main_py():
     
 # Display images
 # ------------------------------------------------------------------------
-def display_default_image(LCD):
-    default_image_path = 'assets/display/Ready.jpg'
-    try:
-        image = Image.open(default_image_path)
-        rotated_image = image.rotate(-90, expand=True)
-        print("Displaying default image.")
-        LCD.LCD_ShowImage(rotated_image, 0, 0)
-    except Exception as e:
-        print(f"Error displaying default image: {e}")
-        
-# Function to display "Processing-9.jpg" when main.py is not running
 def display_error_image(LCD):
     print("Displaying Processing-9.jpg as main.py is not running.")
     state = "Processing"
@@ -131,6 +120,11 @@ def display_image_based_on_state(LCD, state):
             "display_time": 1,
             "loop": False
         },
+        "Startup": {
+            "images": [f"assets/display/Default-{i}.jpg" for i in range(0, 10)],
+            "display_time": 0.125,
+            "loop": True
+        },
         "Test": {
             "images": ["assets/display/Test.jpg"],
             "display_time": 1,
@@ -185,7 +179,7 @@ def check_button(LCD, button_pin, button_name):
 def main():
     LCD.LCD_Init(Lcd_ScanDir)
     LCD.LCD_Clear()
-    display_default_image(LCD)
+    display_image_based_on_state(LCD, "Startup")
 
     client.subscribe("state_engine/state")
     client.on_message = on_message
