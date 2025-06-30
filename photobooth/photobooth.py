@@ -102,7 +102,8 @@ class PhotoBooth:
             time.sleep(1)
         
         # Convert image to SVG
-        tempSVG = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath)
+        tempSVG = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath, min_contour_area=self.state_engine.minContourArea)
+        print(f"Min Area: {self.state_engine.minContourArea}")
         
         # Check if the SVG file was generated
         if not tempSVG or not os.path.isfile(tempSVG):
@@ -198,7 +199,7 @@ class PhotoBooth:
             #     self.state_engine.currentPhotoPath, min_contour_area=5, suffix='_edge', method=1)
             # self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(
             #     self.state_engine.currentPhotoPath, min_contour_area=5, suffix='_binary', method=2)
-            self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath)
+            self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath, min_contour_area=self.state_engine.minContourArea)
             
             # Create the final output SVG file using the rolling ID
             current_id = id_array[id_index]

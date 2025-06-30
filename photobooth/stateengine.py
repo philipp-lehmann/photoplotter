@@ -17,6 +17,11 @@ class StateEngine:
         self.paperSizeY = 1122 #841 multiplied by higher 96 dpi of Nextdraw
         self.workID = 0
         self.photoID = list(range(1, self.totalImages + 1))  # List of positions from 1 to totalImages
+        self.maxContourArea = 100
+        self.minContourArea = 20
+        self.stepContourArea = 5
+        self.last_update_time = 0
+        self.update_interval = 1
         self.transitions = {
             "Startup": ["Waiting", "ResetPending", "Test"],
             "Waiting": ["Tracking"],
@@ -144,9 +149,12 @@ class StateEngine:
         reset_keys = ["KEY2", "KEY3", "UP", "DOWN", "LEFT", "RIGHT"]
         template_keys = ["KEY1"]
         redraw_keys = ["KEY2"]
+        more_details_keys = ["UP"]
+        less_details_keys = ["DOWN"]
         
         # Handle messages received on subscribed topics
         print(f"Received message on topic '{msg.topic}': {message}")
+        current_time = time.time()
 
         if self.state == "ResetPending":
             if message in reset_keys:
@@ -163,8 +171,21 @@ class StateEngine:
         elif self.state == "Waiting":
             self.reset_work_id()
             self.change_state("Tracking")
+            
+        elif self.state == "Tracking": 
+            if current_time - self.last_update_time >= self.update_interval:
+                if message in more_details_keys:
+                    self.minContourArea = min(self.minContourArea + self.stepContourArea, self.maxContourArea)  
+                    self.last_update_time = current_time
+                    print(f"Inc: {self.minContourArea}")
+                elif message in less_details_keys:
+                    self.minContourArea = max(self.minContourArea - self.stepContourArea, 0)  
+                    self.last_update_time = current_time
+                    print(f"Dec: {self.minContourArea}")
+                
         elif self.state == "Working":
             self.change_state("Tracking")
+            
         elif self.state == "Drawing":
             if message in redraw_keys:
                 print("Redraw triggered")
