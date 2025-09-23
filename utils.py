@@ -1,5 +1,6 @@
 # utils.py
 import time
+import random
 
 # ----- @profile Speed Trackter -----
 def profile(func):
@@ -44,6 +45,11 @@ def is_running_on_raspberry_pi():
                 return "Raspberry Pi" in cpuinfo
         except FileNotFoundError:
             return False
+
+def get_random_color():
+    """Generates a random hex color code."""
+    hex_color = '#%02x%02x%02x' % (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+    return hex_color
 
 def pc(text, color="cyan", style="bold"):
     """
