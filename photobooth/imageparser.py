@@ -188,10 +188,15 @@ class ImageParser:
             print("Failed to load image.")
             return None
         
-        # Detect faces
         opt_image = cv2.medianBlur(image, 5)
+
+        # Convert the image to grayscale to simplify the processing
         gray_image = cv2.cvtColor(opt_image, cv2.COLOR_BGR2GRAY)
-        return gray_image
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+        cleaned_image = cv2.morphologyEx(gray_image, cv2.MORPH_OPEN, kernel)
+        
+        # Now you can use this cleaned_image for contour detection
+        return cleaned_image
 
 
     # ----- Depth Map -----
@@ -223,7 +228,7 @@ class ImageParser:
         depth_map_normalized = cv2.normalize(depth_map, None, 0, 255, cv2.NORM_MINMAX)
         return np.uint8(depth_map_normalized)
     
-    def enhance_foreground(self, image, depth_map, contrast_factor=2.0, background_factor=0.5):
+    def enhance_foreground(self, image, depth_map, contrast_factor=2.0, background_factor=0.5, threshold=0.5):
         """
         Enhance the foreground of the image based on a depth map.
         The foreground contrast is enhanced, and the background is darkened.
@@ -241,17 +246,15 @@ class ImageParser:
         depth_map_normalized = cv2.normalize(depth_map, None, 0, 1, cv2.NORM_MINMAX)
 
         # Create a mask for the foreground (near objects, typically with lower depth values)
-        foreground_mask = (depth_map_normalized >= 0.5).astype(np.uint8) 
-        background_mask = (depth_map_normalized < 0.5).astype(np.uint8) 
+        foreground_mask = (depth_map_normalized >= threshold).astype(np.uint8) 
+        background_mask = (depth_map_normalized < threshold).astype(np.uint8) 
 
         # Enhance foreground contrast using CLAHE (Contrast Limited Adaptive Histogram Equalization)
         clahe = cv2.createCLAHE(clipLimit=contrast_factor, tileGridSize=(8, 8))
-        enhanced_image = clahe.apply(image)  # Applying CLAHE on grayscale image directly
+        enhanced_image = clahe.apply(image)
 
         # Darken the background: Reduce the brightness of background pixels
-        image_background_darker = image * background_factor  # Dim the background
-
-        # Ensure the image background is clipped to 0-255 range (if necessary)
+        image_background_darker = image * background_factor
         image_background_darker = np.clip(image_background_darker, 0, 255).astype(np.uint8)
 
         # Combine the results: Blend the enhanced foreground and darkened background
