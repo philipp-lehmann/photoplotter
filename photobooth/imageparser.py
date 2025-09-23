@@ -11,7 +11,7 @@ import torch
 from torchvision import transforms
 from scipy.spatial import cKDTree
 from lxml import etree
-from utils import profile, wait_for_cooldown
+from utils import profile, wait_for_cooldown, pc
 
 class ImageParser:
     def __init__(self):
@@ -94,10 +94,11 @@ class ImageParser:
         
         # Create and process the SVG
         svg_filepath = self.create_svg(image_filepath, merged_contours, target_width, target_height, scale_x, scale_y, suffix)
-        method = random.choice(["dynamic_grid", "poisson_disk", "none"])
+        methods = ["dynamic_grid", "poisson_disk", "none"]
+        weights = [0.05, 0.05, 0.9]  
+        method = random.choices(methods, weights=weights, k=1)[0]
         processed_svg_filepath = self.process_svg(svg_filepath, depth_map, method, 1, 25)
-        print(f"{method}: Length Before {self.get_svgpath_length(svg_filepath)}/ After: {self.get_svgpath_length(processed_svg_filepath)}")
-        
+        print(f"{method}: Length Before {self.get_svgpath_length(svg_filepath)} / Output: {pc(self.get_svgpath_length(svg_filepath))}")
         print(f"Processed SVG saved at: {processed_svg_filepath}")
         return processed_svg_filepath
     
@@ -125,7 +126,7 @@ class ImageParser:
 
         print("Detected faces:")
         for i, face in enumerate(faces):
-            print(f"😄 \033[1;34mFace {i}: \033[0mLeft={face.left()}, Top={face.top()}, Right={face.right()}, Bottom={face.bottom()}")
+            print(f"😄 \033[1;36mFace {i}: \033[0mLeft={face.left()}, Top={face.top()}, Right={face.right()}, Bottom={face.bottom()}")
 
         # Initialize bounding box coordinates
         min_x, min_y = float('inf'), float('inf')
