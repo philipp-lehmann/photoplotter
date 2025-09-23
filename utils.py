@@ -44,3 +44,28 @@ def is_running_on_raspberry_pi():
                 return "Raspberry Pi" in cpuinfo
         except FileNotFoundError:
             return False
+
+def pc(text, color="cyan", style="bold"):
+    """
+    Pretty colorize a string with ANSI escape codes.
+    Default: bold cyan.
+    """
+    colors = {
+        "black": 30,
+        "red": 31,
+        "green": 32,
+        "yellow": 33,
+        "blue": 34,
+        "magenta": 35,
+        "cyan": 36,
+        "white": 37,
+    }
+    styles = {
+        "normal": 0,
+        "bold": 1,
+        "underline": 4,
+    }
+
+    color_code = colors.get(color, 36)   # default cyan
+    style_code = styles.get(style, 1)    # default bold
+    return f"\033[{style_code};{color_code}m{text}\033[0m"
