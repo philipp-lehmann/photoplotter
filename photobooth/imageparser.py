@@ -352,12 +352,10 @@ class ImageParser:
         if grid_points:
             processed_svg_filepath = svg_filepath.rsplit('.', 1)[0] + '_processed.svg'
             self.align_svg_to_points(svg_filepath, processed_svg_filepath, grid_points)
-            cleaned_svg_filepath = self.remove_duplicate_segments(processed_svg_filepath)
         else:
             processed_svg_filepath = self.simplify_svg(svg_filepath, removal_percentage=simplify, angle_threshold_deg=angle)
-            cleaned_svg_filepath = self.remove_duplicate_segments(processed_svg_filepath)
 
-        return cleaned_svg_filepath
+        return processed_svg_filepath
     
     # RDP Algorithm to simplify points
     def rdp(self, points, epsilon):
@@ -467,11 +465,10 @@ class ImageParser:
         for i, polyline in enumerate(polylines):
             points = polyline.get('points')
             if points:
-                # print(f"Polyline {i} has {len(points.split())} points")
                 parsed_points = self.parse_points(points)
                 epsilon = 1.0 * keep_fraction  # Adjust epsilon based on keep_fraction
                 simplified_points = self.rdp(parsed_points, epsilon * 10)
-                # simplified_points = self.angle_simplification(simplified_points, angle_threshold_deg)  # Second step (angle-based simplification)
+                # simplified_points = self.angle_simplification(simplified_points, angle_threshold_deg)
 
                 simplified_points_str = self.points_to_str(simplified_points)
                 polyline.set('points', simplified_points_str)
@@ -483,9 +480,17 @@ class ImageParser:
             if parent is not None:
                 parent.remove(elem)
 
-        output_svg_filepath = svg_filepath.rsplit('.', 1)[0] + '_' + str(removal_percentage) + '_simplified.svg'
+        # Generate output file path for the simplified SVG
+        output_svg_filepath = svg_filepath.rsplit('.', 1)[0] + f'_{removal_percentage}_simplified.svg'
         tree.write(output_svg_filepath, pretty_print=True, xml_declaration=True, encoding='UTF-8')
-        return output_svg_filepath
+
+        print(f"Simplified SVG saved to {output_svg_filepath}")
+
+        # Call remove_duplicate_segments to remove any duplicate segments from the SVG
+        cleaned_svg_filepath = self.remove_duplicate_segments(output_svg_filepath)
+
+        return cleaned_svg_filepath
+
 
 
 
@@ -636,56 +641,87 @@ class ImageParser:
         return kdtree.data[idx]
 
     @profile
-    def remove_duplicate_segments(self, svg_filepath):
-        """Remove duplicate line segments from polylines in an SVG file."""
-        import xml.etree.ElementTree as ET
-
-        def parse_points(points_str):
-            """Parse the points attribute into a list of (x, y) tuples."""
+    def remove_duplicate_segments(self, svg_filepath, threshold=10.0):
+        # Ensure we are working with a valid string path
+        assert isinstance(svg_filepath, str), "Expected svg_filepath to be a string path"
+        
+        def _parse_points(points_str):
             points = points_str.strip().split()
-            return [tuple(map(float, point.split(','))) for point in points]
+            result = []
+            for point in points:
+                if ',' in point:
+                    x, y = point.split(',')
+                else:
+                    x, y = point.split()
+                result.append((float(x), float(y)))
+            return result
 
-        def format_points(points):
-            """Format a list of (x, y) tuples into a points attribute string."""
+        def _format_points(points):
             return ' '.join(f"{x},{y}" for x, y in points)
 
-        def get_line_key(point1, point2):
-            """Generate a unique key for a line segment based on its endpoints."""
-            return tuple(sorted([point1, point2]))
+        def _distance(p1, p2):
+            return math.hypot(p1[0] - p2[0], p1[1] - p2[1])
 
-        tree = ET.parse(svg_filepath)
+        def _is_near_duplicate(segment, seen_segments, threshold):
+            p1, p2 = segment
+            for s1, s2 in seen_segments:
+                if (_distance(p1, s1) <= threshold and _distance(p2, s2) <= threshold) or \
+                (_distance(p1, s2) <= threshold and _distance(p2, s1) <= threshold):
+                    return True
+            return False
+
+        # Parse the SVG file
+        try:
+            with open(svg_filepath, 'rb') as f:
+                tree = etree.parse(f)
+        except Exception as e:
+            print(f"Error reading the SVG file {svg_filepath}: {e}")
+            return None
+
         root = tree.getroot()
+        namespace = {'svg': 'http://www.w3.org/2000/svg'}
+        polylines = root.findall('.//svg:polyline', namespaces=namespace)
 
-        seen_segments = set()
-        new_polylines = []
+        if not polylines:
+            print("No polylines found in the SVG file.")
+            return svg_filepath  # Return the original filepath if no polylines are found
 
-        for polyline in root.findall('.//{http://www.w3.org/2000/svg}polyline'):
-            points = parse_points(polyline.attrib.get('points', ''))
-            unique_points = []
+        seen_segments = []
 
+        # Iterate through the polylines and remove duplicates
+        for polyline in polylines:
+            points_str = polyline.get('points', '')
+            if not points_str:
+                continue
+
+            points = _parse_points(points_str)
+            if len(points) < 2:
+                continue
+
+            new_points = [points[0]]
             for i in range(len(points) - 1):
-                segment_key = get_line_key(points[i], points[i + 1])
-                if segment_key not in seen_segments:
-                    seen_segments.add(segment_key)
-                    if not unique_points or unique_points[-1] != points[i]:
-                        unique_points.append(points[i])
-                    unique_points.append(points[i + 1])
+                segment = tuple(sorted([points[i], points[i + 1]]))
+                if not _is_near_duplicate(segment, seen_segments, threshold):
+                    seen_segments.append(segment)
+                    new_points.append(points[i + 1])
 
-            if unique_points:
-                # Avoid duplicates at the start of the next polyline
-                unique_points = [unique_points[0]] + [
-                    pt for i, pt in enumerate(unique_points[1:], start=1)
-                    if pt != unique_points[i - 1]
-                ]
-                new_polylines.append((polyline, format_points(unique_points)))
+            # Update polyline with unique points
+            if len(new_points) > 1:
+                polyline.set('points', _format_points(new_points))
+            else:
+                parent = polyline.getparent()
+                if parent is not None:
+                    parent.remove(polyline)
 
-        # Update polylines in the tree
-        for polyline, new_points in new_polylines:
-            polyline.set('points', new_points)
+        # Generate the output file path
+        output_svg_filepath = svg_filepath.rsplit('.', 1)[0] + '_simplified_dupes.svg'
 
-        # Save the cleaned SVG
-        tree.write(svg_filepath)
-        return svg_filepath
+        # Write the cleaned SVG to the output file
+        tree.write(output_svg_filepath, pretty_print=True, xml_declaration=True, encoding='UTF-8')
+        print(f"SVG saved with duplicates removed to: {output_svg_filepath}")
+
+        return output_svg_filepath
+
 
 
     def get_svgpath_length(self, svg_filepath):
