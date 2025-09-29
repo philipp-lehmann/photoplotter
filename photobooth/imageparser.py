@@ -188,6 +188,7 @@ class ImageParser:
             print("Failed to load image.")
             return None
         
+        faces = self.face_detector(image)
         opt_image = cv2.medianBlur(image, 5)
 
         # Convert the image to grayscale to simplify the processing
@@ -195,7 +196,11 @@ class ImageParser:
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
         cleaned_image = cv2.morphologyEx(gray_image, cv2.MORPH_OPEN, kernel)
         
-        # Now you can use this cleaned_image for contour detection
+        # Apply facial landmarks
+        if faces:
+            for face_rect in faces:
+                self.draw_facial_landmarks(cleaned_image, face_rect) # Use your existing function
+        
         return cleaned_image
 
 
@@ -911,7 +916,7 @@ class ImageParser:
 
         print(f"Combined SVG saved to {output_file}")   
     
-    # ----- NOT IN USE -----
+    # ----- Face landmarks -----
     def crop_to_largest_face(self, image, face_rect, target_width=800, target_height=800):
         """
         NOT IN USE: This function is no longer active.
@@ -961,6 +966,7 @@ class ImageParser:
         blended_image = cv2.addWeighted(image, 0.8, enhanced_image, 0.2, 0)
         return blended_image
 
+    @profile
     def draw_facial_landmarks(self, image, face_rect):
         """
         NOT IN USE: This function is no longer active.
@@ -970,8 +976,7 @@ class ImageParser:
             print("Error: Image is empty or not loaded properly.")
             return
 
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        landmarks = self.landmark_detector(gray, face_rect)
+        landmarks = self.landmark_detector(image, face_rect)
 
         # Define probabilities for each scenario
         probability_eyebrows = 0.24 
@@ -1015,7 +1020,7 @@ class ImageParser:
         if random.random() < probability_teeth: #teeth
             self.draw_feature_line(image, landmarks, [61, 67, 62, 66, 63, 65])
 
-    def draw_feature_line(self, img, landmarks, points_indices, color=(255, 255, 255), thickness=1):
+    def draw_feature_line(self, img, landmarks, points_indices, color=(255, 255, 255), thickness=2):
         """Helper method to draw lines connecting facial landmarks."""
         points = [(landmarks.part(i).x, landmarks.part(i).y) for i in points_indices if 0 <= i < 68]
 
