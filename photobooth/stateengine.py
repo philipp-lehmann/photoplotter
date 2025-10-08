@@ -21,6 +21,12 @@ class StateEngine:
         self.minContourArea = 20
         self.stepContourArea = 5
         self.last_update_time = 0
+        self.stresslevel = 0.0
+        self.last_draw_end_time = None
+        self.next_draw_start_time = None
+        self.min_stress_time = 30     # seconds (max stress)
+        self.max_stress_time = 300    # seconds (min stress, 5 min)
+        self.stress_decay_rate = 0.01
         self.update_interval = 1
         self.transitions = {
             "Startup": ["Waiting", "ResetPending", "Test"],
@@ -134,6 +140,45 @@ class StateEngine:
         startPositionY = (row * offsetY) + (row * gutterSize) + borderSize
         
         return (startPositionX, startPositionY)
+    
+    # Stresslevel
+    # ------------------------------------------------------------------------    
+    def calculate_stresslevel(self, interval_seconds):
+        """
+        Compute stress level based on the time between drawings.
+        Shorter intervals → higher stress.
+        Long intervals → stress decays toward 0.0.
+        """
+        min_time = self.min_stress_time
+        max_time = self.max_stress_time
+
+        # Clamp interval to min/max for stress scaling
+        clamped = max(min_time, min(interval_seconds, max_time))
+        stress = 1.0 - (clamped - min_time) / (max_time - min_time)
+        alpha = 0.3
+        smoothed_stress = (alpha * stress) + (1 - alpha) * self.stresslevel
+
+        # Idle decay: reduce stress if interval is long
+        idle_decay = self.stress_decay_rate * interval_seconds
+        smoothed_stress = max(0.0, smoothed_stress - idle_decay)
+
+        self.stresslevel = smoothed_stress
+
+        print(f"⏱️ Interval: {interval_seconds:.1f}s → StressLevel: {self.stresslevel:.2f}")
+        return self.stresslevel
+
+    def update_stresslevel_from_interval(self):
+        """
+        Compute and update stresslevel based on time since the last drawing ended.
+        If no previous drawing time exists, the stresslevel remains unchanged.
+        Returns the current stresslevel.
+        """
+        if not self.last_draw_end_time:
+            print("No previous drawing found. Using default stresslevel.")
+            return self.stresslevel
+
+        interval = time.time() - self.last_draw_end_time
+        return self.calculate_stresslevel(interval)
 
     # Messages
     # ------------------------------------------------------------------------

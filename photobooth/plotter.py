@@ -29,15 +29,16 @@ class Plotter:
     #     self.nd1.moveto(0, 0)
     #     self.nd1.disconnect()
         
-    def connect_to_plotter(self):
+    def connect_to_plotter(self, speed=60):
         """Attempt to connect to the NextDraw plotter."""
         if self.nd1.connect():
             self.nd1.options.model = 2
             self.nd1.options.auto_rotate = True
-            self.nd1.options.pen_rate_lower = 80
-            self.nd1.options.pen_rate_raise = 80
-            self.nd1.options.speed_pendown = 100
-            self.nd1.options.speed_penup = 100
+            self.nd1.options.pen_rate_lower = speed
+            self.nd1.options.pen_rate_raise = speed
+            self.nd1.options.speed_pendown = speed
+            self.nd1.options.speed_pendown = speed
+            self.nd1.options.speed_penup = speed
             self.nd1.options.penlift = 3
             
             self.nd1.update()
@@ -54,21 +55,45 @@ class Plotter:
         else:
             print("Simulation Mode: Returning home.")
 
-    def plot_image(self, svg_path):
-           
+    def plot_image(self, svg_path, stresslevel=1.0):
+        """
+        Plot an SVG image with optional stress level adjustment.
+
+        stresslevel: float (0.0 - 1.0)
+            Controls plotting speed or pen pressure — higher = more stress, faster.
+        """
         svg_path = os.path.abspath(svg_path)
-        
-        if os.path.exists(svg_path):
-            if self.plotter_found:
-                self.nd1.interactive()   
-                self.nd1.plot_setup(svg_path)
-                self.nd1.options.reordering = 2
-                self.nd1.plot_run(True)
-                
-                print("Plotting complete.")
-            else:
-                print("NextDraw not found.")
-        else:
+
+        if not os.path.exists(svg_path):
             print("SVG file not found.")
-        
-        
+            return
+
+        if not self.plotter_found:
+            print("NextDraw not found.")
+            return
+
+        # Ensure stresslevel is clamped between 0 and 1
+        stresslevel = max(0.0, min(1.0, stresslevel))
+
+        # Derive speed or pressure from stresslevel
+        base_speed = 50
+        adjusted_speed = int(base_speed + stresslevel * 50)  # scale 60–100
+
+        print(f"Plotting with stress level {stresslevel} (speed={adjusted_speed})")
+
+        self.nd1.interactive()
+        self.nd1.plot_setup(svg_path)
+
+        # Update options 
+        self.nd1.options.reordering = 2
+        self.nd1.options.speed_pendown = adjusted_speed
+        self.nd1.options.speed_penup = adjusted_speed
+        self.nd1.options.pen_rate_lower = adjusted_speed
+        self.nd1.options.pen_rate_raise = adjusted_speed
+
+        self.nd1.update()
+
+        # Run plotting
+        self.nd1.plot_run(True)
+
+        print("Plotting complete.")

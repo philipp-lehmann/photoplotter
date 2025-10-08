@@ -90,7 +90,9 @@ class PhotoBooth:
         )
         
         print(f"Converted Work pattern to SVG: {self.state_engine.currentSVGPath}, random: {random_photo_id}, from {self.state_engine.photoID}")
-        self.plotter.plot_image(self.state_engine.currentSVGPath)
+        stress = self.state_engine.update_stresslevel_from_interval()
+        self.plotter.plot_image(self.state_engine.currentSVGPath, stresslevel=stress)
+        self.state_engine.last_draw_end_time = time.time()
        
         # Change state to Tracking after the work is done
         self.state_engine.change_state("Tracking")
@@ -132,8 +134,10 @@ class PhotoBooth:
         if self.plotter.connect_to_plotter == False: 
             time.sleep(1)
         print(f"Drawing: Connecting with penplotter {self.state_engine.currentSVGPath}")
-        self.plotter.plot_image(self.state_engine.currentSVGPath)
+        stress = self.state_engine.update_stresslevel_from_interval()
+        self.plotter.plot_image(self.state_engine.currentSVGPath, stresslevel=stress)
         self.state_engine.update_photo_id()
+        self.state_engine.last_draw_end_time = time.time()
 
         # Check if all spots for images have been drawn
         if self.state_engine.photoID and not self.state_engine.state == "Redrawing":
