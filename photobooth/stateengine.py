@@ -17,9 +17,6 @@ class StateEngine:
         self.paperSizeY = 1122 #841 multiplied by higher 96 dpi of Nextdraw
         self.workID = 0
         self.photoID = list(range(1, self.totalImages + 1))  # List of positions from 1 to totalImages
-        self.maxContourArea = 100
-        self.minContourArea = 20
-        self.stepContourArea = 5
         self.last_update_time = 0
         self.stresslevel = 0.0
         self.last_draw_end_time = None
@@ -179,6 +176,13 @@ class StateEngine:
 
         interval = time.time() - self.last_draw_end_time
         return self.calculate_stresslevel(interval)
+    
+    def get_stress_scaled_params(self):
+        s = max(0.0, min(1.0, self.stresslevel))
+        min_paths = int(40 - (40 - 20) * s)
+        max_paths = int(140 - (140 - 80) * s)
+        min_contour_area = int(10 + (20 - 10) * s)
+        return {"min_paths": min_paths, "max_paths": max_paths, "min_contour_area": min_contour_area}
 
     # Messages
     # ------------------------------------------------------------------------
@@ -216,17 +220,6 @@ class StateEngine:
         elif self.state == "Waiting":
             self.reset_work_id()
             self.change_state("Tracking")
-            
-        elif self.state == "Tracking": 
-            if current_time - self.last_update_time >= self.update_interval:
-                if message in more_details_keys:
-                    self.minContourArea = min(self.minContourArea + self.stepContourArea, self.maxContourArea)  
-                    self.last_update_time = current_time
-                    print(f"Inc: {self.minContourArea}")
-                elif message in less_details_keys:
-                    self.minContourArea = max(self.minContourArea - self.stepContourArea, 0)  
-                    self.last_update_time = current_time
-                    print(f"Dec: {self.minContourArea}")
                 
         elif self.state == "Working":
             self.change_state("Tracking")
@@ -237,7 +230,7 @@ class StateEngine:
                 self.change_state("Redrawing")
                 time.sleep(1)    
         else:
-            #print(f"Unexpected state: {self.state}") 
+            # print(f"Unexpected state: {self.state}") 
             pass
         
     def publish_message(self, topic, message):

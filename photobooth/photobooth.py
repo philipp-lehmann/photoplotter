@@ -19,7 +19,7 @@ class PhotoBooth:
     # ------------------------------------------------------------------------
     def process_startup(self):
         # Logic for "Startup" state
-        time.sleep(1)
+        time.sleep(0.5)
         if self.plotter.plotter_found:
             self.state_engine.change_state("ResetPending")
             print("Waiting for reset")
@@ -101,11 +101,11 @@ class PhotoBooth:
     def process_processing(self):
         # Logic for "Drawing" state
         if not self.plotter.connect_to_plotter:
-            time.sleep(1)
+            time.sleep(0.5)
         
-        # Convert image to SVG
-        tempSVG = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath, min_contour_area=self.state_engine.minContourArea)
-        print(f"Min Area: {self.state_engine.minContourArea}")
+        # Calc current stresslevel and convert image to SVG
+        params = self.state_engine.get_stress_scaled_params()
+        tempSVG = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath, **params)
         
         # Check if the SVG file was generated
         if not tempSVG or not os.path.isfile(tempSVG):
@@ -198,22 +198,29 @@ class PhotoBooth:
         for jpg_file in jpg_files:
             self.state_engine.currentPhotoPath = os.path.join(photos_dir, jpg_file)
 
-            # Convert to SVG with various methods
-            # self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(
-            #     self.state_engine.currentPhotoPath, min_contour_area=5, suffix='_edge', method=1)
-            # self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(
-            #     self.state_engine.currentPhotoPath, min_contour_area=5, suffix='_binary', method=2)
-            self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath, min_contour_area=self.state_engine.minContourArea)
-            
-            # Create the final output SVG file using the rolling ID
-            current_id = id_array[id_index]
-            startX, startY = self.state_engine.get_image_params_by_id(current_id)
-            self.state_engine.currentSVGPath = self.image_parser.create_output_svg(
-                self.state_engine.currentSVGPath, "photo-output-", offset_x=startX, offset_y=startY, id=current_id, paper_width=self.state_engine.paperSizeX, paper_height=self.state_engine.paperSizeY
-            )
+            # Test across 3 fixed stress levels: calm, medium, stressed
+            for stress in [0.0, 0.5, 1.0]:
+                print(f"\n🧠 Testing stress level {stress:.1f} for {jpg_file}")
 
-            # Update rolling ID, ensuring it wraps between 0 and 15
-            id_index = (id_index + 1) % len(id_array)
+                params = self.state_engine.get_stress_scaled_params()
+                self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath, **params)
+
+                # Create the final output SVG file using the rolling ID
+                current_id = id_array[id_index]
+                startX, startY = self.state_engine.get_image_params_by_id(current_id)
+                self.state_engine.currentSVGPath = self.image_parser.create_output_svg(
+                    self.state_engine.currentSVGPath,
+                    f"photo-output-stress-{stress:.1f}-",
+                    offset_x=startX,
+                    offset_y=startY,
+                    id=current_id,
+                    paper_width=self.state_engine.paperSizeX,
+                    paper_height=self.state_engine.paperSizeY
+                )
+
+                # Update rolling ID, ensuring it wraps between 0 and 15
+                id_index = (id_index + 1) % len(id_array)
+
 
 
         output_directory = os.path.join(parent_dir, "photos/output")
