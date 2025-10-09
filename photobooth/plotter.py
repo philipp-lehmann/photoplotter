@@ -76,8 +76,8 @@ class Plotter:
         stresslevel = max(0.0, min(1.0, stresslevel))
 
         # Derive speed or pressure from stresslevel
-        base_speed = 50
-        adjusted_speed = int(base_speed + stresslevel * 50)  # scale 60–100
+        base_speed = 40
+        adjusted_speed = int(base_speed + stresslevel * 60)  # scale 60–100
 
         print(f"Plotting with stress level {stresslevel} (speed={adjusted_speed})")
 

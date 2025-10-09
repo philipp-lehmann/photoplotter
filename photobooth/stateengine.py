@@ -26,7 +26,7 @@ class StateEngine:
         self.next_draw_start_time = None
         self.min_stress_time = 30     # seconds (max stress)
         self.max_stress_time = 300    # seconds (min stress, 5 min)
-        self.stress_decay_rate = 0.01
+        self.stress_decay_rate = 0.0025
         self.update_interval = 1
         self.transitions = {
             "Startup": ["Waiting", "ResetPending", "Test"],
