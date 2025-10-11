@@ -159,23 +159,30 @@ class PhotoBooth:
         # Logic for "ResetPending" state
         pass
     
-    def process_template(self):
+    def process_template(self, dynamic_grid=True):
         print("🚩 Generate template")
         parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        self.currentDebugPath = os.path.join(parent_dir, f"assets/work/work-0.svg")
-        # Logic to retrieve work pattern and create output SVG
         
-        for i in range(1, 16):
-            startX, startY = self.state_engine.get_image_params_by_id(i - 1)
-            self.state_engine.currentSVGPath = self.image_parser.create_output_svg(
-                self.currentDebugPath, "work-output-", offset_x=startX, offset_y=startY, id=i, paper_width=self.state_engine.paperSizeX, paper_height=self.state_engine.paperSizeY
-            )
+        if (dynamic_grid):
+            # Dynamic grid generation (skipped)
+            self.currentDebugPath = os.path.join(parent_dir, f"assets/work/work-0.svg")
+            # Logic to retrieve work pattern and create output SVG
+            
+            for i in range(1, 16):
+                startX, startY = self.state_engine.get_image_params_by_id(i - 1)
+                self.state_engine.currentSVGPath = self.image_parser.create_output_svg(
+                    self.currentDebugPath, "work-output-", offset_x=startX, offset_y=startY, id=i, paper_width=self.state_engine.paperSizeX, paper_height=self.state_engine.paperSizeY
+                )
+            
+            output_directory = os.path.join(parent_dir, "photos/output")
+            combined_file_path = os.path.join(parent_dir, "photos/collection/photo-collection.svg")
+            self.image_parser.collect_all_paths(output_directory, combined_file_path, "work")
+            self.plotter.plot_image(combined_file_path)
         
-        output_directory = os.path.join(parent_dir, "photos/output")
-        combined_file_path = os.path.join(parent_dir, "photos/collection/photo-collection.svg")
-        self.image_parser.collect_all_paths(output_directory, combined_file_path, "work")
-        
-        self.plotter.plot_image(combined_file_path)
+        else:   
+            instructions_file_path = os.path.join(parent_dir, "photos/collection/photo-collection-with-instructions.svg")
+            self.plotter.plot_image(instructions_file_path)
+            
         self.state_engine.change_state("ResetPending")
         pass
     
@@ -226,6 +233,8 @@ class PhotoBooth:
         output_directory = os.path.join(parent_dir, "photos/output")
         combined_file_path = os.path.join(parent_dir, "photos/collection/photo-collection.svg")
         self.image_parser.collect_all_paths(output_directory, combined_file_path, "photo")
+        
+        self.process_template()
                     
         print("All SVGs files processed.")
         sys.exit()
