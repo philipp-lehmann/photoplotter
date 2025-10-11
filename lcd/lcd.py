@@ -96,7 +96,7 @@ def display_image_based_on_state(LCD, state):
             "loop": True
         },
         "Snapping": {
-            "images": [f"assets/display/Snapping-{i}.jpg" for i in range(1, 40)],
+            "images": [f"assets/display/Snapping-{i}.jpg" for i in range(1, 30)],
             "display_time": 0.125,
             "loop": False
         },
