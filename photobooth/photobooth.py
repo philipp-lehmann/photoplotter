@@ -159,7 +159,7 @@ class PhotoBooth:
         # Logic for "ResetPending" state
         pass
     
-    def process_template(self, dynamic_grid=True):
+    def process_template(self, dynamic_grid=False):
         print("🚩 Generate template")
         parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         
