@@ -55,12 +55,14 @@ class Plotter:
         else:
             print("Simulation Mode: Returning home.")
 
-    def plot_image(self, svg_path, stresslevel=1.0):
+    def plot_image(self, svg_path, stresslevel=1.0, is_pointing_motion=False):
         """
         Plot an SVG image with optional stress level adjustment.
 
         stresslevel: float (0.0 - 1.0)
             Controls plotting speed or pen pressure — higher = more stress, faster.
+        is_pointing_motion: bool
+            If True, overrides stress-based speed and sets max speed for quick pointing/reset indicator.
         """
         svg_path = os.path.abspath(svg_path)
 
@@ -69,17 +71,21 @@ class Plotter:
             return
 
         if not self.plotter_found:
-            print("NextDraw not found.")
+            print("NextDraw not found. Plotting 'work-2' skipped in simulation mode.")
             return
 
         # Ensure stresslevel is clamped between 0 and 1
         stresslevel = max(0.0, min(1.0, stresslevel))
 
-        # Derive speed or pressure from stresslevel
-        base_speed = 40
-        adjusted_speed = int(base_speed + stresslevel * 60)  # scale 60–100
-
-        print(f"Plotting with stress level {stresslevel} (speed={adjusted_speed})")
+        if is_pointing_motion:
+            # Set maximum speed for quick motion
+            adjusted_speed = 50 
+            print(f"Plotting reset indicator with max speed ({adjusted_speed}).")
+        else:
+            # Derive speed or pressure from stresslevel (base_speed 40, scaled range 60-100)
+            base_speed = 40
+            adjusted_speed = int(base_speed + stresslevel * 60) 
+            print(f"Plotting with stress level {stresslevel} (speed={adjusted_speed})")
 
         self.nd1.interactive()
         self.nd1.plot_setup(svg_path)

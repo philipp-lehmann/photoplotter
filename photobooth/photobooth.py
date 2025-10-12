@@ -157,6 +157,28 @@ class PhotoBooth:
         
     def process_reset_pending(self):
         # Logic for "ResetPending" state
+        
+        timeout_s = self.state_engine.reset_timeout_s
+        
+        # Check for state entry to set start time and plot indicator
+        if not hasattr(self.state_engine, 'reset_pending_start_time'):
+            self.state_engine.reset_pending_start_time = time.time()
+            print(f"ResetPending started. Auto-restart in {timeout_s}s.")
+
+            # Draw work-2.svg indicator with max speed
+            parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            work_2_path = os.path.join(parent_dir, "assets/work/work-2.svg")
+            self.plotter.plot_image(work_2_path, stresslevel=1.0, is_pointing_motion=True)
+            
+        # Check if timeout has passed
+        if time.time() - self.state_engine.reset_pending_start_time >= timeout_s:
+            print(f"Timeout reached. Restarting to Waiting.")
+            
+            # Change state and cleanup
+            self.state_engine.change_state("Waiting")
+            del self.state_engine.reset_pending_start_time
+        else:
+            time.sleep(1) # Prevent busy loop
         pass
     
     def process_template(self, dynamic_grid=False):
