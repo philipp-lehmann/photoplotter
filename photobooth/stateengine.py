@@ -17,7 +17,7 @@ class StateEngine:
         self.paperSizeY = 1122 #841 multiplied by higher 96 dpi of Nextdraw
         self.workID = 0
         self.photoID = list(range(1, self.totalImages + 1))  # List of positions from 1 to totalImages
-        self.reset_timeout_s = 30
+        self.reset_timeout_s = 15
         self.last_update_time = 0
         self.stresslevel = 0.0
         self.last_draw_end_time = None
