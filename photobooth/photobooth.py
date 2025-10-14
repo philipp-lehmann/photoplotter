@@ -255,9 +255,7 @@ class PhotoBooth:
         output_directory = os.path.join(parent_dir, "photos/output")
         combined_file_path = os.path.join(parent_dir, "photos/collection/photo-collection.svg")
         self.image_parser.collect_all_paths(output_directory, combined_file_path, "photo")
-        
-        self.process_template()
-                    
+                            
         print("All SVGs files processed.")
         sys.exit()
         pass
