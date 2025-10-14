@@ -167,8 +167,23 @@ class PhotoBooth:
 
             # Draw work-pointer.svg indicator with max speed
             parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            work_pointer_path = os.path.join(parent_dir, f"assets/work/work-pointer.svg")
-            self.plotter.plot_image(work_pointer_path, stresslevel=1.0, is_pointing_motion=True)
+            input_svg_path = os.path.join(parent_dir, f"assets/work/work-pointer.svg")
+            
+            # Get the parameters for Position 1 (id=1, which is index 0)
+            target_id = 1
+            startX, startY = self.state_engine.get_image_params_by_id(target_id - 1)
+            self.state_engine.currentSVGPath = self.image_parser.create_output_svg(
+                input_svg_path, 
+                "work-pointer-output-", # Use a distinct prefix for the output file
+                offset_x=startX, 
+                offset_y=startY, 
+                id=target_id, 
+                paper_width=self.state_engine.paperSizeX, 
+                paper_height=self.state_engine.paperSizeY
+            )
+            
+            print(f"Generated work-pointer SVG: {self.state_engine.currentSVGPath}")
+            self.plotter.plot_image(self.state_engine.currentSVGPath, is_pointing_motion=True)
             
         # Check if timeout has passed
         if time.time() - self.state_engine.reset_pending_start_time >= timeout_s:
