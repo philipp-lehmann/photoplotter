@@ -71,7 +71,7 @@ class Plotter:
             return
 
         if not self.plotter_found:
-            print("NextDraw not found. Plotting 'work-2' skipped in simulation mode.")
+            print("NextDraw not found. Plotting 'work-pointer' skipped in simulation mode.")
             return
 
         # Ensure stresslevel is clamped between 0 and 1

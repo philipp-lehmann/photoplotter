@@ -78,7 +78,7 @@ class PhotoBooth:
         print(f"Working started: {self.state_engine.workID}")
         # Logic to retrieve work pattern and create output SVG
         parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        self.state_engine.currentWorkPath = os.path.join(parent_dir, f"assets/work/work-1.svg")
+        self.state_engine.currentWorkPath = os.path.join(parent_dir, f"assets/work/work-event.svg")
             
         # Randomly pick one photo ID from the remaining list without removing it
         random_photo_id = random.choice(self.state_engine.photoID)
@@ -165,10 +165,10 @@ class PhotoBooth:
             self.state_engine.reset_pending_start_time = time.time()
             print(f"ResetPending started. Auto-restart in {timeout_s}s.")
 
-            # Draw work-2.svg indicator with max speed
+            # Draw work-pointer.svg indicator with max speed
             parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            work_2_path = os.path.join(parent_dir, "assets/work/work-2.svg")
-            self.plotter.plot_image(work_2_path, stresslevel=1.0, is_pointing_motion=True)
+            work_pointer_path = os.path.join(parent_dir, f"assets/work/work-pointer.svg")
+            self.plotter.plot_image(work_pointer_path, stresslevel=1.0, is_pointing_motion=True)
             
         # Check if timeout has passed
         if time.time() - self.state_engine.reset_pending_start_time >= timeout_s:
@@ -187,7 +187,7 @@ class PhotoBooth:
         
         if (dynamic_grid):
             # Dynamic grid generation (skipped)
-            self.currentDebugPath = os.path.join(parent_dir, f"assets/work/work-0.svg")
+            self.currentDebugPath = os.path.join(parent_dir, f"assets/work/work-template.svg")
             # Logic to retrieve work pattern and create output SVG
             
             for i in range(1, 16):
