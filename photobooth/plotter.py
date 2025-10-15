@@ -1,3 +1,4 @@
+import time
 import os
 from nextdraw import NextDraw
 
@@ -98,8 +99,15 @@ class Plotter:
         self.nd1.options.pen_rate_raise = adjusted_speed
 
         self.nd1.update()
-
+        
         # Run plotting
+        start_time = time.time() # Record the time before plotting starts
         self.nd1.plot_run(True)
 
+        # --- Duration Calculation and Print ---
+        end_time = time.time() # Record the time after plotting finishes
+        plot_duration = end_time - start_time
+        # --- Duration Calculation and Print ---
+
         print("Plotting complete.")
+        print(f"⏱️ Plot duration: {plot_duration:.2f} seconds.") # Print the duration
