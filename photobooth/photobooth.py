@@ -201,7 +201,7 @@ class PhotoBooth:
         
         if (dynamic_grid):
             # Dynamic grid generation (skipped)
-            self.currentDebugPath = os.path.join(parent_dir, f"assets/work/work-template.svg")
+            self.currentDebugPath = os.path.join(parent_dir, "assets/work/work-template.svg")
             # Logic to retrieve work pattern and create output SVG
             
             for i in range(1, 16):
@@ -216,8 +216,8 @@ class PhotoBooth:
             self.plotter.plot_image(combined_file_path)
         
         else:   
-            instructions_file_path = os.path.join(parent_dir, "photos/collection/photo-collection-with-instructions.svg")
-            self.plotter.plot_image(instructions_file_path)
+            instructions_file_path = os.path.join(parent_dir, "assets/work/work-instructions.svg")
+            self.plotter.plot_image(instructions_file_path, stresslevel=0.65)
             
         self.state_engine.change_state("ResetPending")
         pass

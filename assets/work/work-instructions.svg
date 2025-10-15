@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:xlink="http://www.w3.org/1999/xlink" baseProfile="full" height="1122" version="1.1" viewBox="0 0 1587 1122" width="1587">
+  <defs/>  
+  <g id="instructions_1" data-name="instructions_1">
+    <rect x="78.4" y="120.2" width="34.8" height="34.8" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <rect x="115.5" y="120.2" width="34.8" height="34.8" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <rect x="152.5" y="120.2" width="34.8" height="34.8" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <rect x="189.6" y="120.2" width="34.8" height="34.8" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <rect x="226.7" y="120.2" width="34.8" height="34.8" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <rect x="78.4" y="163.5" width="34.8" height="34.8" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <rect x="115.5" y="163.5" width="34.8" height="34.8" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polygon points="152.5 163.5 169.9 163.5 187.4 163.5 187.4 181 174 182.2 169.9 198.5 152.5 198.5 152.5 181 152.5 163.5" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="232.2 175 232.2 169.1 238.1 169.1" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="238.1 192.9 232.2 192.9 232.2 187" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="256.1 187 256.1 192.9 250.1 192.9" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="250.1 169.1 256.1 169.1 256.1 175" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="195.1 175 195.1 169.1 201.1 169.1" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="201.1 192.9 195.1 192.9 195.1 187" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="218.9 187 218.9 192.9 213 192.9" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="213 169.1 218.9 169.1 218.9 175" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="89.8 235.9 83.9 235.9 83.9 229.9" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="107.8 229.9 107.8 235.9 101.8 235.9" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="101.8 211.9 107.8 211.9 107.8 218" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="83.9 218 83.9 211.9 89.8 211.9" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="127 235.9 120.9 235.9 120.9 229.9" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="144.9 229.9 144.9 235.9 138.8 235.9" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="138.8 211.9 144.9 211.9 144.9 218" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="120.9 218 120.9 211.9 127 211.9" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="158 218 158 211.9 164 211.9" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="164 235.9 158 235.9 158 229.9" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="181.9 229.9 181.9 235.9 176 235.9" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="176 211.9 181.9 211.9 181.9 218" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="201.1 235.9 195.1 235.9 195.1 229.9" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="218.9 229.9 218.9 235.9 213 235.9" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="213 211.9 218.9 211.9 218.9 218" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="195.1 218 195.1 211.9 201.1 211.9" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="238.1 235.9 232.2 235.9 232.2 229.9" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="256.1 229.9 256.1 235.9 250.1 235.9" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="250.1 211.9 256.1 211.9 256.1 218" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="232.2 218 232.2 211.9 238.1 211.9" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polygon points="181.9 186.5 181.9 192.9 175.5 192.9 181.9 186.5" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <line x1="187.4" y1="181" x2="181.9" y2="186.5" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <line x1="175.5" y1="192.9" x2="169.9" y2="198.5" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+  </g>
+  <polyline points="80 50 50 50 50 80" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+  <polyline points="260 50 290 50 290 80" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+  <polyline points="290 260 290 290 260 290" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+  <polyline points="80 290 50 290 50 260" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+  <g id="all_paths">
+    <polyline points="1309.6 407.3 1279.6 407.3 1279.6 437.3" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="1489.6 407.3 1519.6 407.3 1519.6 437.3" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="1519.6 617.3 1519.6 647.3 1489.6 647.3" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="1309.6 647.3 1279.6 647.3 1279.6 617.3" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+  </g>
+  <g id="all_paths1" data-name="all_paths">
+    <polyline points="80 764.7 50 764.7 50 794.7" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="260 764.7 290 764.7 290 794.7" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="290 974.7 290 1004.7 260 1004.7" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="80 1004.7 50 1004.7 50 974.7" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+  </g>
+  <g id="all_paths2" data-name="all_paths">
+    <polyline points="387.4 764.7 357.4 764.7 357.4 794.7" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="567.4 764.7 597.4 764.7 597.4 794.7" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="597.4 974.7 597.4 1004.7 567.4 1004.7" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="387.4 1004.7 357.4 1004.7 357.4 974.7" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+  </g>
+  <g id="all_paths3" data-name="all_paths">
+    <polyline points="694.8 764.7 664.8 764.7 664.8 794.7" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="874.8 764.7 904.8 764.7 904.8 794.7" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="904.8 974.7 904.8 1004.7 874.8 1004.7" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="694.8 1004.7 664.8 1004.7 664.8 974.7" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+  </g>
+  <g id="all_paths4" data-name="all_paths">
+    <polyline points="1002.2 764.7 972.2 764.7 972.2 794.7" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="1182.2 764.7 1212.2 764.7 1212.2 794.7" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="1212.2 974.7 1212.2 1004.7 1182.2 1004.7" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="1002.2 1004.7 972.2 1004.7 972.2 974.7" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+  </g>
+  <g id="all_paths5" data-name="all_paths">
+    <polyline points="1309.6 764.7 1279.6 764.7 1279.6 794.7" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="1489.6 764.7 1519.6 764.7 1519.6 794.7" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="1519.6 974.7 1519.6 1004.7 1489.6 1004.7" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="1309.6 1004.7 1279.6 1004.7 1279.6 974.7" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+  </g>
+  <g id="all_paths6" data-name="all_paths">
+    <polyline points="387.4 50 357.4 50 357.4 80" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="567.4 50 597.4 50 597.4 80" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="597.4 260 597.4 290 567.4 290" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="387.4 290 357.4 290 357.4 260" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+  </g>
+  <g id="all_paths7" data-name="all_paths">
+    <polyline points="694.8 50 664.8 50 664.8 80" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="874.8 50 904.8 50 904.8 80" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="904.8 260 904.8 290 874.8 290" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="694.8 290 664.8 290 664.8 260" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+  </g>
+  <g id="all_paths8" data-name="all_paths">
+    <polyline points="1002.2 50 972.2 50 972.2 80" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="1182.2 50 1212.2 50 1212.2 80" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="1212.2 260 1212.2 290 1182.2 290" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="1002.2 290 972.2 290 972.2 260" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+  </g>
+  <g id="all_paths9" data-name="all_paths">
+    <polyline points="1309.6 50 1279.6 50 1279.6 80" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="1489.6 50 1519.6 50 1519.6 80" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="1519.6 260 1519.6 290 1489.6 290" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="1309.6 290 1279.6 290 1279.6 260" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+  </g>
+  <g id="all_paths10" data-name="all_paths">
+    <polyline points="80 407.3 50 407.3 50 437.3" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="260 407.3 290 407.3 290 437.3" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="290 617.3 290 647.3 260 647.3" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="80 647.3 50 647.3 50 617.3" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+  </g>
+  <g id="all_paths11" data-name="all_paths">
+    <polyline points="387.4 407.3 357.4 407.3 357.4 437.3" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="567.4 407.3 597.4 407.3 597.4 437.3" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="597.4 617.3 597.4 647.3 567.4 647.3" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="387.4 647.3 357.4 647.3 357.4 617.3" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+  </g>
+  <g id="all_paths12" data-name="all_paths">
+    <polyline points="694.8 407.3 664.8 407.3 664.8 437.3" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="874.8 407.3 904.8 407.3 904.8 437.3" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="904.8 617.3 904.8 647.3 874.8 647.3" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="694.8 647.3 664.8 647.3 664.8 617.3" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+  </g>
+  <g id="all_paths13" data-name="all_paths">
+    <polyline points="1002.2 407.3 972.2 407.3 972.2 437.3" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="1182.2 407.3 1212.2 407.3 1212.2 437.3" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="1212.2 617.3 1212.2 647.3 1182.2 647.3" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+    <polyline points="1002.2 647.3 972.2 647.3 972.2 617.3" style="fill: none; stroke: #aaa; stroke-miterlimit: 1.2; stroke-width: .3px;"/>
+  </g>
+  
+</svg>
