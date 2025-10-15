@@ -157,13 +157,12 @@ class PhotoBooth:
         
     def process_reset_pending(self):
         # Logic for "ResetPending" state
-        
         timeout_s = self.state_engine.reset_timeout_s
         
         # Check for state entry to set start time and plot indicator
         if not hasattr(self.state_engine, 'reset_pending_start_time'):
+            print(f"🚩 Reset pending: Auto-restart in {timeout_s}s.")
             self.state_engine.reset_pending_start_time = time.time()
-            print(f"ResetPending started. Auto-restart in {timeout_s}s.")
 
             # Draw work-pointer.svg indicator with max speed
             parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
