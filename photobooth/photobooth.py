@@ -36,7 +36,7 @@ class PhotoBooth:
     
     def process_tracking(self):
         # Logic for "Tracking" state
-        time.sleep(2)
+        time.sleep(1)
         image_path = self.camera.snap_image()
         
         if image_path:

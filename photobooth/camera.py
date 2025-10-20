@@ -56,15 +56,30 @@ class Camera:
                 print(f"Error capturing image: {e}")
                 return None
         
-    def crop_to_square(self, image_filepath):
-        with Image.open(image_filepath) as img:
-            width, height = img.size   # Get dimensions
-            new_size = min(width, height)
+    def crop_to_square(self, image_filepath, horizontal_anchor=0.0):
+        if not (0.0 <= horizontal_anchor <= 1.0):
+            raise ValueError("horizontal_anchor must be between 0.0 and 1.0")
 
-            left = (width - new_size)/2
-            top = (height - new_size)/2
-            right = (width + new_size)/2
-            bottom = (height + new_size)/2
-            
+        with Image.open(image_filepath) as img:
+            width, height = img.size
+            new_size = min(width, height)  # The size of the resulting square
+
+            top = (height - new_size) / 2
+            bottom = (height + new_size) / 2
+
+            # --- Calculate horizontal crop coordinates (anchored) ---
+            if width > height:
+                # The image is wider than it is tall, so we determine the left edge
+                # based on the anchor. The crop width is 'new_size' (which is 'height').
+                horizontal_shift = (width - new_size) * horizontal_anchor
+                
+                left = horizontal_shift
+                right = left + new_size  # 'new_size' is the crop width
+            else:
+                # The image is taller or already square, so the crop is centered horizontally
+                left = (width - new_size) / 2
+                right = (width + new_size) / 2
+
+            # The crop box is defined as a 4-tuple: (left, top, right, bottom)
             img_cropped = img.crop((left, top, right, bottom))
             img_cropped.save(image_filepath)
