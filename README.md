@@ -1,18 +1,22 @@
 # photoplotter
-The photoplotter project is a Python-based application designed to create a digital photobooth experience. It consists of several modules organized within a package structure. Here's a general project description:
+![Photo of the installation](doc/photoplotter-installation.jpg)
+The Photoplotter is a standalone Python-based installation that recreates the charm of a traditional photobooth with a digital twist. It captures visitors’ photos, processes them, and transforms them into abstract portraits, which are then drawn onto Post-it notes using an AxiDraw pen plotter.
+The software is built around a modular architecture managed by a state engine, coordinating image capture, processing, and plotting. By combining computer vision, generative art, and physical drawing, the installation offers visitors a unique, interactive, and tangible memento of their experience.
 
-**Description:**
-The photobooth application allows users to take photos, process them, and print them with an axidraw penplotter. It simulates the experience of a traditional photobooth but with added digital features. 
+**RDFN:**
+This project has been developed by Philipp Lehmann from Redefine, a Zurich based UX/UI Design Studio
+[RDFN](https://www.rdfn.ch/photoplotter)
+[Redefine](https://www.redefine.studio)
 
-**Classes:**
+## Main Classes:
 
 1. `photobooth.py:` This module contains the main logic for the photobooth application, coordinating interactions between different components.
 2. `stateengine.py:` Manages the state of the photobooth, controlling transitions between different states such as idle, capturing, processing, printing and completed.
 Should also track the current id of the current portrait drawing. Communicates with broker messages to output the current application state on `lcd.py`
-3. `camera.py:` Handles camera functionality, including facetracking, capturing photos and providing them for processing. Saves snapped image temporary and source images for vectorization separately.
-4. `imageparser.py:` Processes the snapped images captured by the camera, converting them to traced SVGs for plotting.
-5. `plotter.py:` Manages the plotter connection and functionality to draw the portraits, which could be used for printing svg images with a axidraw penplotter.
-6. `lcd.py:` Display interface of the photobooth, showing instructions and the current state of the application to users on a 128x128 lcd display. Located in a separate directory and communicates with broker to submit button inputs. Runs as a separate task.
+1. `camera.py:` Handles camera functionality, including facetracking, capturing photos and providing them for processing. Saves snapped image temporary and source images for vectorization separately.
+2. `imageparser.py:` Processes the snapped images captured by the camera, converting them to traced SVGs for plotting.
+3. `plotter.py:` Manages the plotter connection and functionality to draw the portraits, which could be used for printing svg images with a axidraw penplotter.
+4. `lcd.py:` Display interface of the photobooth, showing instructions and the current state of the application to users on a 128x128 lcd display. Located in a separate directory and communicates with broker to submit button inputs. Runs as a separate task.
 
 **File Structure:**
 The project is structured as follows:
@@ -57,17 +61,12 @@ photoplotter/
 - Ensure smooth transitions between different states of operation.
 - Provide options for different target outputs, paper sizes or drawing complexity.
 
-**Ideas:**
-
-- Add reprint functionality
-- Style picker logic
-- Configuration for output sizes
 
 This project aims to combine the nostalgic charm of traditional photobooths with modern digital technology, offering a fun and interactive experience for users of all ages.
 
 **State-Engine**
 - The project uses a state-engine.
-![State engine for this branch](doc/state-engine-stadtfest.jpg)
+![State engine for this branch](doc/state-engine.jpg)
 
 
 ## Startup
@@ -85,9 +84,6 @@ source photoplotter-env/bin/activate
 python main.py
 ```
 
-<aside>
-☝ Alternatively run `start.sh`
-</aside>
 
 ## Setup repo
 
@@ -114,7 +110,7 @@ python -m pip install https://software-download.bantamtools.com/nd/api/nextdraw_
 ```
 
 
-## Services
+## Raspberry Pi Services
 Create .service files to launch on startup
 ```
 
@@ -146,5 +142,5 @@ zip -r photos.zip photos
 ```
 
 <aside>
-⚠️ After reinstallation make sure plotter sizes are correct in `axidraw_conf.py`
+⚠️ After reinstallation make sure plotter sizes are correct in `nextdraw_conf.py`, there have been issues with the library to set the paper size correctly
 </aside>
