@@ -36,8 +36,10 @@ photoplotter/
 │   └── imageparser.py
 │   
 └── photos/
-	└── current/
+	└── output/
+	└── collection/
 	└── snapped/
+	└── test/
 	└── traced/
 
 ```
@@ -47,6 +49,7 @@ photoplotter/
 - Users interact with the photobooth by following on-screen instructions.
 - They can capture photos using the integrated camera.
 - The captured photos are processed, saved and plotted.
+- When not connected to Pi the app goes into test mode and collects all images in the test folder.
 
 **Goals:**
 
@@ -56,13 +59,15 @@ photoplotter/
 
 **Ideas:**
 
-- Use facetracking instead of button input
+- Add reprint functionality
+- Style picker logic
+- Configuration for output sizes
 
 This project aims to combine the nostalgic charm of traditional photobooths with modern digital technology, offering a fun and interactive experience for users of all ages.
 
 **State-Engine**
 - The project uses a state-engine.
-![State engine for this branch](doc/state-engine-kunstlokal.jpg)
+![State engine for this branch](doc/state-engine-stadtfest.jpg)
 
 
 ## Startup
@@ -89,6 +94,7 @@ python main.py
 ```bash
 # Create venv
 python -m venv photoplotter-env
+source photoplotter-env/bin/activate
 
 # Install dependencies
 pip install paho-mqtt==1.5.1
@@ -98,8 +104,45 @@ pip install Pillow
 pip install lxml
 pip install numpy
 pip install paho-mqtt
+pip install dlib
+pip install scipy
+pip install torch
+pip install torch torchvision
+pip install timm
 
-python -m pip install https://cdn.evilmadscientist.com/dl/ad/public/AxiDraw_API.zip
+python -m pip install https://software-download.bantamtools.com/nd/api/nextdraw_api.zip
+```
+
+
+## Services
+Create .service files to launch on startup
+```
+
+# Disable autostart
+sudo systemctl stop photoplotter_lcd.service
+sudo systemctl stop photoplotter_main.service
+```
+```
+sudo systemctl disable photoplotter_lcd.service
+sudo systemctl disable photoplotter_main.service
+```
+```
+# Enable autostart
+sudo systemctl start photoplotter_lcd.service
+sudo systemctl start photoplotter_main.service
+```
+```
+sudo systemctl enable photoplotter_lcd.service
+sudo systemctl enable photoplotter_main.service
+```
+```
+# Check status
+sudo systemctl status photoplotter_lcd.service
+sudo systemctl status photoplotter_main.service
+```
+```
+# Zip & download with right click in vs code
+zip -r photos.zip photos
 ```
 
 <aside>

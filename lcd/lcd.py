@@ -42,17 +42,6 @@ def start_main_py():
     
 # Display images
 # ------------------------------------------------------------------------
-def display_default_image(LCD):
-    default_image_path = 'assets/display/Ready.jpg'
-    try:
-        image = Image.open(default_image_path)
-        rotated_image = image.rotate(-90, expand=True)
-        print("Displaying default image.")
-        LCD.LCD_ShowImage(rotated_image, 0, 0)
-    except Exception as e:
-        print(f"Error displaying default image: {e}")
-        
-# Function to display "Processing-9.jpg" when main.py is not running
 def display_error_image(LCD):
     print("Displaying Processing-9.jpg as main.py is not running.")
     state = "Processing"
@@ -92,48 +81,64 @@ def display_image_based_on_state(LCD, state):
 
     state_config = {
         "Waiting": {
-            "images": ["assets/display/Waiting-0.jpg", "assets/display/Waiting-1.jpg", "assets/display/Waiting-2.jpg", "assets/display/Waiting-3.jpg", "assets/display/Waiting-4.jpg"],
+            "images": [f"assets/display/Waiting-{i}.jpg" for i in range(0, 10)],
             "display_time": 0.125,
             "loop": True
         },
         "Working": {
-            "images": ["assets/display/Working-0.jpg", "assets/display/Working-1.jpg", "assets/display/Working-2.jpg", "assets/display/Working-3.jpg", "assets/display/Working-4.jpg", "assets/display/Working-5.jpg", "assets/display/Working-6.jpg", "assets/display/Working-7.jpg", "assets/display/Working-8.jpg", "assets/display/Working-9.jpg"],
+            "images": [f"assets/display/Working-{i}.jpg" for i in range(0, 10)],
             "display_time": 0.125,
             "loop": True
         },
         "Tracking": {
-            "images": ["assets/display/Tracking-0.jpg", "assets/display/Tracking-1.jpg", "assets/display/Tracking-2.jpg", "assets/display/Tracking-3.jpg", "assets/display/Tracking-4.jpg", "assets/display/Tracking-5.jpg", "assets/display/Tracking-6.jpg", "assets/display/Tracking-7.jpg", "assets/display/Tracking-8.jpg", "assets/display/Tracking-9.jpg"],
+            "images": [f"assets/display/Tracking-{i}.jpg" for i in range(0, 10)],
             "display_time": 0.125,
             "loop": True
         },
         "Snapping": {
-            "images": ["assets/display/Snapping-0.jpg", "assets/display/Snapping-1.jpg", "assets/display/Snapping-2.jpg", "assets/display/Snapping-3.jpg", "assets/display/Snapping-4.jpg", "assets/display/Snapping-5.jpg", "assets/display/Snapping-6.jpg", "assets/display/Snapping-7.jpg", "assets/display/Snapping-8.jpg", "assets/display/Snapping-9.jpg"],
+            "images": [f"assets/display/Snapping-{i}.jpg" for i in range(1, 30)],
             "display_time": 0.125,
-            "loop": True
+            "loop": False
         },
         "Processing": {
-            "images": ["assets/display/Processing-1.jpg", "assets/display/Processing-2.jpg", "assets/display/Processing-3.jpg", "assets/display/Processing-4.jpg", "assets/display/Processing-5.jpg", "assets/display/Processing-6.jpg", "assets/display/Processing-7.jpg", "assets/display/Processing-8.jpg", "assets/display/Processing-9.jpg", "assets/display/Processing-10.jpg"],
+            "images": [f"assets/display/Processing-{i}.jpg" for i in range(0, 20)],
             "display_time": 0.125,
             "loop": True
         },
         "ResetPending": {
-            "images": ["assets/display/ResetPending.jpg"],
+            "images": [f"assets/display/ResetPending-{i}.jpg" for i in range(0, 29)],
+            "display_time": 0.5,
+            "loop": True
+        },
+        "Template": {
+            "images": ["assets/display/Template-0.jpg"],
             "display_time": 1,
             "loop": False
         },
+        "Redrawing": {
+            "images": ["assets/display/Redrawing-0.jpg"],
+            "display_time": 1,
+            "loop": False
+        },
+        "Startup": {
+            "images": [f"assets/display/Default-{i}.jpg" for i in range(0, 10)],
+            "display_time": 0.125,
+            "loop": True
+        },
         "Test": {
-            "images": ["assets/display/Test.jpg"],
+            "images": ["assets/display/Test-0.jpg"],
             "display_time": 1,
             "loop": False
         },
     }
 
     num_images = 15
+    anim_steps = 5
     for i in range(1, num_images + 1):
         state_config[f"Drawing-{i}"] = {
-            "images": [f"assets/display/Drawing-{i}.jpg"],
-            "display_time": 0.1,
-            "loop": False
+            "images": [f"assets/display/Drawing-{j}.jpg" for j in range((i - 1) * anim_steps, i * anim_steps)],
+            "display_time": 0.25,
+            "loop": True
         }
 
     config = state_config.get(state)
@@ -168,13 +173,6 @@ def check_button(LCD, button_pin, button_name):
     if LCD.digital_read(button_pin) == 1:
         if (current_time - last_press_time[button_name]) > debounce_delay:
             last_press_time[button_name] = current_time
-            if button_name == "KEY1":  # Use KEY1 to check and start main.py
-                if not is_main_py_running():
-                    print("main.py is not running.")
-                    display_error_image(LCD)  # Display "Processing-9.jpg"
-                    start_main_py()  # Start main.py
-                else:
-                    print("main.py is already running.")
             return True
     return False
 
@@ -182,7 +180,7 @@ def check_button(LCD, button_pin, button_name):
 def main():
     LCD.LCD_Init(Lcd_ScanDir)
     LCD.LCD_Clear()
-    display_default_image(LCD)
+    display_image_based_on_state(LCD, "Startup")
 
     client.subscribe("state_engine/state")
     client.on_message = on_message

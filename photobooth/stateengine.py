@@ -1,11 +1,11 @@
 import paho.mqtt.client as mqtt
 import time
 import random
+from utils import is_running_on_raspberry_pi
 
 class StateEngine:
     def __init__(self):
         # State
-        self.debugmode = False
         self.state = "Startup"
         self.currentPhotoPath = ""
         self.currentWorkPath = ""
@@ -13,8 +13,19 @@ class StateEngine:
         self.imagesPerRow = 5
         self.imagesPerColumn = 3
         self.totalImages = self.imagesPerColumn * self.imagesPerRow
+        self.paperSizeX = 1587 #1191 multiplied by higher 96 dpi of Nextdraw
+        self.paperSizeY = 1122 #841 multiplied by higher 96 dpi of Nextdraw
         self.workID = 0
         self.photoID = list(range(1, self.totalImages + 1))  # List of positions from 1 to totalImages
+        self.reset_timeout_s = 15
+        self.last_update_time = 0
+        self.stresslevel = 0.0
+        self.last_draw_end_time = None
+        self.next_draw_start_time = None
+        self.min_stress_time = 30     # seconds (max stress)
+        self.max_stress_time = 300    # seconds (min stress, 5 min)
+        self.stress_decay_rate = 0.0025
+        self.update_interval = 1
         self.transitions = {
             "Startup": ["Waiting", "ResetPending", "Test"],
             "Waiting": ["Tracking"],
@@ -22,24 +33,26 @@ class StateEngine:
             "Working": ["Tracking"],
             "Snapping": ["Tracking", "Processing"],
             "Processing": ["Drawing", "Waiting"],
-            "Drawing": ["Waiting", "ResetPending"],
-            "ResetPending": ["Waiting"], 
+            "Drawing": ["Redrawing", "Waiting", "ResetPending"],
+            "Redrawing": ["Drawing", "ResetPending"],
+            "ResetPending": ["Waiting", "Template"],
+            "Template": ["ResetPending"],
             "Test": ["Waiting", "Drawing"]
         }
-        
-        # MQTT
-        self.broker_address = "localhost"
-        self.client = mqtt.Client("StateEngine_Client")
-        self.client.on_connect = self.on_connect
-        
-        if self.debugmode:
-            print("Starting Debugmode...")
-            self.photoID = [1]  # For debug mode, only one photoID
-        else:
+
+        if is_running_on_raspberry_pi():
+            print(f"\033[1;33m📱 Raspberry Pi found: Connecting to broker\033[0m.")
+            self.broker_address = "localhost"
+            self.client = mqtt.Client("StateEngine_Client")
+            self.client.on_connect = self.on_connect
             self.client.connect(self.broker_address)
             self.client.subscribe("lcd/buttons")
             self.client.loop_start()
             self.client.on_message = self.on_message
+            print("MQTT broker started.")
+        else:
+            print(f"\033[1;32m🖥️ Raspberry Pi not found: Entering test mode\033[0m.")
+            self.state = "Test"
         
         print("Starting StateEngine ...")
         self.reset_photo_id()  # Shuffle the photoID list on startup
@@ -80,11 +93,10 @@ class StateEngine:
 
     def reset_photo_id(self):
         triplets = [
-            [1, 6, 11],
-            [2, 7, 12],
-            [3, 8, 13],
-            [4, 9, 14],
-            [5, 10, 15]
+            [1],
+            [2, 3, 4, 5],
+            [6, 7, 8, 9, 10],
+            [11, 12, 13, 14, 15]
         ]
         for triplet in triplets:
             random.shuffle(triplet)
@@ -105,10 +117,8 @@ class StateEngine:
         gutterSize = 50
 
         # Adjusted maximum dimensions to account for border
-        paperSizeX = 1587
-        paperSizeY = 1122
-        maxX = paperSizeX - (borderSize * 2)  # Maximum X dimension in mm for A3 paper
-        maxY = paperSizeY - (borderSize * 2)  # Maximum Y dimension in mm for A3 paper
+        maxX = self.paperSizeX - (borderSize * 2)  # Maximum X dimension in mm for A3 paper
+        maxY = self.paperSizeY - (borderSize * 2)  # Maximum Y dimension in mm for A3 paper
 
         # Total rows needed, given the total images and images per row
         totalRows = (self.totalImages + self.imagesPerRow - 1) // self.imagesPerRow
@@ -129,6 +139,52 @@ class StateEngine:
         startPositionY = (row * offsetY) + (row * gutterSize) + borderSize
         
         return (startPositionX, startPositionY)
+    
+    # Stresslevel
+    # ------------------------------------------------------------------------    
+    def calculate_stresslevel(self, interval_seconds):
+        """
+        Compute stress level based on the time between drawings.
+        Shorter intervals → higher stress.
+        Long intervals → stress decays toward 0.0.
+        """
+        min_time = self.min_stress_time
+        max_time = self.max_stress_time
+
+        # Clamp interval to min/max for stress scaling
+        clamped = max(min_time, min(interval_seconds, max_time))
+        stress = 1.0 - (clamped - min_time) / (max_time - min_time)
+        alpha = 0.3
+        smoothed_stress = (alpha * stress) + (1 - alpha) * self.stresslevel
+
+        # Idle decay: reduce stress if interval is long
+        idle_decay = self.stress_decay_rate * interval_seconds
+        smoothed_stress = max(0.0, smoothed_stress - idle_decay)
+
+        self.stresslevel = smoothed_stress
+
+        print(f"⏱️ Interval: {interval_seconds:.1f}s → StressLevel: {self.stresslevel:.2f}")
+        return self.stresslevel
+
+    def update_stresslevel_from_interval(self):
+        """
+        Compute and update stresslevel based on time since the last drawing ended.
+        If no previous drawing time exists, the stresslevel remains unchanged.
+        Returns the current stresslevel.
+        """
+        if not self.last_draw_end_time:
+            print("No previous drawing found. Using default stresslevel.")
+            return self.stresslevel
+
+        interval = time.time() - self.last_draw_end_time
+        return self.calculate_stresslevel(interval)
+    
+    def get_stress_scaled_params(self):
+        s = max(0.0, min(1.0, self.stresslevel))
+        min_paths = int(40 - (40 - 20) * s)
+        max_paths = int(140 - (140 - 80) * s)
+        min_contour_area = int(10 + (20 - 10) * s)
+        return {"min_paths": min_paths, "max_paths": max_paths, "min_contour_area": min_contour_area}
 
     # Messages
     # ------------------------------------------------------------------------
@@ -138,23 +194,48 @@ class StateEngine:
         else:
             print(f"Failed to connect to MQTT broker with error code {rc}")
             
-    def on_message(self, client, userdata, msg):
+    def on_message(self, client, userdata, msg): 
+        # Manually handle reset
+        message = msg.payload.decode()
+        reset_keys = ["KEY2", "KEY3", "UP", "DOWN", "LEFT", "RIGHT"]
+        template_keys = ["KEY1"]
+        redraw_keys = ["KEY2"]
+        more_details_keys = ["UP"]
+        less_details_keys = ["DOWN"]
+        
         # Handle messages received on subscribed topics
-        print(f"Received message on topic '{msg.topic}': {msg.payload.decode()}")
+        print(f"Received message on topic '{msg.topic}': {message}")
+        current_time = time.time()
+
+        if self.state == "ResetPending":
+            if message in reset_keys:
+                print("Reset confirmed")
+                self.reset_photo_id()  # Reset and shuffle photo IDs
+                self.change_state("Waiting")
+                time.sleep(1)    
+            elif message in template_keys:
+                print("Applying template")
+                self.change_state("Template")
+                time.sleep(1)
         
         # Handler for each state
-        if self.state == "Waiting":
+        elif self.state == "Waiting":
             self.reset_work_id()
             self.change_state("Tracking")
+                
         elif self.state == "Working":
             self.change_state("Tracking")
-        elif self.state == "ResetPending":
-            print("Reset confirmed")
-            self.reset_photo_id()  # Reset and shuffle photo IDs
-            self.change_state("Waiting")
-            time.sleep(3)
+            
+        elif self.state == "Drawing":
+            if message in redraw_keys:
+                print("Redraw triggered")
+                self.change_state("Redrawing")
+                time.sleep(1)    
         else:
+            # print(f"Unexpected state: {self.state}") 
             pass
         
     def publish_message(self, topic, message):
         self.client.publish(topic, message)
+        
+

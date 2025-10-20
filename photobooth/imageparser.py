@@ -1,25 +1,55 @@
-import cv2
 import os
+import re
+import random
+import math
+
+import cv2
 import dlib
 import numpy as np
 import svgwrite
-import re
-import random
+import torch
+from torchvision import transforms
+from scipy.spatial import cKDTree
 from lxml import etree
+from utils import profile, wait_for_cooldown, get_random_color, pc
 
 class ImageParser:
     def __init__(self):
-        self.maxTrials = 10
-        # Initialize dlib face detector and shape predictor (68 landmarks)
+        print("Starting ImageParser ...")
+
+        # Initialize dlib face detector and shape predictor
         self.face_detector = dlib.get_frontal_face_detector()
         base_path = os.path.dirname(os.path.abspath(__file__))
+        
+        # Loading 68 face landmarks model
         predictor_path = os.path.join(base_path, 'shape_predictor', 'shape_predictor_68_face_landmarks.dat')
         self.landmark_detector = dlib.shape_predictor(predictor_path)
-        print("Starting ImageParser ...")
-        pass    
+
+        # Initialize MiDaS model for depth estimation
+        model_type = "MiDaS_small"
+        model_path = os.path.join(base_path, 'midas', 'midas_small.pth')
+        torch.set_num_threads(2)
+
+        if not os.path.exists(model_path):
+            print("Model not found locally. Downloading...")
+            self.model = torch.hub.load("intel-isl/MiDaS", model_type, pretrained=False, trust_repo=True)
+            os.makedirs(os.path.dirname(model_path), exist_ok=True)
+            torch.save(self.model.state_dict(), model_path)
+        else:
+            print("Loading model from local path...")
+            self.model = torch.hub.load("intel-isl/MiDaS", model_type, pretrained=False, trust_repo=True)
+            self.model.load_state_dict(torch.load(model_path))
+
+        self.model.eval()
+
+        self.transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Resize((128, 128)),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        ])
     
     def detect_faces(self, image_filepath):
-        """Quick method to check if a face is present in the image"""
+        """Used when snapping an image. Quick method to check if a face is present in the image"""
         image = cv2.imread(image_filepath)
         if image is None:
             print("Failed to load image.")
@@ -29,58 +59,875 @@ class ImageParser:
         faces = self.face_detector(gray_image)
         return len(faces) > 0
     
+    def convert_to_svg(self, image_filepath, target_width=800, target_height=800, scale_x=1.0, scale_y=1.0, min_paths=30, max_paths=120, min_contour_area=16, suffix='', method=3, apply_depthmap=True):
+        """Convert input image to SVG with parameters."""
+        print(f"Converting {image_filepath}")
+        if not os.path.isfile(image_filepath):
+            print(f"File {image_filepath} does not exist.")
+            return None
+        
+        image = cv2.imread(image_filepath)
+        if image is None:
+            print("Image loading failed.")
+            return None
+        
+        crop_image = self.handle_faces(image, target_width, target_height)
+        opt_image = self.process_face_image(crop_image)
+        depth_map = None
+        
+        if apply_depthmap:
+            opt_image, depth_map = self.generate_and_apply_depth_map(crop_image, opt_image)
+        
+        # Save optimized images
+        self.save_optimized_image(image_filepath, opt_image, depth_map)
+        
+        # Extract contours from the optimized image
+        image_contours = self.extract_contours(opt_image, method, min_contour_area)
+        image_contours = self.sort_and_limit_contours(image_contours, target_width, target_height, max_paths)
+        
+        # Extract contours from the depth map
+        depth_map_contours = self.extract_contours(depth_map, method, min_contour_area)
+        depth_map_contours = self.sort_and_limit_contours(depth_map_contours, target_width, target_height, max_paths)
+        
+        # Merge contours
+        merged_contours = image_contours + depth_map_contours
+        
+        # Create the SVG with a style
+        svg_filepath = self.create_svg(image_filepath, merged_contours, target_width, target_height, scale_x, scale_y, suffix)
+        methods = ["dynamic_grid", "poisson_disk", "none"]
+        weights = [0.025, 0.025, 0.95]  
+        method = random.choices(methods, weights=weights, k=1)[0]
+        
+        # Process SVG
+        processed_svg_filepath = self.process_svg(svg_filepath, method)
+        print(f"{method}: Length Before {self.get_svgpath_length(svg_filepath)} / Output: {pc(self.get_svgpath_length(processed_svg_filepath))}")
+        print(f"Processed SVG saved at: {processed_svg_filepath}")
+        return processed_svg_filepath
+    
+    
+    # ----- Face Detection -----
+    @profile
+    def handle_faces(self, image, target_width, target_height):
+        """Detect and crop faces from the image or return the original."""
+        gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        faces = self.face_detector(gray_image)
+        if faces:
+            return self.crop_all_faces(image, faces, target_width, target_height)
+        
+        print("❌ No face found. Proceeding with the resized image.")
+        return cv2.resize(image, (target_width, target_height))
+    
+    @profile
+    def crop_all_faces(self, image, faces, target_width=800, target_height=800, padding=350):
+        """Crop the image to a bounding rectangle encompassing all faces and resize it."""
+        # Check if 'faces' is a single rectangle or a collection of rectangles and print detected faces
+        if isinstance(faces, dlib.rectangle):
+            faces = [faces]  # Wrap it in a list
+        elif not isinstance(faces, (dlib.rectangles, list)):
+            raise TypeError("'faces' must be a dlib.rectangle or dlib.rectangles object.")
+
+        print("Detected faces:")
+        for i, face in enumerate(faces):
+            print(f"😄 \033[1;36mFace {i}: \033[0mLeft={face.left()}, Top={face.top()}, Right={face.right()}, Bottom={face.bottom()}")
+
+        # Initialize bounding box coordinates
+        min_x, min_y = float('inf'), float('inf')
+        max_x, max_y = float('-inf'), float('-inf')
+        
+        # Calculate the encompassing bounding box
+        for face in faces:
+            min_x = min(min_x, face.left())
+            min_y = min(min_y, face.top())
+            max_x = max(max_x, face.right())
+            max_y = max(max_y, face.bottom())
+        
+        # Add padding
+        min_x = max(0, min_x - padding)
+        min_y = max(0, min_y - padding)
+        max_x = min(image.shape[1], max_x + padding)
+        max_y = min(image.shape[0], max_y + padding)
+        
+        # Adjust bounding box to a square
+        width = max_x - min_x
+        height = max_y - min_y
+        
+        if width > height:
+            diff = width - height
+            padding_top = diff // 2
+            padding_bottom = diff - padding_top
+            min_y = max(0, min_y - padding_top)
+            max_y = min(image.shape[0], max_y + padding_bottom)
+        elif height > width:
+            diff = height - width
+            padding_left = diff // 2
+            padding_right = diff - padding_left
+            min_x = max(0, min_x - padding_left)
+            max_x = min(image.shape[1], max_x + padding_right)
+
+        # Ensure the final bounding box is within image bounds
+        min_x, min_y = max(0, min_x), max(0, min_y)
+        max_x, max_y = min(image.shape[1], max_x), min(image.shape[0], max_y)
+
+        # Verify the bounding box is square
+        width = max_x - min_x
+        height = max_y - min_y
+        # assert width == height, f"Bounding box must be square. Width: {width}, Height: {height}"
+        
+        # Crop the image
+        cropped_image = image[min_y:max_y, min_x:max_x]
+        
+        # Resize the cropped image to the target size
+        resized_image = cv2.resize(cropped_image, (target_width, target_height), interpolation=cv2.INTER_AREA)
+        
+        return resized_image
+    
+    @profile
     def process_face_image(self, image, target_width=800, target_height=800):
         """Optimized method that detects, crops, enhances the face and draws facial features"""
         if image is None:
             print("Failed to load image.")
             return None
         
-        # Detect faces
-        gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        faces = self.face_detector(gray_image)
+        faces = self.face_detector(image)
+        opt_image = cv2.medianBlur(image, 5)
 
-        if len(faces) == 0:
-            print("No faces detected.")
-
-            # Crop the image by 15% on each side
-            height, width = image.shape[:2]
-            crop_x = int(0.2 * width)  # 15% of the width
-            crop_y = int(0.2 * height)  # 15% of the height
-
-            # Perform the cropping
-            cropped_image = image[crop_y:height - crop_y, crop_x:width - crop_x]
-            enhanced_image = self.enhance_faces(cropped_image)
-            return enhanced_image
-
-        # Sort faces by size (width * height) in descending order
-        faces = sorted(faces, key=lambda rect: rect.width() * rect.height(), reverse=True)
-
-        # Process up to 3 largest faces
-        num_faces_to_process = min(3, len(faces))  # Process up to 3 faces
-
-        print(f"Faces found {num_faces_to_process}")
+        # Convert the image to grayscale to simplify the processing
+        gray_image = cv2.cvtColor(opt_image, cv2.COLOR_BGR2GRAY)
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+        cleaned_image = cv2.morphologyEx(gray_image, cv2.MORPH_OPEN, kernel)
         
-        for i in range(num_faces_to_process):
-            largest_face = faces[i]
+        # Apply facial landmarks
+        if faces:
+            for face_rect in faces:
+                self.draw_facial_landmarks(cleaned_image, face_rect) # Use your existing function
+        
+        return cleaned_image
 
-            # Detect landmarks and draw them on the original image (not just the cropped one)
-            self.draw_facial_landmarks(image, largest_face)
-            
-            # Crop the region around the face
-            cropped_image = self.crop_to_largest_face(image, largest_face, target_width, target_height)
-            
-        # Return the original image with landmarks drawn on it
-        enhanced_image = self.enhance_faces(cropped_image)
-        return enhanced_image
 
+    # ----- Depth Map -----
+    @profile
+    def generate_and_apply_depth_map(self, image, opt_image):
+        """Generate a depth map and apply it to the optimized image."""
+        depth_map = self.generate_depth_map(image)
+        depth_map = cv2.resize(depth_map, (opt_image.shape[1], opt_image.shape[0]))
+        
+        if depth_map is not None:
+            # Running opt_image 2x for better results
+            opt_image = self.enhance_foreground(opt_image, depth_map)
+            opt_image = self.enhance_foreground(opt_image, depth_map)
+            return opt_image, depth_map
+        else:
+            print("Depth map generation failed, proceeding without enhancement.")
+            return opt_image, None  
+        
+    def generate_depth_map(self, image):
+        wait_for_cooldown()
+        image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        input_tensor = self.transform(image_rgb).unsqueeze(0)
+
+        wait_for_cooldown()
+        with torch.no_grad():
+            depth_map = self.model(input_tensor)
+
+        depth_map = depth_map.squeeze().cpu().numpy()
+        depth_map_normalized = cv2.normalize(depth_map, None, 0, 255, cv2.NORM_MINMAX)
+        return np.uint8(depth_map_normalized)
+    
+    def enhance_foreground(self, image, depth_map, contrast_factor=2.0, background_factor=0.5, threshold=0.5):
+        """
+        Enhance the foreground of the image based on a depth map.
+        The foreground contrast is enhanced, and the background is darkened.
+
+        Parameters:
+            image (ndarray): The original grayscale image.
+            depth_map (ndarray): The depth map of the image.
+            contrast_factor (float): Factor to enhance contrast in the foreground.
+            background_factor (float): Factor to darken the background.
+
+        Returns:
+            result (ndarray): The processed image with enhanced foreground and darkened background.
+        """
+        # Convert the depth map to a float and normalize to [0, 1]
+        depth_map_normalized = cv2.normalize(depth_map, None, 0, 1, cv2.NORM_MINMAX)
+
+        # Create a mask for the foreground (near objects, typically with lower depth values)
+        foreground_mask = (depth_map_normalized >= threshold).astype(np.uint8) 
+        background_mask = (depth_map_normalized < threshold).astype(np.uint8) 
+
+        # Enhance foreground contrast using CLAHE (Contrast Limited Adaptive Histogram Equalization)
+        clahe = cv2.createCLAHE(clipLimit=contrast_factor, tileGridSize=(8, 8))
+        enhanced_image = clahe.apply(image)
+
+        # Darken the background: Reduce the brightness of background pixels
+        image_background_darker = image * background_factor
+        image_background_darker = np.clip(image_background_darker, 0, 255).astype(np.uint8)
+
+        # Combine the results: Blend the enhanced foreground and darkened background
+        result = np.zeros_like(image, dtype=np.uint8)
+
+        # Apply enhanced foreground to the result where the foreground mask is 1
+        result[foreground_mask == 1] = enhanced_image[foreground_mask == 1]
+
+        # Apply darkened background to the result where the background mask is 1
+        result[background_mask == 1] = image_background_darker[background_mask == 1]
+        return result
+
+
+    # ----- Save image -----     
+    def save_optimized_image(self, image_filepath, opt_image, depth_map=None):
+        """Save the optimized image and optionally the depth map, and return the paths."""
+        # Save the optimized image
+        optimized_image_path = image_filepath.rsplit('.', 1)[0] + '_optimized.' + image_filepath.rsplit('.', 1)[1]
+        cv2.imwrite(optimized_image_path, opt_image)
+        
+        # Save the depth map if it exists
+        if depth_map is not None:
+            depth_map_path = image_filepath.rsplit('.', 1)[0] + '_depthmap.png'
+            cv2.imwrite(depth_map_path, depth_map)
+            return optimized_image_path, depth_map_path
+        
+        return optimized_image_path, None
+
+    # ----- Contours -----  
+    def extract_contours(self, opt_image, method, min_contour_area):
+        """Extract contours based on the selected method."""
+        contours = []
+        if method == 1:  # Edge-based
+            edges = cv2.Canny(opt_image, threshold1=80, threshold2=200)
+            contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        elif method == 2:  # Binary-based
+            _, binary = cv2.threshold(opt_image, 127, 255, cv2.THRESH_BINARY)
+            contours, _ = cv2.findContours(binary, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        elif method == 3:  # Merge both
+            edges = cv2.Canny(opt_image, threshold1=80, threshold2=200)
+            edge_contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            _, binary = cv2.threshold(opt_image, 127, 255, cv2.THRESH_BINARY)
+            binary_contours, _ = cv2.findContours(binary, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+            contours = edge_contours + binary_contours
+        return [c for c in contours if cv2.contourArea(c) > min_contour_area]
+
+    def sort_and_limit_contours(self, contours, target_width, target_height, max_paths):
+        """Sort and limit the number of contours to a specified maximum."""
+        image_center = np.array([target_width // 2, target_height // 2])
+        sorted_contours = sorted(contours, key=lambda c: np.linalg.norm(np.mean(np.squeeze(c), axis=0) - image_center))
+        return sorted_contours[:max_paths]
+
+    # ----- SVG Handling -----  
+    def create_svg(self, image_filepath, contours, target_width, target_height, scale_x, scale_y, suffix):
+        """Create an SVG file from contours."""
+        dwg = svgwrite.Drawing(size=(target_width, target_height))
+        self.add_contours_to_svg(dwg, contours, scale_x, scale_y)
+        parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        output_dir = os.path.join(parent_dir, "photos/traced")
+        os.makedirs(output_dir, exist_ok=True)
+        svg_filename = os.path.splitext(os.path.basename(image_filepath))[0] + suffix + '.svg'
+        svg_filepath = os.path.join(output_dir, svg_filename)
+        dwg.saveas(svg_filepath)
+        return svg_filepath
+    
+    
+    @staticmethod
+    def add_contours_to_svg(dwg, contours, scale_x, scale_y):
+        # Implementation for adding contours to the SVG with styling
+        num_paths = 0
+        for contour in contours:
+            # Convert contour points to a format suitable for svgwrite and apply scaling
+            points = [(point[0][0] * scale_x, point[0][1] * scale_y) for point in contour]
+            random_color = get_random_color()
+            dwg.add(dwg.polyline(points, fill="none", stroke=random_color, stroke_width="1"))
+            num_paths += 1
+        return num_paths
+
+    # ----- SVG Processing -----  
+    @profile
+    def process_svg(self, svg_filepath, method="none", removal_percentage=80, angle=25):
+        """Process the SVG file to align it to points generated by various methods."""
+        
+        grid_points = None
+        
+        # Pick a point generation method
+        if method == "dynamic_grid":
+            print("Using Dynamic Grid method for point generation.")
+            grid_points = self.generate_dynamic_points()
+        elif method == "poisson_disk":
+            print("Using Poisson Disk Sampling method for point generation.")
+            grid_points = self.generate_poisson_disk_points()
+            
+        # SVG Clean up
+        if grid_points:
+            processed_svg_filepath = svg_filepath.rsplit('.', 1)[0] + '_processed.svg'
+            self.align_svg_to_points(svg_filepath, processed_svg_filepath, grid_points)
+        else:
+            processed_svg_filepath = self.simplify_svg(svg_filepath, removal_percentage=removal_percentage)
+
+        return processed_svg_filepath
+    
+    # RDP Algorithm to simplify points
+    def rdp(self, points, epsilon):
+        """
+        Ramer-Douglas-Peucker algorithm to simplify the polyline.
+        :param points: List of (x, y) tuples representing the polyline.
+        :param epsilon: Tolerance for simplification.
+        :return: List of (x, y) tuples representing the simplified polyline.
+        """
+        def perpendicular_distance(p, p1, p2):
+            """
+            Calculate the perpendicular distance from point p to the line defined by p1 and p2.
+            """
+            x1, y1 = p1
+            x2, y2 = p2
+            x0, y0 = p
+            numerator = abs((y2 - y1) * x0 - (x2 - x1) * y0 + x2 * y1 - y2 * x1)
+            denominator = math.sqrt((y2 - y1) ** 2 + (x2 - x1) ** 2)
+            return numerator / denominator
+
+        def rdp_recursive(points, epsilon):
+            if len(points) < 3:
+                return points
+            # Find the point with the maximum perpendicular distance
+            max_dist = 0
+            index = 0
+            for i in range(1, len(points) - 1):
+                dist = perpendicular_distance(points[i], points[0], points[-1])
+                if dist > max_dist:
+                    max_dist = dist
+                    index = i
+            # If the maximum distance is greater than epsilon, recursively simplify
+            if max_dist > epsilon:
+                left = rdp_recursive(points[:index + 1], epsilon)
+                right = rdp_recursive(points[index:], epsilon)
+                return left[:-1] + right
+            else:
+                return [points[0], points[-1]]  # Only keep the start and end points
+
+        return rdp_recursive(points, epsilon)
+
+    # Helper function to convert points string to list of tuples
+    def parse_points(self, points_str):
+        return [tuple(map(float, p.split(','))) for p in points_str.split()]
+
+    # Helper function to convert list of tuples back to string
+    def points_to_str(self, points):
+        return ' '.join(f"{x},{y}" for x, y in points)
+
+
+    # Angle-based simplification: remove points with small angles between segments
+    def angle_simplification(self, points, angle_threshold_deg=15):
+        """
+        Simplify a polyline by removing points where the angle between two adjacent segments is small.
+        :param points: List of (x, y) tuples representing the polyline.
+        :param angle_threshold_deg: The angle threshold (in degrees) below which the point will be removed.
+        :return: List of simplified (x, y) tuples.
+        """
+        def angle_between(p1, p2, p3):
+            """
+            Calculate the angle between two vectors (p1 -> p2) and (p2 -> p3).
+            """
+            # Vector p1 -> p2
+            v1x, v1y = p2[0] - p1[0], p2[1] - p1[1]
+            # Vector p2 -> p3
+            v2x, v2y = p3[0] - p2[0], p3[1] - p2[1]
+            # Dot product
+            dot_product = v1x * v2x + v1y * v2y
+            # Magnitudes
+            mag_v1 = math.sqrt(v1x**2 + v1y**2)
+            mag_v2 = math.sqrt(v2x**2 + v2y**2)
+            # Cosine of the angle
+            cos_theta = dot_product / (mag_v1 * mag_v2)
+            # Ensure the value is within the valid range for acos
+            cos_theta = max(-1, min(1, cos_theta))
+            # Return the angle in radians, converted to degrees
+            return math.acos(cos_theta) * (180.0 / math.pi)
+
+        simplified = [points[0]]  # Start with the first point
+        for i in range(1, len(points) - 1):
+            prev_point = simplified[-1]
+            current_point = points[i]
+            next_point = points[i + 1]
+            
+            # Calculate the angle between the two segments
+            angle = angle_between(prev_point, current_point, next_point)
+            
+            # If the angle is greater than the threshold, keep the point, otherwise skip it
+            if angle > angle_threshold_deg:
+                simplified.append(current_point)
+        
+        simplified.append(points[-1])  # Always keep the last point
+        return simplified
+
+    @profile
+    def simplify_svg(self, svg_filepath, removal_percentage=80):
+        tree = etree.parse(svg_filepath)
+        root = tree.getroot()
+
+        namespace = {'svg': 'http://www.w3.org/2000/svg'}
+        polylines = root.findall('.//svg:polyline', namespaces=namespace)
+
+        print(f"Found {len(polylines)} polylines")
+        keep_fraction = 1 - removal_percentage / 100
+
+        # For each polyline, simplify with RDP algorithm
+        for i, polyline in enumerate(polylines):
+            points = polyline.get('points')
+            if points:
+                parsed_points = self.parse_points(points)
+                epsilon = 1.0 * keep_fraction  # Adjust epsilon based on keep_fraction
+                simplified_points = self.rdp(parsed_points, epsilon * 10)
+                simplified_points_str = self.points_to_str(simplified_points)
+                polyline.set('points', simplified_points_str)
+
+        # Remove unnecessary elements
+        xpath_expr = './/*[not(@points) and not(@d) and not(@x) and not(@y)]'
+        for elem in root.xpath(xpath_expr, namespaces=namespace):
+            parent = elem.getparent()
+            if parent is not None:
+                parent.remove(elem)
+
+        # Generate output file path for the simplified SVG
+        output_svg_filepath = svg_filepath.rsplit('.', 1)[0] + f'_{removal_percentage}_simplified.svg'
+        tree.write(output_svg_filepath, pretty_print=True, xml_declaration=True, encoding='UTF-8')
+
+        print(f"Simplified SVG saved to {output_svg_filepath}")
+
+        # Call remove_duplicate_segments to remove any duplicate segments from the SVG
+        cleaned_svg_filepath = self.remove_duplicate_segments(output_svg_filepath)
+
+        return cleaned_svg_filepath
+
+
+
+
+    def generate_dynamic_points(self, min_value=0, max_value=800, num_points_mean=70, num_points_std=10, center=400.0, plateau_radius=50, randomness_factor=0.1):
+        """Generate a dynamic grid as an array of (x, y) points with higher density near the center,
+        a plateau region, and increasing randomness towards the edges.
+
+        num_points is sampled from a Gaussian distribution clipped between 40 and 100.
+        """
+        # Sample num_points from a Gaussian distribution and clip between 40 and 100
+        num_points = int(np.clip(np.random.normal(loc=num_points_mean, scale=num_points_std), 40, 100))
+        print(f"Generated grid with \033[1;31m{num_points}\033[0m points.")
+
+        # Generate cubic-scaled values for x and y
+        values = np.linspace(-1, 1, num_points)
+        scaled_values = center + (max_value - min_value) * values**3
+
+        grid_points = []
+        for x in scaled_values:
+            for y in scaled_values:
+                # Calculate the distance from the center
+                distance = ((x - center)**2 + (y - center)**2)**0.5
+
+                # Keep points within the plateau radius
+                if distance <= plateau_radius:
+                    grid_points.append((x, y))
+                else:
+                    # Introduce randomness for points outside the plateau radius
+                    edge_factor = min(1.0, distance / (max_value - min_value))  # Normalize edge factor to [0, 1]
+                    if random.random() > randomness_factor * edge_factor:
+                        grid_points.append((x, y))
+
+        return grid_points
+
+    def generate_poisson_disk_points(self, width=800, height=800, radius=20, k=30):
+        """Generate points using Poisson Disk Sampling."""
+        def distance(p1, p2):
+            return np.sqrt((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)
+        
+        grid_size = radius / np.sqrt(2)
+        cols, rows = int(width // grid_size), int(height // grid_size)
+        grid = [None] * (cols * rows)
+        
+        def grid_index(x, y):
+            col = int(x // grid_size)
+            row = int(y // grid_size)
+            if 0 <= col < cols and 0 <= row < rows:
+                return col + row * cols
+            else:
+                return -1 
+
+        points = []
+        active_list = []
+
+        def add_point(x, y):
+            idx = grid_index(x, y)
+            if idx != -1:
+                grid[idx] = (x, y)
+                points.append((x, y))
+                active_list.append((x, y))
+
+        add_point(random.uniform(0, width), random.uniform(0, height))
+
+        while active_list:
+            x, y = active_list.pop(random.randint(0, len(active_list) - 1))
+            for _ in range(k):
+                angle = random.uniform(0, 2 * np.pi)
+                r = random.uniform(radius, 2 * radius)
+                nx, ny = x + r * np.cos(angle), y + r * np.sin(angle)
+                if not (0 <= nx < width and 0 <= ny < height):
+                    continue
+                neighbor_found = False
+                for i in range(-2, 3):
+                    for j in range(-2, 3):
+                        idx = grid_index(nx + i * grid_size, ny + j * grid_size)
+                        if 0 <= idx < len(grid) and grid[idx] and distance(grid[idx], (nx, ny)) < radius:
+                            neighbor_found = True
+                            break
+                    if neighbor_found:
+                        break
+                if not neighbor_found:
+                    add_point(nx, ny)
+        return points
+    
+    def generate_depth_based_points(self, depth_map, target_points=2000, min_points_per_region=1, max_points_per_region=10):
+        """Generate points with density based on the depth map."""
+        height, width = depth_map.shape
+        points = []
+        radius_map = cv2.normalize(1 / (depth_map + 1e-5), None, 5, 50, cv2.NORM_MINMAX)  # Inverse depth for density
+
+        # Generate points with depth-based density
+        for y in range(height):
+            for x in range(width):
+                radius = int(radius_map[y, x])
+                num_points = int(np.interp(radius, [5, 50], [max_points_per_region, min_points_per_region]))
+                
+                for _ in range(num_points):
+                    offset_x = random.uniform(-radius, radius)
+                    offset_y = random.uniform(-radius, radius)
+                    if offset_x**2 + offset_y**2 <= radius**2:  # Stay within the circular region
+                        new_x = x + offset_x
+                        new_y = y + offset_y
+                        if 0 <= new_x < width and 0 <= new_y < height:
+                            points.append((new_x, new_y))
+
+        # Normalize total number of points to the target
+        if len(points) > target_points:
+            points = random.sample(points, target_points)
+
+        print(f"Generated {len(points)} points based on depth map (target was {target_points}).")
+        return points
+    
+    
+    # ----- SVG Align and Cleanup -----  
+    @profile
+    def align_svg_to_points(self, input_file, output_file, grid_points):
+        """Process SVG by aligning points to a dynamic grid using lxml.etree."""
+        parser = etree.XMLParser(remove_blank_text=True)
+        tree = etree.parse(input_file, parser)
+        root = tree.getroot()
+
+        # Build KD-Tree for faster nearest-point lookup
+        kdtree = self.precompute_kdtree(grid_points)
+
+        namespace = {'svg': 'http://www.w3.org/2000/svg'}
+        for poly in root.xpath(".//svg:polyline | .//svg:polygon", namespaces=namespace):
+            points = poly.get("points")
+            if points:
+                new_points = []
+                for point in points.split():
+                    try:
+                        x, y = map(float, point.split(","))
+                        aligned_point = self.align_to_dynamic_grid((x, y), kdtree)
+                        new_points.append(f"{aligned_point[0]},{aligned_point[1]}")
+                    except ValueError:
+                        continue  # Skip malformed points
+                poly.set("points", " ".join(new_points))
+
+        tree.write(output_file, pretty_print=True, xml_declaration=True, encoding="UTF-8")
+        print(f"Aligned SVG saved as {output_file}")
+        return output_file
+    
+    def precompute_kdtree(self, grid_points):
+        return cKDTree(grid_points)
+
+    def align_to_dynamic_grid(self, point, kdtree):
+        _, idx = kdtree.query(point)
+        return kdtree.data[idx]
+
+    @profile
+    def remove_duplicate_segments(self, svg_filepath, threshold=2.0):
+        assert isinstance(svg_filepath, str), "Expected svg_filepath to be a string path"
+        
+        # Nested helper functions... (same as your original code)
+        def _parse_points(points_str):
+            # ... (same)
+            points = points_str.strip().replace(' ', ',').split(',')
+            result = []
+            for i in range(0, len(points), 2):
+                result.append((float(points[i]), float(points[i+1])))
+            return result
+
+        def _format_points(points):
+            # ... (same)
+            return ' '.join(f"{x},{y}" for x, y in points)
+
+        def _distance(p1, p2):
+            # ... (same)
+            return math.hypot(p1[0] - p2[0], p1[1] - p2[1])
+
+        def _is_near_duplicate(segment, seen_segments, threshold):
+            # ... (same)
+            p1, p2 = segment
+            for s1, s2 in seen_segments:
+                if (_distance(p1, s1) <= threshold and _distance(p2, s2) <= threshold) or \
+                (_distance(p1, s2) <= threshold and _distance(p2, s1) <= threshold):
+                    return True
+            return False
+
+        try:
+            with open(svg_filepath, 'rb') as f:
+                tree = etree.parse(f)
+        except Exception as e:
+            print(f"Error reading the SVG file {svg_filepath}: {e}")
+            return None
+
+        root = tree.getroot()
+        namespace = {'svg': 'http://www.w3.org/2000/svg'}
+        polylines = root.findall('.//svg:polyline', namespaces=namespace)
+
+        if not polylines:
+            print("No polylines found in the SVG file.")
+            return svg_filepath
+
+        all_segments = []
+        
+        # Phase 1: Collect all segments from all polylines
+        for polyline in polylines:
+            points_str = polyline.get('points', '')
+            if not points_str:
+                continue
+            
+            points = _parse_points(points_str)
+            if len(points) < 2:
+                continue
+                
+            for i in range(len(points) - 1):
+                p1, p2 = points[i], points[i+1]
+                all_segments.append({
+                    'segment': tuple(sorted([p1, p2])),
+                    'parent_polyline': polyline,
+                    'index': i,
+                    'is_duplicate': False
+                })
+
+        seen_segments = []
+        
+        # Phase 2: Identify duplicate segments
+        for segment_info in all_segments:
+            segment = segment_info['segment']
+            if _is_near_duplicate(segment, seen_segments, threshold):
+                segment_info['is_duplicate'] = True
+            else:
+                seen_segments.append(segment)
+
+        # Phase 3: Split and modify polylines
+        for polyline in polylines:
+            points_str = polyline.get('points', '')
+            if not points_str:
+                continue
+                
+            original_points = _parse_points(points_str)
+            parent = polyline.getparent()
+            
+            if not parent:
+                continue
+            
+            segments_to_remove_indices = []
+            for i in range(len(original_points) - 1):
+                p1, p2 = original_points[i], original_points[i+1]
+                # Check the all_segments list for this specific segment
+                for segment_info in all_segments:
+                    if segment_info['parent_polyline'] == polyline and segment_info['index'] == i:
+                        if segment_info['is_duplicate']:
+                            segments_to_remove_indices.append(i)
+                        break
+            
+            # If no duplicates found in this polyline, continue to the next one
+            if not segments_to_remove_indices:
+                continue
+
+            # Split the polyline based on duplicate segments
+            start_index = 0
+            
+            # Add a sentinel value to handle the last segment correctly
+            segments_to_remove_indices.append(len(original_points) - 1) 
+            
+            # Split the path at each duplicate segment
+            for i, end_index in enumerate(segments_to_remove_indices):
+                
+                # The first new path includes the point before the removed segment
+                path_points_1 = original_points[start_index : end_index ]
+
+                if len(path_points_1) > 1:
+                    # Create a new polyline for this path
+                    new_polyline = etree.Element('polyline')
+                    new_polyline.set('points', _format_points(path_points_1))
+                    
+                    # Copy other attributes like style, stroke, etc.
+                    for key, value in polyline.attrib.items():
+                        if key != 'points':
+                            new_polyline.set(key, value)
+                    
+                    parent.append(new_polyline)
+
+                # The next path will start from the point after the removed segment
+                start_index = end_index + 1
+            
+            # After splitting, remove the original polyline
+            parent.remove(polyline)
+
+
+        # Generate and write the output file
+        output_svg_filepath = svg_filepath.rsplit('.', 1)[0] + '_reduced.svg'
+        tree.write(output_svg_filepath, pretty_print=True, xml_declaration=True, encoding='UTF-8')
+        print(f"SVG saved with duplicates removed to: {output_svg_filepath}")
+
+        return output_svg_filepath
+
+
+
+    def get_svgpath_length(self, svg_filepath):
+        """
+        Calculates the total length of all polylines in an SVG file.
+        
+        :param svg_filepath: Path to the SVG file
+        :return: Total length of all polylines in the SVG
+        """
+        def distance(p1, p2):
+            """Calculate the Euclidean distance between two points."""
+            return math.sqrt((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)
+        
+        def parse_points(points_str):
+            """Parse the 'points' attribute into a list of (x, y) tuples."""
+            return [tuple(map(float, point.split(','))) for point in points_str.strip().split()]
+
+        # Parse the SVG file
+        tree = etree.parse(svg_filepath)
+        root = tree.getroot()
+
+        namespace = {'svg': 'http://www.w3.org/2000/svg'}
+        polylines = root.findall('.//svg:polyline', namespaces=namespace)
+
+        total_length = 0.0
+
+        for polyline in polylines:
+            points = polyline.get('points')
+            if points:
+                parsed_points = parse_points(points)
+                # Calculate length of the polyline
+                length = sum(distance(parsed_points[i], parsed_points[i + 1]) for i in range(len(parsed_points) - 1))
+                total_length += length
+
+        return int(round(total_length))
+    
+    # ----- SVG Output -----
+    @profile  
+    def create_output_svg(self, image_svg_path, imgname='image', scale_factor=0.3, offset_x=0, offset_y=0, id=0, paper_width=500, paper_height=500):
+        """Create output image on artboard with id for output position"""
+        # Load the original SVG content from a file
+        with open(image_svg_path, 'rb') as file:  # Note 'rb' mode for reading as bytes
+            svg_data = file.read()
+
+        # Parse the original SVG
+        root = etree.fromstring(svg_data)
+
+        # Create a new SVG drawing with svgwrite, setting the desired size and viewBox
+        dwg = svgwrite.Drawing(
+            size=(paper_width, paper_height),
+            profile='full',
+            viewBox=f'0 0 {paper_width} {paper_height}'
+        )
+        dwg.attribs.update({
+            "xmlns": "http://www.w3.org/2000/svg"
+        })
+
+        # Transform and position the image
+        group = dwg.g(id="all_paths", transform=f"translate({offset_x}, {offset_y}) scale({scale_factor})")
+
+        for element in root.iter("{http://www.w3.org/2000/svg}*"):
+            if element.tag.endswith('polyline'):
+                points = element.get('points')
+                if points:
+                    points_tuples = re.findall(r'(-?\d*\.?\d+)[,\s](-?\d*\.?\d+)', points)
+                    if points_tuples:
+                        group.add(dwg.polyline(points=points_tuples, 
+                                            stroke=element.get('stroke', 'black'),
+                                            fill=element.get('fill', 'none'),
+                                            stroke_width=element.get('stroke-width', '1')))
+
+        dwg.add(group)
+        
+         # Use an absolute path for the output directory
+        parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        output_dir = os.path.join(parent_dir, "photos/output")  # Join it with your relative path
+        os.makedirs(output_dir, exist_ok=True)  # Create the directory if it doesn't exist
+        
+        # svg_filename = os.path.splitext(os.path.basename(image_svg_path))[0] + str(id) + '.svg'
+        svg_filename = imgname + str(id) + '.svg'
+        output_svg_path = os.path.join(output_dir, svg_filename)  # This is your absolute path for the SVG file
+        dwg.saveas(output_svg_path)
+
+        return output_svg_path
+    
+    # ----- SVG Collection -----  
+    def collect_all_paths(self, input_directory, output_file, prefix=""):
+        """Combines all SVG files in the input directory. """
+        # Get all SVG files in the directory, sorted alphabetically
+        svg_files = sorted(
+            f for f in os.listdir(input_directory) 
+            if f.endswith('.svg') and (f.startswith(prefix) if prefix else True)
+        )
+        if not svg_files:
+            print("No SVG files found in the directory.")
+            return
+
+        # Parse the first file to use its <svg> structure
+        first_svg_path = os.path.join(input_directory, svg_files[0])
+        with open(first_svg_path, 'rb') as file:
+            first_svg_data = file.read()
+        first_root = etree.fromstring(first_svg_data)
+        namespace = {'svg': "http://www.w3.org/2000/svg"}
+        
+        # Remove any content inside the first <svg> tag (except attributes)
+        for child in list(first_root):
+            first_root.remove(child)
+
+        # Append contents from all files
+        for filename in svg_files:
+            file_path = os.path.join(input_directory, filename)
+            with open(file_path, 'rb') as file:
+                svg_data = file.read()
+            root = etree.fromstring(svg_data)
+
+            # Append all children of the current SVG (excluding the outer <svg> tag)
+            for child in root:
+                if child.tag.endswith('g'):  # Handle <g> tags explicitly
+                    if len(child):  # Check if the <g> tag has children
+                        first_root.append(child)
+                    else:
+                        # If <g> is self-closing, convert to open-close format
+                        g = etree.Element('g', attrib=child.attrib)
+                        first_root.append(g)
+                else:
+                    first_root.append(child)
+
+        # Save the combined SVG to the output file
+        with open(output_file, 'wb') as file:
+            file.write(etree.tostring(first_root, pretty_print=True))
+
+        print(f"Combined SVG saved to {output_file}")   
+    
+    # ----- Face landmarks -----
     def crop_to_largest_face(self, image, face_rect, target_width=800, target_height=800):
-        """Crop the image around the detected face to a square size."""
+        """
+        NOT IN USE: This function is no longer active.
+        Crop the image around the detected face to a square size.
+        """
         x, y, w, h = face_rect.left(), face_rect.top(), face_rect.width(), face_rect.height()
         center_x, center_y = x + w // 2, y + h // 2
 
         # Determine the size of the square crop
         crop_size = max(w, h)
-        margin = int(crop_size * 0.60)  # Add some margin around the face
+        margin = int(crop_size * 0.14)  # Add some margin around the face
         crop_size += 2 * margin
 
         # Calculate crop boundaries
@@ -106,33 +953,40 @@ class ImageParser:
         return cv2.resize(cropped_image, (target_width, target_height))
 
     def enhance_faces(self, image):
+        """
+        NOT IN USE: This function is no longer active.
+        Increase the contrast of the input image
+        """
         lab_image = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
         l_channel, a_channel, b_channel = cv2.split(lab_image)
         clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
         enhanced_l_channel = clahe.apply(l_channel)
         enhanced_lab_image = cv2.merge((enhanced_l_channel, a_channel, b_channel))
         enhanced_image = cv2.cvtColor(enhanced_lab_image, cv2.COLOR_LAB2BGR)
-        blended_image = cv2.addWeighted(image, 0.65, enhanced_image, 0.35, 0)
+        blended_image = cv2.addWeighted(image, 0.8, enhanced_image, 0.2, 0)
         return blended_image
 
+    @profile
     def draw_facial_landmarks(self, image, face_rect):
-        """Draw the 68 facial landmarks using dlib's shape predictor."""
+        """
+        NOT IN USE: This function is no longer active.
+        Draw the 68 facial landmarks using dlib's shape predictor.
+        """
         if image is None or image.size == 0:
             print("Error: Image is empty or not loaded properly.")
             return
 
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        landmarks = self.landmark_detector(gray, face_rect)
+        landmarks = self.landmark_detector(image, face_rect)
 
         # Define probabilities for each scenario
-        probability_eyebrows = 0.14 
-        probability_mouth = 0.12 
-        probability_jawline = 0.07
-        probability_eyes_1 = 0.21
-        probability_eyes_2 = 0.15
-        probability_nose_1 = 0.24
-        probability_nose_2 = 0.11
-        probability_teeth = 0.07
+        probability_eyebrows = 0.24 
+        probability_mouth = 0.22 
+        probability_jawline = 0.27
+        probability_eyes_1 = 0.31
+        probability_eyes_2 = 0.35
+        probability_nose_1 = 0.34
+        probability_nose_2 = 0.21
+        probability_teeth = 0.17
 
         # Randomly decide whether to draw each feature based on probabilities
         if random.random() < probability_jawline: #leftjaw
@@ -166,147 +1020,9 @@ class ImageParser:
         if random.random() < probability_teeth: #teeth
             self.draw_feature_line(image, landmarks, [61, 67, 62, 66, 63, 65])
 
-    def draw_feature_line(self, img, landmarks, points_indices, color=(255, 255, 255), thickness=1):
+    def draw_feature_line(self, img, landmarks, points_indices, color=(255, 255, 255), thickness=2):
         """Helper method to draw lines connecting facial landmarks."""
         points = [(landmarks.part(i).x, landmarks.part(i).y) for i in points_indices if 0 <= i < 68]
 
         for i in range(len(points) - 1):
             cv2.line(img, points[i], points[i + 1], color, thickness)
-
-    def convert_to_svg(self, image_filepath, target_width=800, target_height=800, scale_x=0.35, scale_y=0.35, min_paths=30, max_paths=90, min_contour_area=20, suffix=''):
-        print("Converting current photo to SVG")
-        if os.path.isfile(image_filepath):
-            image = cv2.imread(image_filepath)
-            if image is not None:
-                # Detect faces using dlib
-                gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-                faces = self.face_detector(gray_image)
-
-                if len(faces) > 0:
-                    # Use the largest detected face
-                    largest_face = max(faces, key=lambda rect: rect.width() * rect.height())
-                    image = self.crop_to_largest_face(image, largest_face, target_width, target_height)
-                else:
-                    opt_image = image
-                    print("No face found. Proceeding with the original image.")
-                
-                # Optimize the image
-                opt_image = self.process_face_image(image)
-                optimized_image_path = image_filepath.rsplit('.', 1)[0] + '_optimized.' + image_filepath.rsplit('.', 1)[1]
-                cv2.imwrite(optimized_image_path, opt_image)
-                
-                # Convert the optimized image to SVG
-                gray_image = cv2.cvtColor(opt_image, cv2.COLOR_BGR2GRAY)
-                edges = cv2.Canny(gray_image, threshold1=80, threshold2=200)
-                contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                filtered_contours = [contour for contour in contours if cv2.contourArea(contour) > min_contour_area]
-                simplified_contours = [cv2.approxPolyDP(contour, 1, True) for contour in filtered_contours]
-
-                # Optimization loop for paths
-                num_paths = 0
-                trials = 0
-                lower_threshold = 80
-                upper_threshold = 200
-                epsilon = 1
-
-                while num_paths < min_paths or num_paths > max_paths:
-                    dwg = svgwrite.Drawing(size=(target_width, target_height))
-                    num_paths = self.add_contours_to_svg(dwg, simplified_contours, scale_x, scale_y)
-
-                    if num_paths < min_paths or num_paths > max_paths:
-                        lower_threshold, upper_threshold, epsilon = self.adjust_thresholds(
-                            num_paths, min_paths, max_paths, lower_threshold, upper_threshold, epsilon, trials)
-                        edges = cv2.Canny(gray_image, lower_threshold, upper_threshold)
-                        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                        simplified_contours = [cv2.approxPolyDP(contour, epsilon, True) for contour in contours]
-
-                    trials += 1
-                    if trials > self.maxTrials:
-                        break
-
-                # Sort contours by distance from center and limit paths if necessary
-                image_center = np.array([target_width // 2, target_height // 2])
-                sorted_contours = sorted(simplified_contours, key=lambda c: np.linalg.norm(np.mean(np.squeeze(c), axis=0) - image_center))
-
-                simplified_contours = sorted_contours[:max_paths] if len(sorted_contours) > max_paths else sorted_contours
-                dwg = svgwrite.Drawing(size=(target_width, target_height))
-                self.add_contours_to_svg(dwg, simplified_contours, scale_x, scale_y)
-
-                # Save the SVG
-                parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                output_dir = os.path.join(parent_dir, "photos/traced")
-                os.makedirs(output_dir, exist_ok=True)
-                
-                svg_filename = os.path.splitext(os.path.basename(image_filepath))[0] + suffix + '.svg'
-                svg_filepath = os.path.join(output_dir, svg_filename)
-                dwg.saveas(svg_filepath)
-                
-                return svg_filepath
-
-        return None
-
-    def create_output_svg(self, image_svg_path, imgname = 'image', scale_factor = 0.8, offset_x=0, offset_y=0, id=0):
-        # Load the original SVG content from a file
-        with open(image_svg_path, 'rb') as file:  # Note 'rb' mode for reading as bytes
-            svg_data = file.read()
-
-        # Parse the original SVG
-        root = etree.fromstring(svg_data)
-
-        # Create a new SVG drawing with svgwrite, setting the artboard size to 420x297mm (check size)
-        dwg = svgwrite.Drawing(size=('1587', '1122'))
-
-        # Transform and position the image
-        group = dwg.g(id="all_paths", transform=f"translate({offset_x}, {offset_y}) scale({scale_factor})")
-        # dwg.add(dwg.rect(insert=(0, 0), size=('1587', '1122px'), fill='white'))
-
-        for element in root.iter("{http://www.w3.org/2000/svg}*"):
-            if element.tag.endswith('polyline'):
-                points = element.get('points')
-                if points:
-                    points_tuples = re.findall(r'(-?\d*\.?\d+)[,\s](-?\d*\.?\d+)', points)
-                    if points_tuples:
-                        group.add(dwg.polyline(points=points_tuples, 
-                                            stroke=element.get('stroke', 'black'),
-                                            fill=element.get('fill', 'none'),
-                                            stroke_width=element.get('stroke-width', '1')))
-
-        dwg.add(group)
-        
-         # Use an absolute path for the output directory
-        parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        output_dir = os.path.join(parent_dir, "photos/current")  # Join it with your relative path
-        os.makedirs(output_dir, exist_ok=True)  # Create the directory if it doesn't exist
-        
-        # svg_filename = os.path.splitext(os.path.basename(image_svg_path))[0] + str(id) + '.svg'
-        svg_filename = imgname + str(id) + '.svg'
-        output_svg_path = os.path.join(output_dir, svg_filename)  # This is your absolute path for the SVG file
-        dwg.saveas(output_svg_path)
-
-        return output_svg_path
-
-    @staticmethod
-    def add_contours_to_svg(dwg, contours, scale_x, scale_y):
-        # Implementation for adding contours to the SVG with styling
-        num_paths = 0
-        for contour in contours:
-            # Convert contour points to a format suitable for svgwrite and apply scaling
-            points = [(point[0][0] * scale_x, point[0][1] * scale_y) for point in contour]
-            dwg.add(dwg.polyline(points, fill="none", stroke="#aaa", stroke_width="1"))
-            num_paths += 1
-        return num_paths
-
-    @staticmethod
-    def adjust_thresholds(num_paths, min_paths, max_paths, lower_threshold, upper_threshold, epsilon, trial):
-        # Adjusts the thresholds based on the number of paths
-        
-        if num_paths < min_paths:
-            lower_threshold -= 5
-            upper_threshold -= 10 
-            epsilon *= 0.85 
-        elif num_paths > max_paths:
-            lower_threshold += 5 
-            upper_threshold += 15 
-            epsilon *= 1.15
-            
-        return lower_threshold, upper_threshold, epsilon
