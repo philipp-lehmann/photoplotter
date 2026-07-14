@@ -209,7 +209,7 @@ overrides = {
     'speed_limit':None,         # Speed limit, inches per second.
     'speed_up':None,            # Speed limit, pen-up, inches per second.
     'auto_home': None,          # Boolean; True if model supports automatic homing
-    'z_motor': None,            # Machine default is 0 for standard servo, 1 for brushless
+    'z_motor': 1,               # Machine default is 0 for standard servo, 1 for brushless
     'servo_pin': None,          # EBB I/O pin number (port B) for pen-lift servo
     'servo_max': None,          # Up, "100%" position. Units of 83.3 ns
     'servo_min': None,          # Down, "0%" position. Units of 83.3 ns
