@@ -91,7 +91,8 @@ class Plotter:
         self.nd1.interactive()
         self.nd1.plot_setup(svg_path)
 
-        # Update options 
+        # Update options
+        self.nd1.options.penlift = 3  # brushless servo
         self.nd1.options.reordering = 2
         self.nd1.options.speed_pendown = adjusted_speed
         self.nd1.options.speed_penup = adjusted_speed
