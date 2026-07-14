@@ -74,7 +74,8 @@ This project aims to combine the nostalgic charm of traditional photobooths with
 ```bash
 # Startup lcd display first
 cd photoplotter
-sudo python lcd/lcd.py
+source lcd-env/bin/activate
+python lcd/lcd.py
 ```
 
 ```bash
@@ -144,3 +145,80 @@ zip -r photos.zip photos
 <aside>
 ⚠️ After reinstallation make sure plotter sizes are correct in `nextdraw_conf.py`, there have been issues with the library to set the paper size correctly
 </aside>
+
+
+
+---
+
+
+
+# LCD Setup (Waveshare 1.44" LCD HAT)
+
+Setup notes for `lcd/lcd.py` on Raspberry Pi 5. This component runs in its own
+venv (`lcd-env`), separate from the main `photoplotter-env`, and communicates
+with the main script over MQTT.
+
+## 1. Enable SPI
+
+Required for the display hardware.
+
+```bash
+sudo raspi-config nonint do_spi 0
+sudo reboot
+```
+
+## 2. Create a dedicated venv
+
+Uses `--system-site-packages` so system-level GPIO libraries are visible.
+
+```bash
+cd ~/Documents/photoplotter
+python3 -m venv lcd-env --system-site-packages
+```
+
+## 3. Install system build dependencies
+
+```bash
+sudo apt install swig -y
+sudo apt install liblgpio-dev -y   # if not found, try: python3-lgpio
+```
+
+## 4. Install Python packages into the venv
+
+```bash
+lcd-env/bin/pip install paho-mqtt==1.5.1 Pillow psutil spidev gpiozero lgpio numpy
+```
+
+## 5. Install and start MQTT broker (Mosquitto)
+
+`lcd.py` connects to a local MQTT broker on startup — required even for local-only testing.
+
+```bash
+sudo apt install mosquitto mosquitto-clients -y
+sudo systemctl enable mosquitto --now
+```
+
+## 6. Run
+
+Needs `sudo` for GPIO/SPI access.
+
+```bash
+sudo lcd-env/bin/python lcd/lcd.py
+```
+
+## Notes / gotchas
+
+- **PEP 668 (`externally-managed-environment`)**: recent Pi OS blocks system-wide
+  `pip install`. Use the venv above, or `pip install --break-system-packages` as
+  a last resort.
+- **`gpiozero` backend**: Pi 5 uses a new GPIO chip, so the classic `RPi.GPIO`
+  pin factory doesn't work. Use `lgpio` instead.
+- **`lgpio` build failure (`cannot find -llgpio`)**: the pip package compiles a
+  C extension and needs `swig` + the system `liblgpio` library present before
+  it will build. Install `liblgpio-dev` first.
+- **`ConnectionRefusedError` on MQTT connect**: means no broker is running.
+  Install and start Mosquitto (step 5).
+- **Power supply**: heavy installs (e.g. `dlib`, `torch`) can brown out the
+  Pi 5 on an underspec'd USB-C supply. Check with `vcgencmd get_throttled` —
+  anything other than `0x0` means undervoltage has occurred since boot. Use
+  the official 27W USB-C PD supply.
