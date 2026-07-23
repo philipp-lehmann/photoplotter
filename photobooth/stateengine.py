@@ -77,7 +77,7 @@ class StateEngine:
             "Snapping": ["Tracking", "Processing"],
             "Processing": ["Drawing", "Waiting"],
             "Drawing": ["Redrawing", "Waiting", "ResetPending"],
-            "Redrawing": ["Drawing", "ResetPending"],
+            "Redrawing": ["Waiting", "ResetPending"],
             "ResetPending": ["Waiting", "Template"],
             "Template": ["ResetPending"],
             "Test": ["Waiting", "Drawing"]
@@ -297,7 +297,13 @@ class StateEngine:
             if message in redraw_keys:
                 print("Redraw triggered")
                 self.change_state("Redrawing")
-                time.sleep(1)    
+                time.sleep(1)
+
+        elif self.state == "Redrawing":
+            # Slot 1 reprint already in progress — ignore repeat KEY2 presses until
+            # it finishes and a fresh "Drawing" state re-arms the redraw trigger.
+            pass
+
         else:
             # print(f"Unexpected state: {self.state}") 
             pass

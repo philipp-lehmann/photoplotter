@@ -118,6 +118,11 @@ class PhotoBooth:
             self.state_engine.change_state("Waiting")
             return
 
+        # Keep the traced (pre-positioned) SVG + its native size so a redraw can
+        # later re-place the same tracing into Slot 1 without recalculating it.
+        self.state_engine.currentTracedSVGPath = tempSVG
+        self.state_engine.currentTraceWidth = params["target_width"]
+
         # Get slot geometry and the scale factor needed to fill it
         geom = self.state_engine.get_slot_geometry(next_slot_id)
         scale_factor = self.state_engine.compute_scale_factor(
@@ -155,11 +160,24 @@ class PhotoBooth:
             print(f"All photos printed, changing state to 'ResetPending'.")
 
     def process_redrawing(self):
-        # Go back to drawing or reset if no space left
-        time.sleep(3)
-        
+        # KEY2 always reprints the current tracing into Slot 1 (the featured slot),
+        # no recalculation and no photo slot consumed (Slot 1 isn't part of photoID).
+        target_id = 1
+        geom = self.state_engine.get_slot_geometry(target_id)
+        scale_factor = self.state_engine.compute_scale_factor(
+            geom.width, geom.height, source_size=self.state_engine.currentTraceWidth
+        )
+        self.state_engine.currentSVGPath = self.image_parser.create_output_svg(
+            self.state_engine.currentTracedSVGPath, "photo-output-", offset_x=geom.x, offset_y=geom.y, scale_factor=scale_factor, id=target_id, paper_width=self.state_engine.paperSizeX, paper_height=self.state_engine.paperSizeY
+        )
+
+        print(f"Redrawing: Reprinting {self.state_engine.currentSVGPath} into Slot {target_id}")
+        stress = self.state_engine.update_stresslevel_from_interval()
+        self.plotter.plot_image(self.state_engine.currentSVGPath, stresslevel=stress)
+        self.state_engine.last_draw_end_time = time.time()
+
         if self.state_engine.photoID:
-            self.state_engine.change_state("Drawing")
+            self.state_engine.change_state("Waiting")
         else:
             self.state_engine.change_state("ResetPending")
         
