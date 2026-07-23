@@ -14,7 +14,7 @@ class PhotoBooth:
         self.camera = Camera()
         self.plotter = Plotter()
         self.image_parser = ImageParser()
-        self.test_mode = "slots"  # "slots" (verify slot geometry, no plotter needed) | "photos" (original stress-level test loop)
+        self.test_mode = "photos"  # "slots" (verify slot geometry, no plotter needed) | "photos" (original stress-level test loop)
 
     # Handling states
     # ------------------------------------------------------------------------

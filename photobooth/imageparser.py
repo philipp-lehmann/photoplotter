@@ -2,16 +2,20 @@ import os
 import re
 import random
 import math
+import urllib.request
 
 import cv2
 import dlib
 import numpy as np
 import svgwrite
-import torch
-from torchvision import transforms
+import mediapipe as mp
+from mediapipe.tasks import python as mp_python
+from mediapipe.tasks.python import vision as mp_vision
 from scipy.spatial import cKDTree
 from lxml import etree
 from utils import profile, wait_for_cooldown, get_random_color, pc
+
+SELFIE_SEGMENTER_URL = "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite"
 
 class ImageParser:
     def __init__(self):
@@ -20,33 +24,23 @@ class ImageParser:
         # Initialize dlib face detector and shape predictor
         self.face_detector = dlib.get_frontal_face_detector()
         base_path = os.path.dirname(os.path.abspath(__file__))
-        
+
         # Loading 68 face landmarks model
         predictor_path = os.path.join(base_path, 'shape_predictor', 'shape_predictor_68_face_landmarks.dat')
         self.landmark_detector = dlib.shape_predictor(predictor_path)
 
-        # Initialize MiDaS model for depth estimation
-        model_type = "MiDaS_small"
-        model_path = os.path.join(base_path, 'midas', 'midas_small.pth')
-        torch.set_num_threads(2)
-
+        # Initialize MediaPipe selfie segmentation for person/background separation
+        model_path = os.path.join(base_path, 'models', 'selfie_segmenter.tflite')
         if not os.path.exists(model_path):
-            print("Model not found locally. Downloading...")
-            self.model = torch.hub.load("intel-isl/MiDaS", model_type, pretrained=False, trust_repo=True)
+            print("Segmentation model not found locally. Downloading...")
             os.makedirs(os.path.dirname(model_path), exist_ok=True)
-            torch.save(self.model.state_dict(), model_path)
-        else:
-            print("Loading model from local path...")
-            self.model = torch.hub.load("intel-isl/MiDaS", model_type, pretrained=False, trust_repo=True)
-            self.model.load_state_dict(torch.load(model_path))
+            urllib.request.urlretrieve(SELFIE_SEGMENTER_URL, model_path)
 
-        self.model.eval()
-
-        self.transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Resize((128, 128)),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-        ])
+        segmenter_options = mp_vision.ImageSegmenterOptions(
+            base_options=mp_python.BaseOptions(model_asset_path=model_path),
+            output_confidence_masks=True,
+        )
+        self.segmenter = mp_vision.ImageSegmenter.create_from_options(segmenter_options)
     
     def detect_faces(self, image_filepath):
         """Used when snapping an image. Quick method to check if a face is present in the image"""
@@ -72,25 +66,29 @@ class ImageParser:
             return None
         
         crop_image = self.handle_faces(image, target_width, target_height)
-        opt_image = self.process_face_image(crop_image)
-        depth_map = None
-        
+        opt_image, faces = self.process_face_image(crop_image)
+        person_mask = None
+
         if apply_depthmap:
-            opt_image, depth_map = self.generate_and_apply_depth_map(crop_image, opt_image)
-        
+            opt_image, person_mask = self.generate_and_apply_mask(crop_image, opt_image)
+
         # Save optimized images
-        self.save_optimized_image(image_filepath, opt_image, depth_map)
-        
+        self.save_optimized_image(image_filepath, opt_image, person_mask)
+
+        # Occasionally swap Canny for XDoG sketch edges to vary the line style
+        if method == 3 and random.random() < 0.3:
+            method = 4
+
         # Extract contours from the optimized image
-        image_contours = self.extract_contours(opt_image, method, min_contour_area)
-        image_contours = self.sort_and_limit_contours(image_contours, target_width, target_height, max_paths)
-        
-        # Extract contours from the depth map
-        depth_map_contours = self.extract_contours(depth_map, method, min_contour_area)
-        depth_map_contours = self.sort_and_limit_contours(depth_map_contours, target_width, target_height, max_paths)
-        
+        image_contours = self.extract_contours(opt_image, method, min_contour_area, mask=person_mask)
+        image_contours = self.sort_and_limit_contours(image_contours, target_width, target_height, max_paths, faces=faces)
+
+        # Extract silhouette + offset "aura" rings from the person mask
+        mask_contours = self.extract_mask_ring_contours(person_mask, min_contour_area)
+        mask_contours = self.sort_and_limit_contours(mask_contours, target_width, target_height, max_paths, faces=faces)
+
         # Merge contours
-        merged_contours = image_contours + depth_map_contours
+        merged_contours = image_contours + mask_contours
         
         # Create the SVG with a style
         svg_filepath = self.create_svg(image_filepath, merged_contours, target_width, target_height, scale_x, scale_y, suffix)
@@ -183,55 +181,60 @@ class ImageParser:
     
     @profile
     def process_face_image(self, image, target_width=800, target_height=800):
-        """Optimized method that detects, crops, enhances the face and draws facial features"""
+        """Optimized method that detects, crops, enhances the face and draws facial features.
+        Returns the cleaned grayscale image and the detected face rectangles."""
         if image is None:
             print("Failed to load image.")
-            return None
-        
-        faces = self.face_detector(image)
-        opt_image = cv2.medianBlur(image, 5)
+            return None, []
 
-        # Convert the image to grayscale to simplify the processing
-        gray_image = cv2.cvtColor(opt_image, cv2.COLOR_BGR2GRAY)
-        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
-        cleaned_image = cv2.morphologyEx(gray_image, cv2.MORPH_OPEN, kernel)
-        
+        gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+        # Detect at half resolution (HOG cost drops ~4x), scale rects back up
+        small_gray = cv2.resize(gray_image, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_AREA)
+        faces = [
+            dlib.rectangle(f.left() * 2, f.top() * 2, f.right() * 2, f.bottom() * 2)
+            for f in self.face_detector(small_gray)
+        ]
+
+        # Edge-preserving smoothing: removes skin/sensor noise, keeps feature edges sharp
+        cleaned_image = cv2.bilateralFilter(gray_image, 7, 50, 7)
+
         # Apply facial landmarks
         if faces:
             for face_rect in faces:
-                self.draw_facial_landmarks(cleaned_image, face_rect) # Use your existing function
-        
-        return cleaned_image
+                self.draw_facial_landmarks(cleaned_image, face_rect)
+
+        return cleaned_image, faces
 
 
-    # ----- Depth Map -----
+    # ----- Person Mask (segmentation) -----
     @profile
-    def generate_and_apply_depth_map(self, image, opt_image):
-        """Generate a depth map and apply it to the optimized image."""
-        depth_map = self.generate_depth_map(image)
-        depth_map = cv2.resize(depth_map, (opt_image.shape[1], opt_image.shape[0]))
-        
-        if depth_map is not None:
+    def generate_and_apply_mask(self, image, opt_image):
+        """Generate a person mask and use it to enhance the foreground of the optimized image."""
+        person_mask = self.generate_person_mask(image)
+
+        if person_mask is not None:
+            person_mask = cv2.resize(person_mask, (opt_image.shape[1], opt_image.shape[0]))
             # Running opt_image 2x for better results
-            opt_image = self.enhance_foreground(opt_image, depth_map)
-            opt_image = self.enhance_foreground(opt_image, depth_map)
-            return opt_image, depth_map
+            opt_image = self.enhance_foreground(opt_image, person_mask)
+            opt_image = self.enhance_foreground(opt_image, person_mask)
+            return opt_image, person_mask
         else:
-            print("Depth map generation failed, proceeding without enhancement.")
-            return opt_image, None  
-        
-    def generate_depth_map(self, image):
+            print("Person mask generation failed, proceeding without enhancement.")
+            return opt_image, None
+
+    def generate_person_mask(self, image):
+        """Run MediaPipe selfie segmentation; returns a uint8 mask (255 = person)."""
         wait_for_cooldown()
         image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        input_tensor = self.transform(image_rgb).unsqueeze(0)
+        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=image_rgb)
+        result = self.segmenter.segment(mp_image)
 
-        wait_for_cooldown()
-        with torch.no_grad():
-            depth_map = self.model(input_tensor)
+        if not result.confidence_masks:
+            return None
 
-        depth_map = depth_map.squeeze().cpu().numpy()
-        depth_map_normalized = cv2.normalize(depth_map, None, 0, 255, cv2.NORM_MINMAX)
-        return np.uint8(depth_map_normalized)
+        confidence = np.squeeze(result.confidence_masks[0].numpy_view())
+        return np.uint8(np.clip(confidence * 255, 0, 255))
     
     def enhance_foreground(self, image, depth_map, contrast_factor=2.0, background_factor=0.5, threshold=0.5):
         """
@@ -288,28 +291,106 @@ class ImageParser:
         
         return optimized_image_path, None
 
-    # ----- Contours -----  
-    def extract_contours(self, opt_image, method, min_contour_area):
-        """Extract contours based on the selected method."""
+    # ----- Contours -----
+    def extract_contours(self, opt_image, method, min_contour_area, mask=None):
+        """Extract contours based on the selected method.
+        1 = auto-Canny edges, 2 = posterized shading iso-lines,
+        3 = Canny + posterized (default), 4 = XDoG sketch + posterized."""
+        if opt_image is None:
+            return []
         contours = []
-        if method == 1:  # Edge-based
-            edges = cv2.Canny(opt_image, threshold1=80, threshold2=200)
-            contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        elif method == 2:  # Binary-based
-            _, binary = cv2.threshold(opt_image, 127, 255, cv2.THRESH_BINARY)
-            contours, _ = cv2.findContours(binary, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-        elif method == 3:  # Merge both
-            edges = cv2.Canny(opt_image, threshold1=80, threshold2=200)
-            edge_contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            _, binary = cv2.threshold(opt_image, 127, 255, cv2.THRESH_BINARY)
-            binary_contours, _ = cv2.findContours(binary, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-            contours = edge_contours + binary_contours
-        return [c for c in contours if cv2.contourArea(c) > min_contour_area]
+        if method == 1:
+            contours = self.auto_canny_contours(opt_image)
+        elif method == 2:
+            contours = self.posterized_contours(opt_image, mask)
+        elif method == 3:
+            contours = self.auto_canny_contours(opt_image) + self.posterized_contours(opt_image, mask)
+        elif method == 4:
+            contours = self.xdog_contours(opt_image) + self.posterized_contours(opt_image, mask)
 
-    def sort_and_limit_contours(self, contours, target_width, target_height, max_paths):
-        """Sort and limit the number of contours to a specified maximum."""
-        image_center = np.array([target_width // 2, target_height // 2])
-        sorted_contours = sorted(contours, key=lambda c: np.linalg.norm(np.mean(np.squeeze(c), axis=0) - image_center))
+        filtered = [c for c in contours if cv2.contourArea(c) > min_contour_area]
+        # Remove pixel-staircase jitter so plotted lines are smooth
+        return [cv2.approxPolyDP(c, 1.5, True) for c in filtered]
+
+    def auto_canny_contours(self, image):
+        """Canny edges with thresholds derived from the image median (robust to lighting)."""
+        med = np.median(image)
+        lower = int(max(0, 0.66 * med))
+        upper = int(min(255, 1.33 * med))
+        edges = cv2.Canny(image, lower, upper)
+        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        return list(contours)
+
+    def posterized_contours(self, image, mask=None):
+        """Topographic iso-lines: threshold the shading at 3-5 random levels and trace each.
+        Restricted to the person mask so the background doesn't eat the path budget."""
+        num_levels = random.randint(3, 5)
+        mask_binary = None
+        if mask is not None:
+            _, mask_binary = cv2.threshold(mask, 127, 255, cv2.THRESH_BINARY)
+
+        contours = []
+        step = 256 // num_levels
+        for level in range(step, 256, step):
+            _, binary = cv2.threshold(image, level, 255, cv2.THRESH_BINARY)
+            if mask_binary is not None:
+                binary = cv2.bitwise_and(binary, mask_binary)
+            level_contours, _ = cv2.findContours(binary, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+            contours += level_contours
+        return contours
+
+    def xdog_contours(self, image, sigma=1.0, k=1.6, gamma=0.97, epsilon=-0.05, phi=15):
+        """Extended Difference-of-Gaussians: hand-drawn-looking sketch strokes."""
+        img = image.astype(np.float32) / 255.0
+        g1 = cv2.GaussianBlur(img, (0, 0), sigma)
+        g2 = cv2.GaussianBlur(img, (0, 0), sigma * k)
+        dog = g1 - gamma * g2
+        sketch = np.where(dog >= epsilon, 1.0, 1.0 + np.tanh(phi * (dog - epsilon)))
+        sketch_u8 = np.uint8(np.clip(sketch * 255, 0, 255))
+        _, strokes = cv2.threshold(sketch_u8, 200, 255, cv2.THRESH_BINARY_INV)
+        contours, _ = cv2.findContours(strokes, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+        return list(contours)
+
+    def extract_mask_ring_contours(self, mask, min_contour_area):
+        """Silhouette contour of the person plus 1-3 offset 'aura' rings
+        (replaces the old blobby depth-map contours)."""
+        if mask is None:
+            return []
+        _, silhouette = cv2.threshold(mask, 127, 255, cv2.THRESH_BINARY)
+        contours, _ = cv2.findContours(silhouette, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        contours = list(contours)
+
+        for _ in range(random.randint(1, 3)):
+            offset = random.randint(8, 30)
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * offset + 1, 2 * offset + 1))
+            morph = cv2.dilate if random.random() < 0.5 else cv2.erode
+            ring = morph(silhouette, kernel)
+            ring_contours, _ = cv2.findContours(ring, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            contours += ring_contours
+
+        filtered = [c for c in contours if cv2.contourArea(c) > min_contour_area]
+        return [cv2.approxPolyDP(c, 1.5, True) for c in filtered]
+
+    def sort_and_limit_contours(self, contours, target_width, target_height, max_paths, faces=None):
+        """Sort and limit the number of contours to a specified maximum.
+        Contours on/near a face come first; background fills the remaining budget."""
+        if faces:
+            face_centers = [np.array([(f.left() + f.right()) / 2, (f.top() + f.bottom()) / 2]) for f in faces]
+
+            def priority(c):
+                x, y, w, h = cv2.boundingRect(c)
+                on_face = any(
+                    x < f.right() and x + w > f.left() and y < f.bottom() and y + h > f.top()
+                    for f in faces
+                )
+                centroid = np.array([x + w / 2, y + h / 2])
+                dist = min(np.linalg.norm(centroid - fc) for fc in face_centers)
+                return (0 if on_face else 1, dist)
+
+            sorted_contours = sorted(contours, key=priority)
+        else:
+            image_center = np.array([target_width // 2, target_height // 2])
+            sorted_contours = sorted(contours, key=lambda c: np.linalg.norm(np.mean(np.squeeze(c, axis=1), axis=0) - image_center))
         return sorted_contours[:max_paths]
 
     # ----- SVG Handling -----  
@@ -362,45 +443,19 @@ class ImageParser:
 
         return processed_svg_filepath
     
-    # RDP Algorithm to simplify points
+    # Ramer-Douglas-Peucker simplification via OpenCV (C-speed)
     def rdp(self, points, epsilon):
         """
-        Ramer-Douglas-Peucker algorithm to simplify the polyline.
+        Simplify a polyline with the Ramer-Douglas-Peucker algorithm.
         :param points: List of (x, y) tuples representing the polyline.
         :param epsilon: Tolerance for simplification.
         :return: List of (x, y) tuples representing the simplified polyline.
         """
-        def perpendicular_distance(p, p1, p2):
-            """
-            Calculate the perpendicular distance from point p to the line defined by p1 and p2.
-            """
-            x1, y1 = p1
-            x2, y2 = p2
-            x0, y0 = p
-            numerator = abs((y2 - y1) * x0 - (x2 - x1) * y0 + x2 * y1 - y2 * x1)
-            denominator = math.sqrt((y2 - y1) ** 2 + (x2 - x1) ** 2)
-            return numerator / denominator
-
-        def rdp_recursive(points, epsilon):
-            if len(points) < 3:
-                return points
-            # Find the point with the maximum perpendicular distance
-            max_dist = 0
-            index = 0
-            for i in range(1, len(points) - 1):
-                dist = perpendicular_distance(points[i], points[0], points[-1])
-                if dist > max_dist:
-                    max_dist = dist
-                    index = i
-            # If the maximum distance is greater than epsilon, recursively simplify
-            if max_dist > epsilon:
-                left = rdp_recursive(points[:index + 1], epsilon)
-                right = rdp_recursive(points[index:], epsilon)
-                return left[:-1] + right
-            else:
-                return [points[0], points[-1]]  # Only keep the start and end points
-
-        return rdp_recursive(points, epsilon)
+        if len(points) < 3:
+            return points
+        points_np = np.array(points, dtype=np.float32).reshape(-1, 1, 2)
+        approx = cv2.approxPolyDP(points_np, epsilon, False)
+        return [(float(p[0][0]), float(p[0][1])) for p in approx]
 
     # Helper function to convert points string to list of tuples
     def parse_points(self, points_str):
@@ -578,36 +633,7 @@ class ImageParser:
                     add_point(nx, ny)
         return points
     
-    def generate_depth_based_points(self, depth_map, target_points=2000, min_points_per_region=1, max_points_per_region=10):
-        """Generate points with density based on the depth map."""
-        height, width = depth_map.shape
-        points = []
-        radius_map = cv2.normalize(1 / (depth_map + 1e-5), None, 5, 50, cv2.NORM_MINMAX)  # Inverse depth for density
-
-        # Generate points with depth-based density
-        for y in range(height):
-            for x in range(width):
-                radius = int(radius_map[y, x])
-                num_points = int(np.interp(radius, [5, 50], [max_points_per_region, min_points_per_region]))
-                
-                for _ in range(num_points):
-                    offset_x = random.uniform(-radius, radius)
-                    offset_y = random.uniform(-radius, radius)
-                    if offset_x**2 + offset_y**2 <= radius**2:  # Stay within the circular region
-                        new_x = x + offset_x
-                        new_y = y + offset_y
-                        if 0 <= new_x < width and 0 <= new_y < height:
-                            points.append((new_x, new_y))
-
-        # Normalize total number of points to the target
-        if len(points) > target_points:
-            points = random.sample(points, target_points)
-
-        print(f"Generated {len(points)} points based on depth map (target was {target_points}).")
-        return points
-    
-    
-    # ----- SVG Align and Cleanup -----  
+    # ----- SVG Align and Cleanup -----
     @profile
     def align_svg_to_points(self, input_file, output_file, grid_points):
         """Process SVG by aligning points to a dynamic grid using lxml.etree."""
@@ -664,15 +690,6 @@ class ImageParser:
             # ... (same)
             return math.hypot(p1[0] - p2[0], p1[1] - p2[1])
 
-        def _is_near_duplicate(segment, seen_segments, threshold):
-            # ... (same)
-            p1, p2 = segment
-            for s1, s2 in seen_segments:
-                if (_distance(p1, s1) <= threshold and _distance(p2, s2) <= threshold) or \
-                (_distance(p1, s2) <= threshold and _distance(p2, s1) <= threshold):
-                    return True
-            return False
-
         try:
             with open(svg_filepath, 'rb') as f:
                 tree = etree.parse(f)
@@ -709,15 +726,33 @@ class ImageParser:
                     'is_duplicate': False
                 })
 
-        seen_segments = []
-        
-        # Phase 2: Identify duplicate segments
-        for segment_info in all_segments:
-            segment = segment_info['segment']
-            if _is_near_duplicate(segment, seen_segments, threshold):
-                segment_info['is_duplicate'] = True
-            else:
-                seen_segments.append(segment)
+        # Phase 2: Identify duplicate segments (KD-tree over endpoint pairs instead of O(n²) scan)
+        if all_segments:
+            coords = np.array(
+                [[s['segment'][0][0], s['segment'][0][1], s['segment'][1][0], s['segment'][1][1]] for s in all_segments]
+            )
+            kdtree = cKDTree(coords)
+            kept = np.zeros(len(all_segments), dtype=bool)
+            search_radius = threshold * math.sqrt(2)
+
+            for i, segment_info in enumerate(all_segments):
+                p1, p2 = segment_info['segment']
+                is_dup = False
+                for j in kdtree.query_ball_point(coords[i], search_radius):
+                    if j >= i or not kept[j]:
+                        continue
+                    s1, s2 = all_segments[j]['segment']
+                    if (_distance(p1, s1) <= threshold and _distance(p2, s2) <= threshold) or \
+                       (_distance(p1, s2) <= threshold and _distance(p2, s1) <= threshold):
+                        is_dup = True
+                        break
+                if is_dup:
+                    segment_info['is_duplicate'] = True
+                else:
+                    kept[i] = True
+
+        # Fast lookup for Phase 3: (polyline, segment index) -> segment info
+        segment_lookup = {(id(s['parent_polyline']), s['index']): s for s in all_segments}
 
         # Phase 3: Split and modify polylines
         for polyline in polylines:
@@ -727,19 +762,15 @@ class ImageParser:
                 
             original_points = _parse_points(points_str)
             parent = polyline.getparent()
-            
-            if not parent:
+
+            if parent is None:
                 continue
             
             segments_to_remove_indices = []
             for i in range(len(original_points) - 1):
-                p1, p2 = original_points[i], original_points[i+1]
-                # Check the all_segments list for this specific segment
-                for segment_info in all_segments:
-                    if segment_info['parent_polyline'] == polyline and segment_info['index'] == i:
-                        if segment_info['is_duplicate']:
-                            segments_to_remove_indices.append(i)
-                        break
+                segment_info = segment_lookup.get((id(polyline), i))
+                if segment_info is not None and segment_info['is_duplicate']:
+                    segments_to_remove_indices.append(i)
             
             # If no duplicates found in this polyline, continue to the next one
             if not segments_to_remove_indices:
