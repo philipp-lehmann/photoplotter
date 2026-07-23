@@ -196,8 +196,11 @@ class ImageParser:
             for f in self.face_detector(small_gray)
         ]
 
-        # Edge-preserving smoothing: removes skin/sensor noise, keeps feature edges sharp
-        cleaned_image = cv2.bilateralFilter(gray_image, 7, 50, 7)
+        # Cartoon-style flattening: iterated edge-preserving smoothing flattens skin
+        # and other low-contrast areas while keeping feature edges (eyes, mouth) sharp
+        cleaned_image = gray_image
+        for _ in range(2):
+            cleaned_image = cv2.bilateralFilter(cleaned_image, 9, 40, 9)
 
         # Apply facial landmarks
         if faces:
@@ -215,8 +218,6 @@ class ImageParser:
 
         if person_mask is not None:
             person_mask = cv2.resize(person_mask, (opt_image.shape[1], opt_image.shape[0]))
-            # Running opt_image 2x for better results
-            opt_image = self.enhance_foreground(opt_image, person_mask)
             opt_image = self.enhance_foreground(opt_image, person_mask)
             return opt_image, person_mask
         else:
@@ -236,44 +237,30 @@ class ImageParser:
         confidence = np.squeeze(result.confidence_masks[0].numpy_view())
         return np.uint8(np.clip(confidence * 255, 0, 255))
     
-    def enhance_foreground(self, image, depth_map, contrast_factor=2.0, background_factor=0.5, threshold=0.5):
+    def enhance_foreground(self, image, mask, contrast_factor=1.5, background_factor=0.5, feather=31):
         """
-        Enhance the foreground of the image based on a depth map.
-        The foreground contrast is enhanced, and the background is darkened.
+        Enhance the foreground contrast and darken the background, blended with a
+        feathered mask. The soft transition avoids an artificial hard edge at the
+        person's outline that edge detection would otherwise trace as extra paths.
 
         Parameters:
             image (ndarray): The original grayscale image.
-            depth_map (ndarray): The depth map of the image.
-            contrast_factor (float): Factor to enhance contrast in the foreground.
+            mask (ndarray): uint8 person mask (255 = person).
+            contrast_factor (float): CLAHE clip limit for the foreground.
             background_factor (float): Factor to darken the background.
+            feather (int): Gaussian kernel size for softening the mask edge (odd).
 
         Returns:
             result (ndarray): The processed image with enhanced foreground and darkened background.
         """
-        # Convert the depth map to a float and normalize to [0, 1]
-        depth_map_normalized = cv2.normalize(depth_map, None, 0, 1, cv2.NORM_MINMAX)
+        alpha = cv2.GaussianBlur(mask, (feather, feather), 0).astype(np.float32) / 255.0
 
-        # Create a mask for the foreground (near objects, typically with lower depth values)
-        foreground_mask = (depth_map_normalized >= threshold).astype(np.uint8) 
-        background_mask = (depth_map_normalized < threshold).astype(np.uint8) 
-
-        # Enhance foreground contrast using CLAHE (Contrast Limited Adaptive Histogram Equalization)
         clahe = cv2.createCLAHE(clipLimit=contrast_factor, tileGridSize=(8, 8))
-        enhanced_image = clahe.apply(image)
+        enhanced = clahe.apply(image).astype(np.float32)
+        background = image.astype(np.float32) * background_factor
 
-        # Darken the background: Reduce the brightness of background pixels
-        image_background_darker = image * background_factor
-        image_background_darker = np.clip(image_background_darker, 0, 255).astype(np.uint8)
-
-        # Combine the results: Blend the enhanced foreground and darkened background
-        result = np.zeros_like(image, dtype=np.uint8)
-
-        # Apply enhanced foreground to the result where the foreground mask is 1
-        result[foreground_mask == 1] = enhanced_image[foreground_mask == 1]
-
-        # Apply darkened background to the result where the background mask is 1
-        result[background_mask == 1] = image_background_darker[background_mask == 1]
-        return result
+        result = enhanced * alpha + background * (1.0 - alpha)
+        return np.uint8(np.clip(result, 0, 255))
 
 
     # ----- Save image -----     
@@ -315,31 +302,54 @@ class ImageParser:
     def auto_canny_contours(self, image):
         """Canny edges with thresholds derived from the image median (robust to lighting)."""
         med = np.median(image)
-        lower = int(max(0, 0.66 * med))
-        upper = int(min(255, 1.33 * med))
+        lower = int(max(0, 0.55 * med))
+        upper = int(min(255, 1.25 * med))
         edges = cv2.Canny(image, lower, upper)
         contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         return list(contours)
 
     def posterized_contours(self, image, mask=None):
         """Topographic iso-lines: threshold the shading at 3-5 random levels and trace each.
-        Restricted to the person mask so the background doesn't eat the path budget."""
-        num_levels = random.randint(3, 5)
-        mask_binary = None
+        Restricted to the person's interior so the silhouette isn't re-traced per level."""
+        num_levels = random.randint(4, 6)
+        smooth = cv2.GaussianBlur(image, (3, 3), 0)
+
+        interior = None
         if mask is not None:
             _, mask_binary = cv2.threshold(mask, 127, 255, cv2.THRESH_BINARY)
+            erode_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (15, 15))
+            interior = cv2.erode(mask_binary, erode_kernel)
 
         contours = []
         step = 256 // num_levels
         for level in range(step, 256, step):
-            _, binary = cv2.threshold(image, level, 255, cv2.THRESH_BINARY)
-            if mask_binary is not None:
-                binary = cv2.bitwise_and(binary, mask_binary)
+            _, binary = cv2.threshold(smooth, level, 255, cv2.THRESH_BINARY)
+            if interior is not None:
+                binary = cv2.bitwise_and(binary, interior)
             level_contours, _ = cv2.findContours(binary, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
             contours += level_contours
+
+        if interior is not None:
+            contours = self.drop_boundary_hugging_contours(contours, interior)
         return contours
 
-    def xdog_contours(self, image, sigma=1.0, k=1.6, gamma=0.97, epsilon=-0.05, phi=15):
+    def drop_boundary_hugging_contours(self, contours, region_mask, band_width=7, max_fraction=0.5):
+        """Discard contours that mostly trace the edge of the region mask instead of
+        actual image features (masking per threshold level cuts every level's shape
+        off at the mask edge, which would otherwise produce stacked outline paths)."""
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (band_width, band_width))
+        band = cv2.morphologyEx(region_mask, cv2.MORPH_GRADIENT, kernel)
+        h, w = band.shape
+        kept = []
+        for c in contours:
+            pts = c.reshape(-1, 2)
+            xs = np.clip(pts[:, 0], 0, w - 1)
+            ys = np.clip(pts[:, 1], 0, h - 1)
+            if (band[ys, xs] > 0).mean() < max_fraction:
+                kept.append(c)
+        return kept
+
+    def xdog_contours(self, image, sigma=1.0, k=1.6, gamma=0.97, epsilon=-0.02, phi=15):
         """Extended Difference-of-Gaussians: hand-drawn-looking sketch strokes."""
         img = image.astype(np.float32) / 255.0
         g1 = cv2.GaussianBlur(img, (0, 0), sigma)
@@ -352,21 +362,11 @@ class ImageParser:
         return list(contours)
 
     def extract_mask_ring_contours(self, mask, min_contour_area):
-        """Silhouette contour of the person plus 1-3 offset 'aura' rings
-        (replaces the old blobby depth-map contours)."""
+        """Single clean silhouette contour of the person from the segmentation mask."""
         if mask is None:
             return []
         _, silhouette = cv2.threshold(mask, 127, 255, cv2.THRESH_BINARY)
         contours, _ = cv2.findContours(silhouette, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        contours = list(contours)
-
-        for _ in range(random.randint(1, 3)):
-            offset = random.randint(8, 30)
-            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * offset + 1, 2 * offset + 1))
-            morph = cv2.dilate if random.random() < 0.5 else cv2.erode
-            ring = morph(silhouette, kernel)
-            ring_contours, _ = cv2.findContours(ring, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            contours += ring_contours
 
         filtered = [c for c in contours if cv2.contourArea(c) > min_contour_area]
         return [cv2.approxPolyDP(c, 1.5, True) for c in filtered]
