@@ -180,9 +180,13 @@ class StateEngine:
 
         return SlotGeometry(id=slot.id, kind=slot.kind, x=x, y=y, width=width, height=height)
 
-    def compute_scale_factor(self, cell_width, cell_height, source_size):
-        """Derives create_output_svg's scale_factor from actual cell size instead of a fixed constant."""
-        return (min(cell_width, cell_height) / source_size) * self.CELL_FILL_RATIO
+    def compute_scale_factor(self, cell_width, cell_height, source_size, fill_ratio=None):
+        """Derives create_output_svg's scale_factor from actual cell size instead of a fixed constant.
+        fill_ratio defaults to CELL_FILL_RATIO (leaves a margin for real artwork); pass 1.0 for
+        alignment/debug guides that should trace the true cell boundary exactly."""
+        if fill_ratio is None:
+            fill_ratio = self.CELL_FILL_RATIO
+        return (min(cell_width, cell_height) / source_size) * fill_ratio
     
     # Stresslevel
     # ------------------------------------------------------------------------    

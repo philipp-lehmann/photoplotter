@@ -218,8 +218,10 @@ class PhotoBooth:
 
             for slot_id in self.state_engine.slot_ids:
                 geom = self.state_engine.get_slot_geometry(slot_id)
+                # fill_ratio=1.0: these are alignment/crop-mark guides, not photo content — they
+                # should trace the true cell boundary exactly rather than leave the usual ink margin.
                 scale_factor = self.state_engine.compute_scale_factor(
-                    geom.width, geom.height, source_size=self.state_engine.DEFAULT_TARGET_SIZE
+                    geom.width, geom.height, source_size=self.state_engine.DEFAULT_TARGET_SIZE, fill_ratio=1.0
                 )
                 self.state_engine.currentSVGPath = self.image_parser.create_output_svg(
                     self.currentDebugPath, "work-output-", offset_x=geom.x, offset_y=geom.y, scale_factor=scale_factor, id=slot_id, paper_width=self.state_engine.paperSizeX, paper_height=self.state_engine.paperSizeY
