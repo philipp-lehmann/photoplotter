@@ -1,9 +1,51 @@
 import paho.mqtt.client as mqtt
 import time
 import random
+from dataclasses import dataclass
+from collections import namedtuple
 from utils import is_running_on_raspberry_pi
 
+@dataclass(frozen=True)
+class Slot:
+    id: int
+    col: int
+    row: int
+    colspan: int = 1
+    rowspan: int = 1
+    kind: str = "standard"   # "standard" | "featured" — seam for future repeat-fill dispatch
+
+SlotGeometry = namedtuple("SlotGeometry", ["id", "kind", "x", "y", "width", "height"])
+
 class StateEngine:
+    # Hardcoded physical grid layout: one 2x2 "featured" slot (top-left) + 11 standard slots.
+    #  -,  -,  3,  4,  5
+    #  -,  -,  8,  9, 10
+    # 11, 12, 13, 14, 15
+    SLOT_LAYOUT = [
+        Slot(id=1,  col=0, row=0, colspan=2, rowspan=2, kind="featured"),
+        Slot(id=3,  col=2, row=0),
+        Slot(id=4,  col=3, row=0),
+        Slot(id=5,  col=4, row=0),
+        Slot(id=8,  col=2, row=1),
+        Slot(id=9,  col=3, row=1),
+        Slot(id=10, col=4, row=1),
+        Slot(id=11, col=0, row=2),
+        Slot(id=12, col=1, row=2),
+        Slot(id=13, col=2, row=2),
+        Slot(id=14, col=3, row=2),
+        Slot(id=15, col=4, row=2),
+    ]
+
+    # Slot 1 (featured) is intentionally excluded — not part of the normal visitor-photo rotation.
+    SHUFFLE_BLOCKS = [
+        [3, 4, 5],
+        [8, 9, 10],
+        [11, 12, 13, 14, 15],
+    ]
+
+    CELL_FILL_RATIO = 0.93   # tuned so standard slots render at the same visual size as before
+    DEFAULT_TARGET_SIZE = 800
+
     def __init__(self):
         # State
         self.state = "Startup"
@@ -12,11 +54,12 @@ class StateEngine:
         self.currentSVGPath = ""
         self.imagesPerRow = 5
         self.imagesPerColumn = 3
-        self.totalImages = self.imagesPerColumn * self.imagesPerRow
+        self.slots = {s.id: s for s in self.SLOT_LAYOUT}
+        self.slot_ids = [s.id for s in self.SLOT_LAYOUT]  # all 12 physical slots, incl. featured
         self.paperSizeX = 1587 #1191 multiplied by higher 96 dpi of Nextdraw
         self.paperSizeY = 1122 #841 multiplied by higher 96 dpi of Nextdraw
         self.workID = 0
-        self.photoID = list(range(1, self.totalImages + 1))  # List of positions from 1 to totalImages
+        self.photoID = []  # populated by reset_photo_id() below (excludes the featured slot)
         self.reset_timeout_s = 15
         self.last_update_time = 0
         self.stresslevel = 0.0
@@ -92,16 +135,11 @@ class StateEngine:
             print("No photo IDs available.")
 
     def reset_photo_id(self):
-        triplets = [
-            [1],
-            [2, 3, 4, 5],
-            [6, 7, 8, 9, 10],
-            [11, 12, 13, 14, 15]
-        ]
-        for triplet in triplets:
-            random.shuffle(triplet)
-        self.photoID = [item for triplet in triplets for item in triplet]
-        print(f"Photo IDs reset and shuffled within triplets: {self.photoID}")
+        blocks = [list(block) for block in self.SHUFFLE_BLOCKS]
+        for block in blocks:
+            random.shuffle(block)
+        self.photoID = [item for block in blocks for item in block]
+        print(f"Photo IDs reset and shuffled within blocks: {self.photoID}")
     
     def update_work_id(self):
         self.workID += 1
@@ -111,34 +149,40 @@ class StateEngine:
         print(f"Reset Work ID: {self.workID} -> 0")
         self.workID = 0
       
-    def get_image_params_by_id(self, id=0):
-        # Define border and gutter
-        borderSize = 50
-        gutterSize = 50
+    def _base_cell_dims(self):
+        """Force square cells: derive one shared cellSize from whichever axis is tighter,
+        then center the resulting (smaller-than-paper on the slack axis) grid within the paper."""
+        borderSize, gutterSize = 50, 50
+        maxX = self.paperSizeX - (borderSize * 2)
+        maxY = self.paperSizeY - (borderSize * 2)
 
-        # Adjusted maximum dimensions to account for border
-        maxX = self.paperSizeX - (borderSize * 2)  # Maximum X dimension in mm for A3 paper
-        maxY = self.paperSizeY - (borderSize * 2)  # Maximum Y dimension in mm for A3 paper
+        candidateWidth  = (maxX - gutterSize * (self.imagesPerRow - 1)) / self.imagesPerRow
+        candidateHeight = (maxY - gutterSize * (self.imagesPerColumn - 1)) / self.imagesPerColumn
+        cellSize = min(candidateWidth, candidateHeight)
 
-        # Total rows needed, given the total images and images per row
-        totalRows = (self.totalImages + self.imagesPerRow - 1) // self.imagesPerRow
-        
-        # Adjust drawableWidth and drawableHeight to account for gutters
-        drawableWidth = maxX - (gutterSize * (self.imagesPerRow - 1))
-        drawableHeight = maxY - (gutterSize * (totalRows - 1))
+        gridWidth  = cellSize * self.imagesPerRow    + gutterSize * (self.imagesPerRow - 1)
+        gridHeight = cellSize * self.imagesPerColumn + gutterSize * (self.imagesPerColumn - 1)
 
-        # Calculate offset for each image, including gutters
-        offsetX = drawableWidth / self.imagesPerRow
-        offsetY = drawableHeight / totalRows  # Now based on actual totalRows
+        borderX = (self.paperSizeX - gridWidth) / 2
+        borderY = (self.paperSizeY - gridHeight) / 2
 
-        # Calculate starting position for the drawing, including border
-        col = id % self.imagesPerRow
-        row = id // self.imagesPerRow  # Fixed to divide by imagesPerRow for consistency
-        
-        startPositionX = (col * offsetX) + (col * gutterSize) + borderSize
-        startPositionY = (row * offsetY) + (row * gutterSize) + borderSize
-        
-        return (startPositionX, startPositionY)
+        return cellSize, cellSize, borderX, borderY, gutterSize
+
+    def get_slot_geometry(self, slot_id):
+        """Returns the SlotGeometry (origin + size) for a given slot id, accounting for spans."""
+        slot = self.slots[slot_id]
+        cellWidth, cellHeight, borderX, borderY, gutterSize = self._base_cell_dims()
+
+        x = borderX + slot.col * (cellWidth + gutterSize)
+        y = borderY + slot.row * (cellHeight + gutterSize)
+        width  = cellWidth  * slot.colspan + gutterSize * (slot.colspan - 1)
+        height = cellHeight * slot.rowspan + gutterSize * (slot.rowspan - 1)
+
+        return SlotGeometry(id=slot.id, kind=slot.kind, x=x, y=y, width=width, height=height)
+
+    def compute_scale_factor(self, cell_width, cell_height, source_size):
+        """Derives create_output_svg's scale_factor from actual cell size instead of a fixed constant."""
+        return (min(cell_width, cell_height) / source_size) * self.CELL_FILL_RATIO
     
     # Stresslevel
     # ------------------------------------------------------------------------    
@@ -185,6 +229,25 @@ class StateEngine:
         max_paths = int(140 - (140 - 80) * s)
         min_contour_area = int(10 + (20 - 10) * s)
         return {"min_paths": min_paths, "max_paths": max_paths, "min_contour_area": min_contour_area}
+
+    def get_render_params(self, slot_id):
+        """Composes stress-scaled trace params with slot-size scaling, so a bigger (spanning)
+        slot gets proportionately more tracing resolution/density instead of a stretched, sparse trace."""
+        slot = self.slots[slot_id]
+        cellWidth, cellHeight, _, _, gutterSize = self._base_cell_dims()
+        slot_width  = cellWidth  * slot.colspan + gutterSize * (slot.colspan - 1)
+        slot_height = cellHeight * slot.rowspan + gutterSize * (slot.rowspan - 1)
+        area_ratio = (slot_width * slot_height) / (cellWidth * cellHeight)
+        linear_ratio = area_ratio ** 0.5
+
+        base = self.get_stress_scaled_params()
+        return {
+            "target_width":     round(self.DEFAULT_TARGET_SIZE * linear_ratio),
+            "target_height":    round(self.DEFAULT_TARGET_SIZE * linear_ratio),
+            "max_paths":        round(base["max_paths"] * area_ratio),
+            "min_contour_area": round(base["min_contour_area"] * area_ratio),
+            "min_paths":        base["min_paths"],
+        }
 
     # Messages
     # ------------------------------------------------------------------------

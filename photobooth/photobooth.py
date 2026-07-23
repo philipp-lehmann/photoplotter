@@ -14,6 +14,7 @@ class PhotoBooth:
         self.camera = Camera()
         self.plotter = Plotter()
         self.image_parser = ImageParser()
+        self.test_mode = "slots"  # "slots" (verify slot geometry, no plotter needed) | "photos" (original stress-level test loop)
 
     # Handling states
     # ------------------------------------------------------------------------
@@ -82,11 +83,14 @@ class PhotoBooth:
             
         # Randomly pick one photo ID from the remaining list without removing it
         random_photo_id = random.choice(self.state_engine.photoID)
-        startX, startY = self.state_engine.get_image_params_by_id(random_photo_id - 1)
-        
+        geom = self.state_engine.get_slot_geometry(random_photo_id)
+        scale_factor = self.state_engine.compute_scale_factor(
+            geom.width, geom.height, source_size=self.state_engine.DEFAULT_TARGET_SIZE
+        )
+
         # Create output SVG using the randomly chosen photo ID
         self.state_engine.currentSVGPath = self.image_parser.create_output_svg(
-            self.state_engine.currentWorkPath, "work-output-", offset_x=startX, offset_y=startY, id=random_photo_id, paper_width=self.state_engine.paperSizeX, paper_height=self.state_engine.paperSizeY
+            self.state_engine.currentWorkPath, "work-output-", offset_x=geom.x, offset_y=geom.y, scale_factor=scale_factor, id=random_photo_id, paper_width=self.state_engine.paperSizeX, paper_height=self.state_engine.paperSizeY
         )
         
         print(f"Converted Work pattern to SVG: {self.state_engine.currentSVGPath}, random: {random_photo_id}, from {self.state_engine.photoID}")
@@ -103,22 +107,26 @@ class PhotoBooth:
         if not self.plotter.connect_to_plotter:
             time.sleep(0.5)
         
-        # Calc current stresslevel and convert image to SVG
-        params = self.state_engine.get_stress_scaled_params()
+        # Calc current stresslevel and convert image to SVG, scaled for the target slot's size
+        next_slot_id = self.state_engine.photoID[-1]
+        params = self.state_engine.get_render_params(next_slot_id)
         tempSVG = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath, **params)
-        
+
         # Check if the SVG file was generated
         if not tempSVG or not os.path.isfile(tempSVG):
             print("Error: SVG file was not created successfully.")
             self.state_engine.change_state("Waiting")
             return
-        
-        # Get the starting coordinates
-        startX, startY = self.state_engine.get_image_params_by_id(self.state_engine.photoID[-1] - 1)
+
+        # Get slot geometry and the scale factor needed to fill it
+        geom = self.state_engine.get_slot_geometry(next_slot_id)
+        scale_factor = self.state_engine.compute_scale_factor(
+            geom.width, geom.height, source_size=params["target_width"]
+        )
 
         # Create the final output SVG file
         self.state_engine.currentSVGPath = self.image_parser.create_output_svg(
-            tempSVG, "photo-output-", offset_x=startX, offset_y=startY, id=self.state_engine.photoID[-1] - 1, paper_width=self.state_engine.paperSizeX, paper_height=self.state_engine.paperSizeY
+            tempSVG, "photo-output-", offset_x=geom.x, offset_y=geom.y, scale_factor=scale_factor, id=next_slot_id, paper_width=self.state_engine.paperSizeX, paper_height=self.state_engine.paperSizeY
         )
         
         # Check if the output SVG was created successfully
@@ -168,16 +176,20 @@ class PhotoBooth:
             parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             input_svg_path = os.path.join(parent_dir, f"assets/work/work-pointer.svg")
             
-            # Get the parameters for Position 1 (id=1, which is index 0)
+            # Get the parameters for Position 1 (the featured slot)
             target_id = 1
-            startX, startY = self.state_engine.get_image_params_by_id(target_id - 1)
+            geom = self.state_engine.get_slot_geometry(target_id)
+            scale_factor = self.state_engine.compute_scale_factor(
+                geom.width, geom.height, source_size=self.state_engine.DEFAULT_TARGET_SIZE
+            )
             self.state_engine.currentSVGPath = self.image_parser.create_output_svg(
-                input_svg_path, 
+                input_svg_path,
                 "work-pointer-output-", # Use a distinct prefix for the output file
-                offset_x=startX, 
-                offset_y=startY, 
-                id=target_id, 
-                paper_width=self.state_engine.paperSizeX, 
+                offset_x=geom.x,
+                offset_y=geom.y,
+                scale_factor=scale_factor,
+                id=target_id,
+                paper_width=self.state_engine.paperSizeX,
                 paper_height=self.state_engine.paperSizeY
             )
             
@@ -195,46 +207,69 @@ class PhotoBooth:
             time.sleep(1) # Prevent busy loop
         pass
     
-    def process_template(self, dynamic_grid=False):
+    def process_template(self, dynamic_grid=False, output_filename="photo-collection.svg", change_state=True):
         print("🚩 Generate template")
         parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        
+
         if (dynamic_grid):
             # Dynamic grid generation (skipped)
             self.currentDebugPath = os.path.join(parent_dir, "assets/work/work-template.svg")
             # Logic to retrieve work pattern and create output SVG
-            
-            for i in range(1, 16):
-                startX, startY = self.state_engine.get_image_params_by_id(i - 1)
-                self.state_engine.currentSVGPath = self.image_parser.create_output_svg(
-                    self.currentDebugPath, "work-output-", offset_x=startX, offset_y=startY, id=i, paper_width=self.state_engine.paperSizeX, paper_height=self.state_engine.paperSizeY
+
+            for slot_id in self.state_engine.slot_ids:
+                geom = self.state_engine.get_slot_geometry(slot_id)
+                scale_factor = self.state_engine.compute_scale_factor(
+                    geom.width, geom.height, source_size=self.state_engine.DEFAULT_TARGET_SIZE
                 )
-            
+                self.state_engine.currentSVGPath = self.image_parser.create_output_svg(
+                    self.currentDebugPath, "work-output-", offset_x=geom.x, offset_y=geom.y, scale_factor=scale_factor, id=slot_id, paper_width=self.state_engine.paperSizeX, paper_height=self.state_engine.paperSizeY
+                )
+
             output_directory = os.path.join(parent_dir, "photos/output")
-            combined_file_path = os.path.join(parent_dir, "photos/collection/photo-collection.svg")
+            combined_file_path = os.path.join(parent_dir, "photos/collection", output_filename)
             self.image_parser.collect_all_paths(output_directory, combined_file_path, "work")
             self.plotter.plot_image(combined_file_path)
-        
-        else:   
+
+        else:
             instructions_file_path = os.path.join(parent_dir, "assets/work/work-instructions.svg")
             self.plotter.plot_image(instructions_file_path, stresslevel=0.65)
-            
-        self.state_engine.change_state("ResetPending")
+
+        if change_state:
+            self.state_engine.change_state("ResetPending")
         pass
     
     
     def process_test(self):
-        
-        print("🚩 Starting test")
+        """Dispatches to a test scenario based on self.test_mode:
+        - "layout": verify slot geometry (positions/sizes), no plotter or real photos needed.
+        - "photos": exercise the real image-tracing pipeline across stress levels (original behavior).
+        """
+        if self.test_mode == "slots":
+            self.process_test_slots()
+        else:
+            self.process_test_photos()
+
+    def process_test_slots(self):
+        print("🚩 Starting test (slots)")
+
+        # Reuses the dynamic-grid template generation to visually verify slot geometry.
+        self.process_template(dynamic_grid=True, change_state=False)
+
+        print("Slot layout preview saved to photos/collection/photo-collection.svg")
+        sys.exit()
+
+    def process_test_photos(self):
+        print("🚩 Starting test (photos)")
         # Base directory
         parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         photos_dir = os.path.join(parent_dir, "photos/test")
-        
+
         # Find all .jpg files in the directory
         jpg_files = [f for f in os.listdir(photos_dir) if f.endswith('.jpg') and not f.endswith('_optimized.jpg')]
-        
-        # Initialize the array of IDs
-        id_array = [0, 1, 2, 3, 5, 6, 7, 8, 10, 11, 12, 13]
+
+        # Initialize the array of IDs (all 12 physical slots, including the featured one,
+        # for full debug coverage of the new layout)
+        id_array = list(self.state_engine.slot_ids)
         id_index = 0  # Index to track the current position in the array
 
         # Process each .jpg file
@@ -245,23 +280,27 @@ class PhotoBooth:
             for stress in [0.0, 0.5, 1.0]:
                 print(f"\n🧠 Testing stress level {stress:.1f} for {jpg_file}")
 
-                params = self.state_engine.get_stress_scaled_params()
+                current_id = id_array[id_index]
+                params = self.state_engine.get_render_params(current_id)
                 self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath, **params)
 
                 # Create the final output SVG file using the rolling ID
-                current_id = id_array[id_index]
-                startX, startY = self.state_engine.get_image_params_by_id(current_id)
+                geom = self.state_engine.get_slot_geometry(current_id)
+                scale_factor = self.state_engine.compute_scale_factor(
+                    geom.width, geom.height, source_size=params["target_width"]
+                )
                 self.state_engine.currentSVGPath = self.image_parser.create_output_svg(
                     self.state_engine.currentSVGPath,
                     f"photo-output-stress-{stress:.1f}-",
-                    offset_x=startX,
-                    offset_y=startY,
+                    offset_x=geom.x,
+                    offset_y=geom.y,
+                    scale_factor=scale_factor,
                     id=current_id,
                     paper_width=self.state_engine.paperSizeX,
                     paper_height=self.state_engine.paperSizeY
                 )
 
-                # Update rolling ID, ensuring it wraps between 0 and 15
+                # Update rolling ID, ensuring it wraps within id_array
                 id_index = (id_index + 1) % len(id_array)
 
 
@@ -269,11 +308,10 @@ class PhotoBooth:
         output_directory = os.path.join(parent_dir, "photos/output")
         combined_file_path = os.path.join(parent_dir, "photos/collection/photo-collection.svg")
         self.image_parser.collect_all_paths(output_directory, combined_file_path, "photo")
-                            
+
         print("All SVGs files processed.")
         sys.exit()
-        pass
-        
+
 
     # Main loop
     # ------------------------------------------------------------------------
