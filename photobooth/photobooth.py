@@ -231,7 +231,7 @@ class PhotoBooth:
 
         if (dynamic_grid):
             # Dynamic grid generation (skipped)
-            self.currentDebugPath = os.path.join(parent_dir, "assets/work/work-template.svg")
+            self.currentDebugPath = os.path.join(parent_dir, "assets/work/work-template-featured.svg")
             # Logic to retrieve work pattern and create output SVG
 
             for slot_id in self.state_engine.slot_ids:
