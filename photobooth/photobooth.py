@@ -251,7 +251,7 @@ class PhotoBooth:
             self.plotter.plot_image(combined_file_path)
 
         else:
-            instructions_file_path = os.path.join(parent_dir, "assets/work/work-instructions.svg")
+            instructions_file_path = os.path.join(parent_dir, "assets/work/work-template-featured.svg")
             self.plotter.plot_image(instructions_file_path, stresslevel=0.65)
 
         if change_state:
