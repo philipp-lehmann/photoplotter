@@ -172,6 +172,7 @@ class PhotoBooth:
         )
 
         print(f"Redrawing: Reprinting {self.state_engine.currentSVGPath} into Slot {target_id}")
+        time.sleep(6)
         stress = self.state_engine.update_stresslevel_from_interval()
         self.plotter.plot_image(self.state_engine.currentSVGPath, stresslevel=stress)
         self.state_engine.last_draw_end_time = time.time()
