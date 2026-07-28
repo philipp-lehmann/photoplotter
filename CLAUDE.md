@@ -11,8 +11,8 @@ A photobooth art installation that captures visitor photos, converts them into a
 Two processes must run concurrently (each in its own terminal):
 
 ```bash
-# Terminal 1: LCD display service (requires sudo for SPI/GPIO)
-sudo python lcd/lcd.py
+# Terminal 1: LCD display service (own venv, requires sudo for SPI/GPIO)
+sudo lcd-env/bin/python lcd/lcd.py
 
 # Terminal 2: Main photobooth logic
 source photoplotter-env/bin/activate
@@ -44,12 +44,12 @@ The system uses an event-driven state machine with two processes communicating v
 ### Image Processing Pipeline
 
 1. `camera.py` — captures JPEG via libcam, auto-crops to square → `photos/snapped/`
-2. `imageparser.py` — face detection (dlib 68-point landmarks) → depth estimation (MiDaS/PyTorch) → contour extraction (OpenCV) → SVG generation → `photos/traced/`
+2. `imageparser.py` — face detection (dlib 68-point landmarks) → person segmentation (MediaPipe selfie segmenter) → depth estimation (MiDaS/PyTorch) → contour extraction (OpenCV) → SVG generation → `photos/traced/`
 3. `plotter.py` — loads SVG, configures pen, plots to Post-it via NextDraw API
 
 ### State Machine (11 states)
 
-`Startup` → `Waiting` ↔ `Tracking` → `Snapping` → `Processing` → `Drawing` → `Redrawing`/`Waiting`/`ResetPending` → `Template`
+`Startup` → `Waiting` ↔ `Tracking` (→ `Working` to look up a drawing pattern) → `Snapping` → `Processing` → `Drawing` → `Redrawing`/`Waiting`/`ResetPending` → `Template`. A separate `Test` state drives the non-Raspberry-Pi test mode.
 
 State logic lives in `photobooth/photobooth.py`; transitions are defined in `photobooth/stateengine.py`.
 
@@ -61,7 +61,7 @@ A float (0.0–1.0) computed from the time interval between drawing sessions. Sh
 
 ### Photo Grid Layout
 
-Portraits are placed in a 5×3 grid (15 positions) tracked by `stateengine.py`. Photo IDs are shuffled in triplets. Grid position, borders, and gutters are configurable in `stateengine.py`.
+Portraits are placed on a 5×3 physical grid: 11 standard single-cell slots plus one 2×2 "featured" slot in the bottom-right, defined in `stateengine.py` (`SLOT_LAYOUT`). The featured slot is excluded from the normal visitor-photo rotation and is instead reprinted on demand (see `KEY2` handling in `photobooth.py`). Photo IDs are shuffled in blocks (`SHUFFLE_BLOCKS`). Grid position, borders, and gutters are configurable in `stateengine.py`.
 
 ## Key Files
 
@@ -84,3 +84,4 @@ Portraits are placed in a 5×3 grid (15 positions) tracked by `stateengine.py`. 
 - The NextDraw API is installed from Bantam Tools' private download URL (not on PyPI)
 - dlib requires the `shape_predictor_68_face_landmarks.dat` model in `photobooth/shape_predictor/`
 - MiDaS model files live in `photobooth/midas/`
+- The MediaPipe selfie segmenter model (`selfie_segmenter.tflite`) is auto-downloaded into `photobooth/models/` on first run if missing

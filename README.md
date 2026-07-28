@@ -13,10 +13,10 @@ This project has been developed by Philipp Lehmann from Redefine, a Zurich based
 1. `photobooth.py:` This module contains the main logic for the photobooth application, coordinating interactions between different components.
 2. `stateengine.py:` Manages the state of the photobooth, controlling transitions between different states such as idle, capturing, processing, printing and completed.
 Should also track the current id of the current portrait drawing. Communicates with broker messages to output the current application state on `lcd.py`
-1. `camera.py:` Handles camera functionality, including facetracking, capturing photos and providing them for processing. Saves snapped image temporary and source images for vectorization separately.
-2. `imageparser.py:` Processes the snapped images captured by the camera, converting them to traced SVGs for plotting.
-3. `plotter.py:` Manages the plotter connection and functionality to draw the portraits, which could be used for printing svg images with a axidraw penplotter.
-4. `lcd.py:` Display interface of the photobooth, showing instructions and the current state of the application to users on a 128x128 lcd display. Located in a separate directory and communicates with broker to submit button inputs. Runs as a separate task.
+3. `camera.py:` Handles camera functionality, including facetracking, capturing photos and providing them for processing. Saves snapped image temporary and source images for vectorization separately.
+4. `imageparser.py:` Processes the snapped images captured by the camera, converting them to traced SVGs for plotting.
+5. `plotter.py:` Manages the plotter connection and functionality to draw the portraits, which could be used for printing svg images with a axidraw penplotter.
+6. `lcd.py:` Display interface of the photobooth, showing instructions and the current state of the application to users on a 128x128 lcd display. Located in a separate directory and communicates with broker to submit button inputs. Runs as a separate task.
 
 **File Structure:**
 The project is structured as follows:
@@ -24,27 +24,34 @@ The project is structured as follows:
 ```
 photoplotter/
 │
-├── start.sh
 ├── main.py
+├── plotfile.py
+├── utils.py
 │
 ├── lcd/
 │   └── lcd.py
 │
-└── photobooth/
+├── photobooth/
 │   ├── __init__.py
 │   ├── photobooth.py
 │   ├── stateengine.py
-│   ├── display.py
 │   ├── camera.py
 │   ├── plotter.py
-│   └── imageparser.py
-│   
+│   ├── imageparser.py
+│   ├── nextdraw_conf.py
+│   ├── shape_predictor/   # dlib 68-point face landmark model
+│   ├── midas/              # MiDaS depth estimation model
+│   ├── models/             # MediaPipe selfie segmenter model
+│   └── haarcascades/
+│
 └── photos/
-	└── output/
-	└── collection/
-	└── snapped/
-	└── test/
-	└── traced/
+    ├── snapped/
+    ├── traced/
+    ├── collection/
+    ├── output/
+    ├── test/
+    ├── samples/
+    └── artists/
 
 ```
 
@@ -72,10 +79,9 @@ This project aims to combine the nostalgic charm of traditional photobooths with
 ## Startup
 
 ```bash
-# Startup lcd display first
+# Startup lcd display first (own venv, needs sudo for SPI/GPIO)
 cd photoplotter
-source lcd-env/bin/activate
-python lcd/lcd.py
+sudo lcd-env/bin/python lcd/lcd.py
 ```
 
 ```bash
@@ -106,6 +112,7 @@ pip install scipy
 pip install torch
 pip install torch torchvision
 pip install timm
+pip install mediapipe
 
 python -m pip install https://software-download.bantamtools.com/nd/api/nextdraw_api.zip
 ```
