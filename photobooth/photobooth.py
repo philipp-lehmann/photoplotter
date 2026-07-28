@@ -119,7 +119,7 @@ class PhotoBooth:
             return
 
         # Keep the traced (pre-positioned) SVG + its native size so a redraw can
-        # later re-place the same tracing into Slot 1 without recalculating it.
+        # later re-place the same tracing into the featured slot without recalculating it.
         self.state_engine.currentTracedSVGPath = tempSVG
         self.state_engine.currentTraceWidth = params["target_width"]
 
@@ -160,9 +160,9 @@ class PhotoBooth:
             print(f"All photos printed, changing state to 'ResetPending'.")
 
     def process_redrawing(self):
-        # KEY2 always reprints the current tracing into Slot 1 (the featured slot),
-        # no recalculation and no photo slot consumed (Slot 1 isn't part of photoID).
-        target_id = 1
+        # KEY2 always reprints the current tracing into the featured slot,
+        # no recalculation and no photo slot consumed (it isn't part of photoID).
+        target_id = self.state_engine.featured_slot_id
         geom = self.state_engine.get_slot_geometry(target_id)
         scale_factor = self.state_engine.compute_scale_factor(
             geom.width, geom.height, source_size=self.state_engine.currentTraceWidth
@@ -195,8 +195,8 @@ class PhotoBooth:
             parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             input_svg_path = os.path.join(parent_dir, f"assets/work/work-pointer.svg")
             
-            # Get the parameters for Position 1 (the featured slot)
-            target_id = 1
+            # Get the parameters for the featured slot
+            target_id = self.state_engine.featured_slot_id
             geom = self.state_engine.get_slot_geometry(target_id)
             scale_factor = self.state_engine.compute_scale_factor(
                 geom.width, geom.height, source_size=self.state_engine.DEFAULT_TARGET_SIZE

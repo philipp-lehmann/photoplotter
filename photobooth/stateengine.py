@@ -36,15 +36,26 @@ class StateEngine:
         Slot(id=13, col=2, row=2),
     ]
 
-    # Slot 1 (featured) is intentionally excluded — not part of the normal visitor-photo rotation.
-    SHUFFLE_BLOCKS = [
-        [3, 4, 5],
-        [8, 9, 10],
-        [11, 12, 13, 14, 15],
-    ]
-
     CELL_FILL_RATIO = 0.93   # tuned so standard slots render at the same visual size as before
     DEFAULT_TARGET_SIZE = 800
+
+    @classmethod
+    def _standard_shuffle_blocks(cls):
+        """Derives shuffle blocks from SLOT_LAYOUT instead of hand-maintaining a separate list:
+        one block per row of "standard" slots, ordered by column. Excludes the featured slot(s),
+        so repositioning/resizing the featured slot in SLOT_LAYOUT keeps this in sync automatically."""
+        rows = {}
+        for slot in cls.SLOT_LAYOUT:
+            if slot.kind == "standard":
+                rows.setdefault(slot.row, []).append(slot)
+        return [
+            [slot.id for slot in sorted(rows[row], key=lambda s: s.col)]
+            for row in sorted(rows)
+        ]
+
+    @classmethod
+    def _featured_slot_id(cls):
+        return next(s.id for s in cls.SLOT_LAYOUT if s.kind == "featured")
 
     def __init__(self):
         # State
@@ -56,6 +67,7 @@ class StateEngine:
         self.imagesPerColumn = 3
         self.slots = {s.id: s for s in self.SLOT_LAYOUT}
         self.slot_ids = [s.id for s in self.SLOT_LAYOUT]  # all 12 physical slots, incl. featured
+        self.featured_slot_id = self._featured_slot_id()
         self.paperSizeX = 1587 #1191 multiplied by higher 96 dpi of Nextdraw
         self.paperSizeY = 1122 #841 multiplied by higher 96 dpi of Nextdraw
         self.workID = 0
@@ -135,7 +147,7 @@ class StateEngine:
             print("No photo IDs available.")
 
     def reset_photo_id(self):
-        blocks = [list(block) for block in self.SHUFFLE_BLOCKS]
+        blocks = self._standard_shuffle_blocks()
         for block in blocks:
             random.shuffle(block)
         self.photoID = [item for block in blocks for item in block]
@@ -300,7 +312,7 @@ class StateEngine:
                 time.sleep(1)
 
         elif self.state == "Redrawing":
-            # Slot 1 reprint already in progress — ignore repeat KEY2 presses until
+            # Featured-slot reprint already in progress — ignore repeat KEY2 presses until
             # it finishes and a fresh "Drawing" state re-arms the redraw trigger.
             pass
 
