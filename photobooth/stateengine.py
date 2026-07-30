@@ -40,13 +40,14 @@ class StateEngine:
     DEFAULT_TARGET_SIZE = 800
 
     # Global drawing style for all plotted portraits (None = classic contour tracing).
-    # '+'-combinable tokens: 'features', 'outline', 'shade', 'oneline',
+    # '+'-combinable tokens: 'features', 'outline', 'shade', 'hair', 'oneline',
     # e.g. "features+outline+shade+oneline". Test styles with parsefile.py first.
     DRAWING_STYLE = "features+outline+shade+oneline"
     FEATURE_RADIUS = 18   # features: max distance (px at 800) from a landmark line
     SHADES = 2            # shade: tone count incl. paper white
     HATCH_SPACING = 10    # shade: hatch line spacing (px at 800)
     SIMPLIFY = 80         # RDP simplification strength in percent (higher = fewer points)
+    HAIR_STROKES = 30     # hair: target brush stroke count
 
     @classmethod
     def _standard_shuffle_blocks(cls):
@@ -277,6 +278,7 @@ class StateEngine:
             "shades":           self.SHADES,
             "hatch_spacing":    self.HATCH_SPACING,
             "simplify":         self.SIMPLIFY,
+            "hair_strokes":     self.HAIR_STROKES,
         }
 
     # Messages

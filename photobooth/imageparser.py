@@ -71,13 +71,14 @@ class ImageParser:
         faces = self.face_detector(gray_image)
         return len(faces) > 0
     
-    def convert_to_svg(self, image_filepath, target_width=800, target_height=800, scale_x=1.0, scale_y=1.0, min_paths=30, max_paths=120, min_contour_area=16, suffix='', method=3, apply_depthmap=True, style=None, feature_radius=18, snap_method=None, shades=2, hatch_spacing=10, simplify=80):
+    def convert_to_svg(self, image_filepath, target_width=800, target_height=800, scale_x=1.0, scale_y=1.0, min_paths=30, max_paths=120, min_contour_area=16, suffix='', method=3, apply_depthmap=True, style=None, feature_radius=18, snap_method=None, shades=2, hatch_spacing=10, simplify=80, hair_strokes=30):
         """Convert input image to SVG with parameters.
-        style: optional '+'-separated styles ('features', 'outline', 'shade', 'oneline'), e.g. 'features+shade+oneline'.
+        style: optional '+'-separated styles ('features', 'outline', 'shade', 'hair', 'oneline'), e.g. 'features+hair+oneline'.
         snap_method: force the point-snap style ('dynamic_grid'/'poisson_disk'/'none') instead of the random pick.
         shades: tone count for the shade style, paper white included (2 = white + one hatched tone).
         hatch_spacing: hatch line spacing in px for the shade style (at 800px target size).
-        simplify: RDP simplification strength in percent (higher = fewer points)."""
+        simplify: RDP simplification strength in percent (higher = fewer points).
+        hair_strokes: target brush stroke count for the hair style."""
         print(f"Converting {image_filepath}")
         if not os.path.isfile(image_filepath):
             print(f"File {image_filepath} does not exist.")
@@ -135,6 +136,10 @@ class ImageParser:
         # so shading is never feature-filtered or dropped by the outline style
         if "shade" in styles:
             merged_contours += self.generate_hatch_contours(opt_image, person_mask, target_width, target_height, shades=shades, spacing=hatch_spacing, landmarks_list=landmarks_list, crop_image=crop_image)
+
+        # Brush strokes following the hair flow (simulated where no texture shows)
+        if "hair" in styles:
+            merged_contours += self.generate_hair_stroke_contours(opt_image, crop_image, target_width, target_height, num_strokes=hair_strokes)
 
         # Create the SVG with a style
         svg_filepath = self.create_svg(image_filepath, merged_contours, target_width, target_height, scale_x, scale_y, suffix)
@@ -709,6 +714,119 @@ class ImageParser:
 
         print(f"Shading: {len(passes)} pass(es) -> {len(segments)} hatch segments")
         return segments
+
+    # ----- Hair Brushes -----
+    def generate_hair_stroke_contours(self, opt_image, crop_image, width, height, num_strokes=30, step=3, min_stroke_length=25):
+        """Main brush strokes in the hair region: streamlines traced along a flow
+        field that follows the real strand orientation (structure tensor) where the
+        image shows texture, and falls back to a simulated silhouette-following
+        flow where it doesn't - so flat or dark hair still gets convincing strokes.
+        A spacing mask keeps the strokes distinct instead of clumping."""
+        hair_mask = self.generate_hair_mask(crop_image)
+        if hair_mask is None:
+            print("No hair mask: skipping hair strokes.")
+            return []
+        hair_mask = cv2.resize(hair_mask, (width, height), interpolation=cv2.INTER_NEAREST)
+        # Erode so strokes start away from the hair boundary
+        hair = cv2.erode(hair_mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))) > 0
+        if not hair.any():
+            print("Empty hair mask: skipping hair strokes.")
+            return []
+
+        scale = width / 800.0
+        step_px = max(1.5, step * scale)
+        min_length_px = min_stroke_length * scale
+
+        # Real strand direction: perpendicular to the dominant gradient of the
+        # smoothed structure tensor
+        gray = cv2.GaussianBlur(opt_image.astype(np.float32), (0, 0), 2)
+        gx = cv2.Sobel(gray, cv2.CV_32F, 1, 0, ksize=3)
+        gy = cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=3)
+        j11 = cv2.GaussianBlur(gx * gx, (0, 0), 4)
+        j22 = cv2.GaussianBlur(gy * gy, (0, 0), 4)
+        j12 = cv2.GaussianBlur(gx * gy, (0, 0), 4)
+        theta = 0.5 * np.arctan2(2 * j12, j11 - j22)
+        real_x, real_y = -np.sin(theta), np.cos(theta)
+
+        # Coherence: how confidently the texture shows an orientation (0 = mush).
+        # Soft ramp so weak signal fades toward the simulated field early
+        coherence = np.sqrt((j11 - j22) ** 2 + 4 * j12 ** 2) / (j11 + j22 + 1e-6)
+        c = np.clip((coherence - 0.15) / (0.5 - 0.15), 0.0, 1.0)
+
+        # Simulated field: isolines of the heavily blurred hair mask, i.e. strokes
+        # sweep parallel to the silhouette and curve around the head
+        blurred = cv2.GaussianBlur(hair_mask.astype(np.float32), (0, 0), 25 * scale)
+        bx = cv2.Sobel(blurred, cv2.CV_32F, 1, 0, ksize=3)
+        by = cv2.Sobel(blurred, cv2.CV_32F, 0, 1, ksize=3)
+        norm = np.hypot(bx, by)
+        flat = norm < 1e-3
+        sim_x = np.where(flat, 0.0, -by / (norm + 1e-9))
+        sim_y = np.where(flat, 1.0, bx / (norm + 1e-9))  # default: hang downward
+
+        # Blend per pixel, aligning the 180-degree-ambiguous real direction to the
+        # simulated one first so the mix never cancels out
+        flip = (real_x * sim_x + real_y * sim_y) < 0
+        real_x, real_y = np.where(flip, -real_x, real_x), np.where(flip, -real_y, real_y)
+        dir_x = c * real_x + (1 - c) * sim_x
+        dir_y = c * real_y + (1 - c) * sim_y
+        norm = np.hypot(dir_x, dir_y) + 1e-9
+        dir_x, dir_y = dir_x / norm, dir_y / norm
+
+        def trace_direction(x, y, sign, spacing_mask):
+            pts = []
+            dx, dy = 0.0, 0.0
+            max_length = random.uniform(60, 160) * scale
+            travelled = 0.0
+            while travelled < max_length:
+                i, j = int(round(y)), int(round(x))
+                if not (0 <= i < height and 0 <= j < width) or not hair[i, j]:
+                    break
+                ndx, ndy = sign * dir_x[i, j], sign * dir_y[i, j]
+                # The orientation field is 180-degree ambiguous: keep continuity
+                # by flipping whichever sense opposes the previous step
+                if ndx * dx + ndy * dy < 0:
+                    ndx, ndy = -ndx, -ndy
+                dx, dy = ndx, ndy
+                x, y = x + dx * step_px, y + dy * step_px
+                pts.append((x, y))
+                travelled += step_px
+                # Stop when running into an already drawn stroke (except right at the seed)
+                if travelled > 3 * step_px and spacing_mask[min(max(int(round(y)), 0), height - 1), min(max(int(round(x)), 0), width - 1)]:
+                    break
+            return pts
+
+        ys, xs = np.nonzero(hair)
+        seed_order = list(range(len(xs)))
+        random.shuffle(seed_order)
+        spacing_mask = np.zeros((height, width), np.uint8)
+        spacing = max(3, int(9 * scale))
+
+        strokes = []
+        for idx in seed_order:
+            if len(strokes) >= num_strokes:
+                break
+            sx, sy = float(xs[idx]), float(ys[idx])
+            if spacing_mask[int(sy), int(sx)]:
+                continue
+
+            backward = trace_direction(sx, sy, -1, spacing_mask)
+            forward = trace_direction(sx, sy, 1, spacing_mask)
+            pts = backward[::-1] + [(sx, sy)] + forward
+            if len(pts) < 3:
+                continue
+            arr = np.array(pts)
+            length = np.hypot(np.diff(arr[:, 0]), np.diff(arr[:, 1])).sum()
+            if length < min_length_px:
+                continue
+
+            contour = np.round(arr).astype(np.int32).reshape(-1, 1, 2)
+            contour = cv2.approxPolyDP(contour, 1.5, False)
+            strokes.append(contour)
+            # Reserve a corridor around the stroke so the next ones keep distance
+            cv2.polylines(spacing_mask, [contour], False, 255, spacing)
+
+        print(f"Hair strokes: {len(strokes)} brush strokes traced")
+        return strokes
 
     # ----- SVG Handling -----
     def create_svg(self, image_filepath, contours, target_width, target_height, scale_x, scale_y, suffix):

@@ -18,7 +18,7 @@ from photobooth.imageparser import ImageParser
 parser = argparse.ArgumentParser(description="Trace an image to SVG without plotting (style test harness).")
 parser.add_argument("file", help="Path to the source image (jpg/png).")
 parser.add_argument("--style", default=None,
-                    help="'+'-combinable styles: features, outline, shade, oneline (e.g. features+shade+oneline).")
+                    help="'+'-combinable styles: features, outline, shade, hair, oneline (e.g. features+hair+oneline).")
 parser.add_argument("--method", type=int, default=3, help="Contour method 1-4 (see extract_contours).")
 parser.add_argument("--snap", default=None, choices=["none", "dynamic_grid", "poisson_disk"],
                     help="Force the point-snap style instead of the random pick.")
@@ -28,12 +28,13 @@ parser.add_argument("--radius", type=float, default=18, help="Feature-overlap ra
 parser.add_argument("--shades", type=int, default=2, help="Tone count incl. paper white (shade style).")
 parser.add_argument("--spacing", type=float, default=10, help="Hatch line spacing in px (shade style).")
 parser.add_argument("--simplify", type=int, default=80, help="RDP simplification strength in percent (higher = fewer points).")
+parser.add_argument("--hair-strokes", type=int, default=30, help="Target brush stroke count (hair style).")
 parser.add_argument("--seed", type=int, default=None, help="Seed RNGs for reproducible output.")
 parser.add_argument("--no-depthmap", action="store_true")
 parser.add_argument("--open", action="store_true", help="Open the resulting SVG (macOS).")
 args = parser.parse_args()
 
-valid_styles = {"default", "features", "outline", "shade", "oneline"}
+valid_styles = {"default", "features", "outline", "shade", "hair", "oneline"}
 if args.style:
     invalid = set(args.style.split("+")) - valid_styles
     if invalid:
@@ -61,6 +62,7 @@ svg_path = image_parser.convert_to_svg(
     shades=args.shades,
     hatch_spacing=args.spacing,
     simplify=args.simplify,
+    hair_strokes=args.hair_strokes,
     snap_method=args.snap,
     apply_depthmap=not args.no_depthmap,
     suffix=f"-{args.style or 'default'}" + (f"-{args.snap}" if args.snap else ""),
