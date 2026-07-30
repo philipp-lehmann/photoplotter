@@ -30,7 +30,7 @@ python plotfile.py /absolute/path/to/file.svg
 ```bash
 python parsefile.py photos/test/1.jpg --style oneline --seed 1 --open
 ```
-Styles combine with `+`: `oneline` (one continuous line), `features` (only strokes near the 68-point facial landmarks), `outline` (person silhouette only; with `features` the silhouette stays whole while image strokes are feature-filtered), e.g. `features+outline+oneline`. `--snap dynamic_grid|poisson_disk` forces the point-snap post-process; `--radius` tunes the feature-overlap distance; `--seed` makes runs reproducible. Outputs land in `photos/parsefile/`.
+Styles combine with `+`: `oneline` (one continuous line), `features` (only strokes near the 68-point facial landmarks), `outline` (person silhouette only; with `features` the silhouette stays whole while image strokes are feature-filtered), `shade` (parallel hatching of dark person areas; `--shades` sets the tone count incl. paper white, `--spacing` the line spacing, darker tones stack rotated hatch families so cross-hatching emerges at `--shades 3+`), e.g. `features+outline+shade+oneline`. `--snap dynamic_grid|poisson_disk` forces the point-snap post-process; `--radius` tunes the feature-overlap distance; `--seed` makes runs reproducible. Outputs land in `photos/parsefile/`.
 
 **Systemd services (Raspberry Pi):**
 ```bash

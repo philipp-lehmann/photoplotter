@@ -18,19 +18,21 @@ from photobooth.imageparser import ImageParser
 parser = argparse.ArgumentParser(description="Trace an image to SVG without plotting (style test harness).")
 parser.add_argument("file", help="Path to the source image (jpg/png).")
 parser.add_argument("--style", default=None,
-                    help="'+'-combinable styles: features, outline, oneline (e.g. features+outline+oneline).")
+                    help="'+'-combinable styles: features, outline, shade, oneline (e.g. features+shade+oneline).")
 parser.add_argument("--method", type=int, default=3, help="Contour method 1-4 (see extract_contours).")
 parser.add_argument("--snap", default=None, choices=["none", "dynamic_grid", "poisson_disk"],
                     help="Force the point-snap style instead of the random pick.")
 parser.add_argument("--max-paths", type=int, default=120)
 parser.add_argument("--min-contour-area", type=int, default=16)
 parser.add_argument("--radius", type=float, default=18, help="Feature-overlap radius in px (features style).")
+parser.add_argument("--shades", type=int, default=2, help="Tone count incl. paper white (shade style).")
+parser.add_argument("--spacing", type=float, default=10, help="Hatch line spacing in px (shade style).")
 parser.add_argument("--seed", type=int, default=None, help="Seed RNGs for reproducible output.")
 parser.add_argument("--no-depthmap", action="store_true")
 parser.add_argument("--open", action="store_true", help="Open the resulting SVG (macOS).")
 args = parser.parse_args()
 
-valid_styles = {"default", "features", "outline", "oneline"}
+valid_styles = {"default", "features", "outline", "shade", "oneline"}
 if args.style:
     invalid = set(args.style.split("+")) - valid_styles
     if invalid:
@@ -55,6 +57,8 @@ svg_path = image_parser.convert_to_svg(
     method=args.method,
     style=style,
     feature_radius=args.radius,
+    shades=args.shades,
+    hatch_spacing=args.spacing,
     snap_method=args.snap,
     apply_depthmap=not args.no_depthmap,
     suffix=f"-{args.style or 'default'}" + (f"-{args.snap}" if args.snap else ""),

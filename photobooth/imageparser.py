@@ -16,6 +16,7 @@ from lxml import etree
 from utils import profile, wait_for_cooldown, get_random_color, pc
 
 SELFIE_SEGMENTER_URL = "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite"
+MULTICLASS_SEGMENTER_URL = "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite"
 
 # Canonical dlib 68-point landmark groups; eye/lip loops repeat their first index to close
 LANDMARK_GROUPS = {
@@ -54,6 +55,10 @@ class ImageParser:
             output_confidence_masks=True,
         )
         self.segmenter = mp_vision.ImageSegmenter.create_from_options(segmenter_options)
+
+        # Multiclass segmenter (hair/skin/clothes) is only needed by the shade
+        # style, so it is downloaded and initialized lazily on first use
+        self.multiclass_segmenter = None
     
     def detect_faces(self, image_filepath):
         """Used when snapping an image. Quick method to check if a face is present in the image"""
@@ -66,10 +71,12 @@ class ImageParser:
         faces = self.face_detector(gray_image)
         return len(faces) > 0
     
-    def convert_to_svg(self, image_filepath, target_width=800, target_height=800, scale_x=1.0, scale_y=1.0, min_paths=30, max_paths=120, min_contour_area=16, suffix='', method=3, apply_depthmap=True, style=None, feature_radius=18, snap_method=None):
+    def convert_to_svg(self, image_filepath, target_width=800, target_height=800, scale_x=1.0, scale_y=1.0, min_paths=30, max_paths=120, min_contour_area=16, suffix='', method=3, apply_depthmap=True, style=None, feature_radius=18, snap_method=None, shades=2, hatch_spacing=10):
         """Convert input image to SVG with parameters.
-        style: optional '+'-separated styles ('features', 'outline', 'oneline'), e.g. 'features+outline+oneline'.
-        snap_method: force the point-snap style ('dynamic_grid'/'poisson_disk'/'none') instead of the random pick."""
+        style: optional '+'-separated styles ('features', 'outline', 'shade', 'oneline'), e.g. 'features+shade+oneline'.
+        snap_method: force the point-snap style ('dynamic_grid'/'poisson_disk'/'none') instead of the random pick.
+        shades: tone count for the shade style, paper white included (2 = white + one hatched tone).
+        hatch_spacing: hatch line spacing in px for the shade style (at 800px target size)."""
         print(f"Converting {image_filepath}")
         if not os.path.isfile(image_filepath):
             print(f"File {image_filepath} does not exist.")
@@ -122,6 +129,11 @@ class ImageParser:
             # so only its jaw-adjacent parts survive)
             if "features" in styles:
                 merged_contours = self.filter_contours_to_features(merged_contours, landmarks_list, target_width, target_height, radius=feature_radius)
+
+        # Hatch dark person areas with parallel lines; added after the style filters
+        # so shading is never feature-filtered or dropped by the outline style
+        if "shade" in styles:
+            merged_contours += self.generate_hatch_contours(opt_image, person_mask, target_width, target_height, shades=shades, spacing=hatch_spacing, landmarks_list=landmarks_list, crop_image=crop_image)
 
         # Create the SVG with a style
         svg_filepath = self.create_svg(image_filepath, merged_contours, target_width, target_height, scale_x, scale_y, suffix)
@@ -282,6 +294,32 @@ class ImageParser:
         confidence = np.squeeze(result.confidence_masks[0].numpy_view())
         return np.uint8(np.clip(confidence * 255, 0, 255))
     
+    def generate_hair_mask(self, image):
+        """Run MediaPipe multiclass selfie segmentation; returns a uint8 mask (255 = hair)."""
+        if self.multiclass_segmenter is None:
+            base_path = os.path.dirname(os.path.abspath(__file__))
+            model_path = os.path.join(base_path, 'models', 'selfie_multiclass.tflite')
+            if not os.path.exists(model_path):
+                print("Multiclass segmentation model not found locally. Downloading...")
+                os.makedirs(os.path.dirname(model_path), exist_ok=True)
+                urllib.request.urlretrieve(MULTICLASS_SEGMENTER_URL, model_path)
+            options = mp_vision.ImageSegmenterOptions(
+                base_options=mp_python.BaseOptions(model_asset_path=model_path),
+                output_category_mask=True,
+            )
+            self.multiclass_segmenter = mp_vision.ImageSegmenter.create_from_options(options)
+
+        wait_for_cooldown()
+        image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=image_rgb)
+        result = self.multiclass_segmenter.segment(mp_image)
+
+        if result.category_mask is None:
+            return None
+
+        categories = np.squeeze(result.category_mask.numpy_view())
+        return np.uint8(np.where(categories == 1, 255, 0))  # category 1 = hair
+
     def enhance_foreground(self, image, mask, contrast_factor=1.5, background_factor=0.5, feather=31):
         """
         Enhance the foreground contrast and darken the background, blended with a
@@ -557,6 +595,119 @@ class ImageParser:
 
         print(f"Feature filter: {len(contours)} contours -> {len(filtered)} feature segments")
         return filtered
+
+    # ----- Shading -----
+    def generate_hatch_contours(self, opt_image, person_mask, width, height, shades=2, spacing=10,
+                                min_region_area=100, min_seg_length=6,
+                                max_percentile=35, cross_percentile=15, wobble=1.5,
+                                landmarks_list=None, crop_image=None):
+        """Hatch dark person areas with parallel line segments.
+        Tone masks nest (every tone covers all pixels darker than its cutoff), so
+        density accumulates toward dark cores; a sparse cross-hatch family is always
+        added over the darkest core. Row spacing, angles and the lines themselves
+        are jittered for a hand-drawn feel. Hair (multiclass segmentation of
+        crop_image) and eye regions (landmarks) are excluded from shading.
+        max_percentile: darkest share of person pixels the lightest tone covers.
+        cross_percentile: darkest share that gets the extra sparse cross-hatch."""
+        if person_mask is None or shades < 2:
+            print("No person mask or too few shades: skipping shading.")
+            return []
+
+        person = person_mask > 127
+
+        # Exclude hair and eye regions; done before the percentile cutoffs so the
+        # tonal range adapts to the area that actually gets shaded
+        exclude = np.zeros((height, width), np.uint8)
+        if crop_image is not None:
+            hair_mask = self.generate_hair_mask(crop_image)
+            if hair_mask is not None:
+                exclude |= cv2.resize(hair_mask, (width, height), interpolation=cv2.INTER_NEAREST)
+        if landmarks_list:
+            for landmarks in landmarks_list:
+                for indices in (range(36, 42), range(42, 48)):
+                    eye = np.array([(landmarks.part(i).x, landmarks.part(i).y) for i in indices], np.int32)
+                    cv2.fillConvexPoly(exclude, cv2.convexHull(eye), 255)
+        margin = max(3, int(13 * width / 800.0)) | 1
+        exclude = cv2.dilate(exclude, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (margin, margin)))
+        person &= exclude == 0
+
+        person_pixels = opt_image[person]
+        if person_pixels.size == 0:
+            print("Empty person mask: skipping shading.")
+            return []
+
+        scale = width / 800.0
+        spacing_px = max(2.0, spacing * scale)
+        min_area_px = min_region_area * scale * scale
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+        base_angle = random.uniform(30, 60)
+        angle_offsets = [0, 90, 45, 135]
+
+        # Percentile cutoffs up to max_percentile, largest first: the lightest tone
+        # hatches the whole shadow region, each darker tone adds a rotated family
+        cutoffs = [np.percentile(person_pixels, max_percentile * k / (shades - 1)) for k in range(shades - 1, 0, -1)]
+        passes = [
+            (cutoff, base_angle + angle_offsets[i % 4] + random.uniform(-8, 8), spacing_px)
+            for i, cutoff in enumerate(cutoffs)
+        ]
+        # Sparse cross-hatch over the darkest core, present in every image
+        passes.append((
+            np.percentile(person_pixels, cross_percentile),
+            base_angle + angle_offsets[len(cutoffs) % 4] + random.uniform(-8, 8),
+            spacing_px * 1.6,
+        ))
+
+        segments = []
+        for cutoff, angle, pass_spacing in passes:
+            tone_mask = np.where(person & (opt_image <= cutoff), 255, 0).astype(np.uint8)
+            tone_mask = cv2.morphologyEx(tone_mask, cv2.MORPH_OPEN, kernel)
+
+            # Drop confetti patches below the minimum region area
+            num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(tone_mask, connectivity=8)
+            for label in range(1, num_labels):
+                if stats[label, cv2.CC_STAT_AREA] < min_area_px:
+                    tone_mask[labels == label] = 0
+            if not tone_mask.any():
+                continue
+
+            # Rotate the mask so hatch lines become horizontal scanlines
+            diag = int(np.ceil(np.hypot(width, height)))
+            M = cv2.getRotationMatrix2D((width / 2, height / 2), angle, 1.0)
+            M[0, 2] += (diag - width) / 2
+            M[1, 2] += (diag - height) / 2
+            rotated = cv2.warpAffine(tone_mask, M, (diag, diag), flags=cv2.INTER_NEAREST)
+            M_inv = cv2.invertAffineTransform(M)
+
+            y = random.uniform(0, pass_spacing)
+            while y < diag:
+                row = rotated[int(y)] > 0
+                edges = np.diff(row.astype(np.int8))
+                starts = np.where(edges == 1)[0] + 1
+                ends = np.where(edges == -1)[0] + 1
+                if row[0]:
+                    starts = np.concatenate(([0], starts))
+                if row[-1]:
+                    ends = np.concatenate((ends, [len(row)]))
+
+                for x0, x1 in zip(starts, ends):
+                    if x1 - 1 - x0 < min_seg_length:
+                        continue
+                    # Hand-drawn feel: shorten the ends a little and wave the line
+                    # by jittering intermediate points perpendicular to it
+                    x0f = x0 + random.uniform(0, 2)
+                    x1f = x1 - 1 - random.uniform(0, 2)
+                    n_pts = max(2, int((x1f - x0f) // 30) + 2)
+                    xs_line = np.linspace(x0f, x1f, n_pts)
+                    ys_line = y + np.random.uniform(-wobble, wobble, n_pts)
+                    pts = np.column_stack([xs_line, ys_line]) @ M_inv[:, :2].T + M_inv[:, 2]
+                    pts[:, 0] = np.clip(pts[:, 0], 0, width - 1)
+                    pts[:, 1] = np.clip(pts[:, 1], 0, height - 1)
+                    segments.append(np.round(pts).astype(np.int32).reshape(-1, 1, 2))
+
+                y += pass_spacing * random.uniform(0.85, 1.15)
+
+        print(f"Shading: {len(passes)} pass(es) -> {len(segments)} hatch segments")
+        return segments
 
     # ----- SVG Handling -----
     def create_svg(self, image_filepath, contours, target_width, target_height, scale_x, scale_y, suffix):
