@@ -71,14 +71,15 @@ class ImageParser:
         faces = self.face_detector(gray_image)
         return len(faces) > 0
     
-    def convert_to_svg(self, image_filepath, target_width=800, target_height=800, scale_x=1.0, scale_y=1.0, min_paths=30, max_paths=120, min_contour_area=16, suffix='', method=3, apply_depthmap=True, style=None, feature_radius=18, snap_method=None, shades=2, hatch_spacing=10, simplify=80, hair_strokes=30):
+    def convert_to_svg(self, image_filepath, target_width=800, target_height=800, scale_x=1.0, scale_y=1.0, min_paths=30, max_paths=120, min_contour_area=16, suffix='', method=3, apply_depthmap=True, style=None, feature_radius=18, snap_method=None, shades=2, hatch_spacing=10, simplify=80, hair_strokes=30, stress=0.0):
         """Convert input image to SVG with parameters.
         style: optional '+'-separated styles ('features', 'outline', 'shade', 'hair', 'oneline'), e.g. 'features+hair+oneline'.
         snap_method: force the point-snap style ('dynamic_grid'/'poisson_disk'/'none') instead of the random pick.
         shades: tone count for the shade style, paper white included (2 = white + one hatched tone).
         hatch_spacing: hatch line spacing in px for the shade style (at 800px target size).
         simplify: RDP simplification strength in percent (higher = fewer points).
-        hair_strokes: target brush stroke count for the hair style."""
+        hair_strokes: target brush stroke count for the hair style.
+        stress: 0.0-1.0; scales the shade style's randomness (max stress = wild hatching)."""
         print(f"Converting {image_filepath}")
         if not os.path.isfile(image_filepath):
             print(f"File {image_filepath} does not exist.")
@@ -89,7 +90,12 @@ class ImageParser:
             print("Image loading failed.")
             return None
         
-        styles = set((style or "").split("+"))
+        # Tokens may be joined with '+' or '-'; warn on typos instead of silently
+        # falling back to the classic tracing
+        styles = set((style or "").replace("-", "+").split("+"))
+        unknown_styles = styles - {"", "features", "outline", "shade", "hair", "oneline"}
+        if unknown_styles:
+            print(f"Warning: ignoring unknown style token(s): {', '.join(sorted(unknown_styles))}")
         crop_image = self.handle_faces(image, target_width, target_height)
         opt_image, faces, landmarks_list = self.process_face_image(crop_image)
         person_mask = None
@@ -135,7 +141,7 @@ class ImageParser:
         # Hatch dark person areas with parallel lines; added after the style filters
         # so shading is never feature-filtered or dropped by the outline style
         if "shade" in styles:
-            merged_contours += self.generate_hatch_contours(opt_image, person_mask, target_width, target_height, shades=shades, spacing=hatch_spacing, landmarks_list=landmarks_list, crop_image=crop_image)
+            merged_contours += self.generate_hatch_contours(opt_image, person_mask, target_width, target_height, shades=shades, spacing=hatch_spacing, landmarks_list=landmarks_list, crop_image=crop_image, stress=stress)
 
         # Brush strokes following the hair flow (simulated where no texture shows)
         if "hair" in styles:
@@ -606,7 +612,7 @@ class ImageParser:
     def generate_hatch_contours(self, opt_image, person_mask, width, height, shades=2, spacing=10,
                                 min_region_area=100, min_seg_length=6,
                                 max_percentile=35, cross_percentile=15, wobble=1.5,
-                                landmarks_list=None, crop_image=None):
+                                landmarks_list=None, crop_image=None, stress=0.0):
         """Hatch dark person areas with parallel line segments.
         Tone masks nest (every tone covers all pixels darker than its cutoff), so
         density accumulates toward dark cores; a sparse cross-hatch family is always
@@ -614,7 +620,8 @@ class ImageParser:
         are jittered for a hand-drawn feel. Hair (multiclass segmentation of
         crop_image) and eye regions (landmarks) are excluded from shading.
         max_percentile: darkest share of person pixels the lightest tone covers.
-        cross_percentile: darkest share that gets the extra sparse cross-hatch."""
+        cross_percentile: darkest share that gets the extra sparse cross-hatch.
+        stress: 0.0-1.0; scales every randomness source, calm at 0, wild at 1."""
         if person_mask is None or shades < 2:
             print("No person mask or too few shades: skipping shading.")
             return []
@@ -646,20 +653,27 @@ class ImageParser:
         spacing_px = max(2.0, spacing * scale)
         min_area_px = min_region_area * scale * scale
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-        base_angle = random.uniform(30, 60)
+
+        # Stress scales every randomness source: calm and orderly at 0, wild at 1
+        stress = max(0.0, min(1.0, stress))
+        angle_jitter = 8 + 25 * stress
+        wobble_px = wobble * (1 + 2.5 * stress)
+        spacing_var = 0.15 + 0.35 * stress
+        end_jitter = 2 + 6 * stress
+        base_angle = random.uniform(30 - 30 * stress, 60 + 120 * stress)
         angle_offsets = [0, 90, 45, 135]
 
         # Percentile cutoffs up to max_percentile, largest first: the lightest tone
         # hatches the whole shadow region, each darker tone adds a rotated family
         cutoffs = [np.percentile(person_pixels, max_percentile * k / (shades - 1)) for k in range(shades - 1, 0, -1)]
         passes = [
-            (cutoff, base_angle + angle_offsets[i % 4] + random.uniform(-8, 8), spacing_px)
+            (cutoff, base_angle + angle_offsets[i % 4] + random.uniform(-angle_jitter, angle_jitter), spacing_px)
             for i, cutoff in enumerate(cutoffs)
         ]
         # Sparse cross-hatch over the darkest core, present in every image
         passes.append((
             np.percentile(person_pixels, cross_percentile),
-            base_angle + angle_offsets[len(cutoffs) % 4] + random.uniform(-8, 8),
+            base_angle + angle_offsets[len(cutoffs) % 4] + random.uniform(-angle_jitter, angle_jitter),
             spacing_px * 1.6,
         ))
 
@@ -700,17 +714,19 @@ class ImageParser:
                         continue
                     # Hand-drawn feel: shorten the ends a little and wave the line
                     # by jittering intermediate points perpendicular to it
-                    x0f = x0 + random.uniform(0, 2)
-                    x1f = x1 - 1 - random.uniform(0, 2)
+                    x0f = x0 + random.uniform(0, end_jitter)
+                    x1f = x1 - 1 - random.uniform(0, end_jitter)
+                    if x1f <= x0f:
+                        continue
                     n_pts = max(2, int((x1f - x0f) // 30) + 2)
                     xs_line = np.linspace(x0f, x1f, n_pts)
-                    ys_line = y + np.random.uniform(-wobble, wobble, n_pts)
+                    ys_line = y + np.random.uniform(-wobble_px, wobble_px, n_pts)
                     pts = np.column_stack([xs_line, ys_line]) @ M_inv[:, :2].T + M_inv[:, 2]
                     pts[:, 0] = np.clip(pts[:, 0], 0, width - 1)
                     pts[:, 1] = np.clip(pts[:, 1], 0, height - 1)
                     segments.append(np.round(pts).astype(np.int32).reshape(-1, 1, 2))
 
-                y += pass_spacing * random.uniform(0.85, 1.15)
+                y += pass_spacing * random.uniform(1 - spacing_var, 1 + spacing_var)
 
         print(f"Shading: {len(passes)} pass(es) -> {len(segments)} hatch segments")
         return segments
@@ -772,10 +788,9 @@ class ImageParser:
         norm = np.hypot(dir_x, dir_y) + 1e-9
         dir_x, dir_y = dir_x / norm, dir_y / norm
 
-        def trace_direction(x, y, sign, spacing_mask):
+        def trace_direction(x, y, sign, max_length):
             pts = []
             dx, dy = 0.0, 0.0
-            max_length = random.uniform(60, 160) * scale
             travelled = 0.0
             while travelled < max_length:
                 i, j = int(round(y)), int(round(x))
@@ -790,14 +805,13 @@ class ImageParser:
                 x, y = x + dx * step_px, y + dy * step_px
                 pts.append((x, y))
                 travelled += step_px
-                # Stop when running into an already drawn stroke (except right at the seed)
-                if travelled > 3 * step_px and spacing_mask[min(max(int(round(y)), 0), height - 1), min(max(int(round(x)), 0), width - 1)]:
-                    break
             return pts
 
         ys, xs = np.nonzero(hair)
         seed_order = list(range(len(xs)))
         random.shuffle(seed_order)
+        # Cap the attempts so sparse hair regions can't grind through every pixel
+        seed_order = seed_order[:num_strokes * 60]
         spacing_mask = np.zeros((height, width), np.uint8)
         spacing = max(3, int(9 * scale))
 
@@ -809,14 +823,23 @@ class ImageParser:
             if spacing_mask[int(sy), int(sx)]:
                 continue
 
-            backward = trace_direction(sx, sy, -1, spacing_mask)
-            forward = trace_direction(sx, sy, 1, spacing_mask)
+            # Trace the full stroke, then keep or reject it whole - stopping at
+            # already drawn strokes would chop the brushes into short dashes
+            max_length = random.uniform(80, 200) * scale
+            backward = trace_direction(sx, sy, -1, max_length / 2)
+            forward = trace_direction(sx, sy, 1, max_length / 2)
             pts = backward[::-1] + [(sx, sy)] + forward
             if len(pts) < 3:
                 continue
             arr = np.array(pts)
             length = np.hypot(np.diff(arr[:, 0]), np.diff(arr[:, 1])).sum()
             if length < min_length_px:
+                continue
+
+            # Reject strokes that mostly run along an already drawn one
+            pj = np.clip(np.round(arr[:, 0]).astype(np.int32), 0, width - 1)
+            pi = np.clip(np.round(arr[:, 1]).astype(np.int32), 0, height - 1)
+            if (spacing_mask[pi, pj] > 0).mean() > 0.25:
                 continue
 
             contour = np.round(arr).astype(np.int32).reshape(-1, 1, 2)

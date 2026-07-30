@@ -29,6 +29,7 @@ parser.add_argument("--shades", type=int, default=2, help="Tone count incl. pape
 parser.add_argument("--spacing", type=float, default=10, help="Hatch line spacing in px (shade style).")
 parser.add_argument("--simplify", type=int, default=80, help="RDP simplification strength in percent (higher = fewer points).")
 parser.add_argument("--hair-strokes", type=int, default=30, help="Target brush stroke count (hair style).")
+parser.add_argument("--stress", type=float, default=0.0, help="Stress level 0-1; scales the shade style's randomness.")
 parser.add_argument("--seed", type=int, default=None, help="Seed RNGs for reproducible output.")
 parser.add_argument("--no-depthmap", action="store_true")
 parser.add_argument("--open", action="store_true", help="Open the resulting SVG (macOS).")
@@ -36,7 +37,7 @@ args = parser.parse_args()
 
 valid_styles = {"default", "features", "outline", "shade", "hair", "oneline"}
 if args.style:
-    invalid = set(args.style.split("+")) - valid_styles
+    invalid = set(args.style.replace("-", "+").split("+")) - valid_styles
     if invalid:
         parser.error(f"Unknown style(s): {', '.join(sorted(invalid))}. Valid: {', '.join(sorted(valid_styles))}")
 
@@ -63,6 +64,7 @@ svg_path = image_parser.convert_to_svg(
     hatch_spacing=args.spacing,
     simplify=args.simplify,
     hair_strokes=args.hair_strokes,
+    stress=args.stress,
     snap_method=args.snap,
     apply_depthmap=not args.no_depthmap,
     suffix=f"-{args.style or 'default'}" + (f"-{args.snap}" if args.snap else ""),
