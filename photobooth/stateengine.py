@@ -39,6 +39,15 @@ class StateEngine:
     CELL_FILL_RATIO = 0.93   # tuned so standard slots render at the same visual size as before
     DEFAULT_TARGET_SIZE = 800
 
+    # Global drawing style for all plotted portraits (None = classic contour tracing).
+    # '+'-combinable tokens: 'features', 'outline', 'shade', 'oneline',
+    # e.g. "features+outline+shade+oneline". Test styles with parsefile.py first.
+    DRAWING_STYLE = "features+outline+shade+oneline"
+    FEATURE_RADIUS = 18   # features: max distance (px at 800) from a landmark line
+    SHADES = 2            # shade: tone count incl. paper white
+    HATCH_SPACING = 10    # shade: hatch line spacing (px at 800)
+    SIMPLIFY = 80         # RDP simplification strength in percent (higher = fewer points)
+
     @classmethod
     def _standard_shuffle_blocks(cls):
         """Derives shuffle blocks from SLOT_LAYOUT instead of hand-maintaining a separate list:
@@ -263,6 +272,11 @@ class StateEngine:
             "max_paths":        round(base["max_paths"] * area_ratio),
             "min_contour_area": round(base["min_contour_area"] * area_ratio),
             "min_paths":        base["min_paths"],
+            "style":            self.DRAWING_STYLE,
+            "feature_radius":   self.FEATURE_RADIUS,
+            "shades":           self.SHADES,
+            "hatch_spacing":    self.HATCH_SPACING,
+            "simplify":         self.SIMPLIFY,
         }
 
     # Messages

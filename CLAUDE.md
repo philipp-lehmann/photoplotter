@@ -32,6 +32,8 @@ python parsefile.py photos/test/1.jpg --style oneline --seed 1 --open
 ```
 Styles combine with `+`: `oneline` (one continuous line), `features` (only strokes near the 68-point facial landmarks), `outline` (person silhouette only; with `features` the silhouette stays whole while image strokes are feature-filtered), `shade` (parallel hatching of dark person areas; `--shades` sets the tone count incl. paper white, `--spacing` the line spacing, darker tones stack rotated hatch families so cross-hatching emerges at `--shades 3+`), e.g. `features+outline+shade+oneline`. `--snap dynamic_grid|poisson_disk` forces the point-snap post-process; `--radius` tunes the feature-overlap distance; `--seed` makes runs reproducible. Outputs land in `photos/parsefile/`.
 
+The live installation's global style is set via `StateEngine.DRAWING_STYLE` in `photobooth/stateengine.py` (same `+`-combinable tokens; `None` = classic contour tracing), with `FEATURE_RADIUS`, `SHADES`, `HATCH_SPACING` alongside it.
+
 **Systemd services (Raspberry Pi):**
 ```bash
 sudo systemctl start photoplotter_lcd.service

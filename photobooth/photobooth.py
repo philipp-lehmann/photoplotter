@@ -15,6 +15,8 @@ class PhotoBooth:
         self.plotter = Plotter()
         self.image_parser = ImageParser()
         self.test_mode = "photos"  # "slots" (verify slot geometry, no plotter needed) | "photos" (original stress-level test loop)
+        self.test_styles = [None, "outline+features", "features+outline+shade+oneline"] # Combinations exercised by the "photos" test mode: every style x stress pair (None = classic contour tracing).
+        self.test_stress = [0.0, 0.5, 1.0] # Test the stress levels
 
     # Handling states
     # ------------------------------------------------------------------------
@@ -293,36 +295,43 @@ class PhotoBooth:
         id_array = list(self.state_engine.slot_ids)
         id_index = 0  # Index to track the current position in the array
 
-        # Process each .jpg file
+        # Process each .jpg file across every style x stress combination
         for jpg_file in jpg_files:
             self.state_engine.currentPhotoPath = os.path.join(photos_dir, jpg_file)
 
-            # Test across 3 fixed stress levels: calm, medium, stressed
-            for stress in [0.0, 0.5, 1.0]:
-                print(f"\n🧠 Testing stress level {stress:.1f} for {jpg_file}")
+            for style in self.test_styles:
+                style_name = (style or "default").replace("+", "-")
 
-                current_id = id_array[id_index]
-                params = self.state_engine.get_render_params(current_id)
-                self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath, **params)
+                for stress in self.test_stress:
+                    print(f"\n🧠 Testing style '{style_name}' at stress {stress:.1f} for {jpg_file}")
 
-                # Create the final output SVG file using the rolling ID
-                geom = self.state_engine.get_slot_geometry(current_id)
-                scale_factor = self.state_engine.compute_scale_factor(
-                    geom.width, geom.height, source_size=params["target_width"]
-                )
-                self.state_engine.currentSVGPath = self.image_parser.create_output_svg(
-                    self.state_engine.currentSVGPath,
-                    f"photo-output-stress-{stress:.1f}-",
-                    offset_x=geom.x,
-                    offset_y=geom.y,
-                    scale_factor=scale_factor,
-                    id=current_id,
-                    paper_width=self.state_engine.paperSizeX,
-                    paper_height=self.state_engine.paperSizeY
-                )
+                    # Apply the stress level so get_render_params actually varies with it
+                    self.state_engine.stresslevel = stress
 
-                # Update rolling ID, ensuring it wraps within id_array
-                id_index = (id_index + 1) % len(id_array)
+                    current_id = id_array[id_index]
+                    params = self.state_engine.get_render_params(current_id)
+                    params["style"] = style
+                    params["suffix"] = f"-{style_name}-s{stress:.1f}"
+                    self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath, **params)
+
+                    # Create the final output SVG file using the rolling ID
+                    geom = self.state_engine.get_slot_geometry(current_id)
+                    scale_factor = self.state_engine.compute_scale_factor(
+                        geom.width, geom.height, source_size=params["target_width"]
+                    )
+                    self.state_engine.currentSVGPath = self.image_parser.create_output_svg(
+                        self.state_engine.currentSVGPath,
+                        f"photo-output-{style_name}-stress-{stress:.1f}-",
+                        offset_x=geom.x,
+                        offset_y=geom.y,
+                        scale_factor=scale_factor,
+                        id=current_id,
+                        paper_width=self.state_engine.paperSizeX,
+                        paper_height=self.state_engine.paperSizeY
+                    )
+
+                    # Update rolling ID, ensuring it wraps within id_array
+                    id_index = (id_index + 1) % len(id_array)
 
 
 

@@ -27,6 +27,7 @@ parser.add_argument("--min-contour-area", type=int, default=16)
 parser.add_argument("--radius", type=float, default=18, help="Feature-overlap radius in px (features style).")
 parser.add_argument("--shades", type=int, default=2, help="Tone count incl. paper white (shade style).")
 parser.add_argument("--spacing", type=float, default=10, help="Hatch line spacing in px (shade style).")
+parser.add_argument("--simplify", type=int, default=80, help="RDP simplification strength in percent (higher = fewer points).")
 parser.add_argument("--seed", type=int, default=None, help="Seed RNGs for reproducible output.")
 parser.add_argument("--no-depthmap", action="store_true")
 parser.add_argument("--open", action="store_true", help="Open the resulting SVG (macOS).")
@@ -59,6 +60,7 @@ svg_path = image_parser.convert_to_svg(
     feature_radius=args.radius,
     shades=args.shades,
     hatch_spacing=args.spacing,
+    simplify=args.simplify,
     snap_method=args.snap,
     apply_depthmap=not args.no_depthmap,
     suffix=f"-{args.style or 'default'}" + (f"-{args.snap}" if args.snap else ""),

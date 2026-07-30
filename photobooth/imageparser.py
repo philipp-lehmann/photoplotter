@@ -71,12 +71,13 @@ class ImageParser:
         faces = self.face_detector(gray_image)
         return len(faces) > 0
     
-    def convert_to_svg(self, image_filepath, target_width=800, target_height=800, scale_x=1.0, scale_y=1.0, min_paths=30, max_paths=120, min_contour_area=16, suffix='', method=3, apply_depthmap=True, style=None, feature_radius=18, snap_method=None, shades=2, hatch_spacing=10):
+    def convert_to_svg(self, image_filepath, target_width=800, target_height=800, scale_x=1.0, scale_y=1.0, min_paths=30, max_paths=120, min_contour_area=16, suffix='', method=3, apply_depthmap=True, style=None, feature_radius=18, snap_method=None, shades=2, hatch_spacing=10, simplify=80):
         """Convert input image to SVG with parameters.
         style: optional '+'-separated styles ('features', 'outline', 'shade', 'oneline'), e.g. 'features+shade+oneline'.
         snap_method: force the point-snap style ('dynamic_grid'/'poisson_disk'/'none') instead of the random pick.
         shades: tone count for the shade style, paper white included (2 = white + one hatched tone).
-        hatch_spacing: hatch line spacing in px for the shade style (at 800px target size)."""
+        hatch_spacing: hatch line spacing in px for the shade style (at 800px target size).
+        simplify: RDP simplification strength in percent (higher = fewer points)."""
         print(f"Converting {image_filepath}")
         if not os.path.isfile(image_filepath):
             print(f"File {image_filepath} does not exist.")
@@ -145,7 +146,7 @@ class ImageParser:
             method = random.choices(methods, weights=weights, k=1)[0]
 
         # Process SVG
-        processed_svg_filepath = self.process_svg(svg_filepath, method)
+        processed_svg_filepath = self.process_svg(svg_filepath, method, removal_percentage=simplify)
 
         # Chain everything into one continuous line (after dedup/simplify, so the
         # single line is not chopped back apart by remove_duplicate_segments)
