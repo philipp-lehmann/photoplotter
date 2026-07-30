@@ -295,6 +295,9 @@ class PhotoBooth:
         id_array = list(self.state_engine.slot_ids)
         id_index = 0  # Index to track the current position in the array
 
+        # Traced SVGs per combination, in photo order: rows of the comparison sheet
+        comparison_rows = {}
+
         # Process each .jpg file across every style x stress combination
         for jpg_file in jpg_files:
             self.state_engine.currentPhotoPath = os.path.join(photos_dir, jpg_file)
@@ -313,6 +316,11 @@ class PhotoBooth:
                     params["style"] = style
                     params["suffix"] = f"-{style_name}-s{stress:.1f}"
                     self.state_engine.currentSVGPath = self.image_parser.convert_to_svg(self.state_engine.currentPhotoPath, **params)
+
+                    combo_label = f"{style_name} @ stress {stress:.1f}"
+                    comparison_rows.setdefault(combo_label, []).append(
+                        (self.state_engine.currentSVGPath, params["target_width"])
+                    )
 
                     # Create the final output SVG file using the rolling ID
                     geom = self.state_engine.get_slot_geometry(current_id)
@@ -338,6 +346,11 @@ class PhotoBooth:
         output_directory = os.path.join(parent_dir, "photos/output")
         combined_file_path = os.path.join(parent_dir, "photos/collection/photo-collection.svg")
         self.image_parser.collect_all_paths(output_directory, combined_file_path, "photo")
+
+        # Comparison sheet: one row per style x stress combination, one column per
+        # test photo, so variants of the same photo line up vertically
+        comparison_file_path = os.path.join(parent_dir, "photos/collection/photo-comparison.svg")
+        self.image_parser.create_comparison_svg(list(comparison_rows.items()), jpg_files, comparison_file_path)
 
         print("All SVGs files processed.")
         sys.exit()

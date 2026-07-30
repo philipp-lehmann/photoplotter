@@ -50,8 +50,8 @@ photoplotter/
     ├── collection/
     ├── output/
     ├── test/
+    └── temp/
     ├── samples/
-    └── artists/
 
 ```
 

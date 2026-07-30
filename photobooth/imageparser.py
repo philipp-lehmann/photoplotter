@@ -1401,9 +1401,57 @@ class ImageParser:
         # Save the combined SVG to the output file
         with open(output_file, 'wb') as file:
             file.write(etree.tostring(first_root, pretty_print=True))
+        print(f"Combined SVG saved to {output_file}")
 
-        print(f"Combined SVG saved to {output_file}")   
-    
+    def create_comparison_svg(self, rows, column_labels, output_filepath, cell_size=300, label_width=260, padding=10):
+        """Assemble traced SVGs into a comparison sheet: one row per combination,
+        one column per test image, the combination name labeling each row.
+        rows: list of (label, cells); cells: list of (svg_filepath, source_size) or None."""
+        ns = 'http://www.w3.org/2000/svg'
+        header_height = 30
+        num_cols = max((len(cells) for _, cells in rows), default=0)
+        width = label_width + num_cols * cell_size
+        height = header_height + len(rows) * cell_size
+        root = etree.Element(f'{{{ns}}}svg', width=str(width), height=str(height),
+                             viewBox=f"0 0 {width} {height}")
+
+        def add_text(x, y, content, size='16'):
+            text = etree.SubElement(root, f'{{{ns}}}text', x=str(round(x)), y=str(round(y)))
+            text.set('font-family', 'monospace')
+            text.set('font-size', size)
+            text.text = content
+
+        for c, column_label in enumerate(column_labels[:num_cols]):
+            add_text(label_width + c * cell_size + padding, header_height - 10, column_label)
+
+        for r, (label, cells) in enumerate(rows):
+            y0 = header_height + r * cell_size
+            # Stack the combination name over the stress part so long style
+            # names stay inside the label column
+            for i, part in enumerate(label.split(' @ ')):
+                add_text(padding, y0 + cell_size / 2 + i * 18, part, size='13')
+
+            for c, cell in enumerate(cells):
+                if not cell:
+                    continue
+                svg_path, source_size = cell
+                if not svg_path or not os.path.isfile(svg_path):
+                    continue
+                scale = (cell_size - 2 * padding) / float(source_size)
+                x0 = label_width + c * cell_size + padding
+                cell_root = etree.parse(svg_path).getroot()
+                for poly in cell_root.findall(f'.//{{{ns}}}polyline'):
+                    points = poly.get('points')
+                    if not points:
+                        continue
+                    moved = [(x0 + x * scale, y0 + padding + y * scale) for x, y in self.parse_points(points)]
+                    etree.SubElement(root, f'{{{ns}}}polyline', points=self.points_to_str(moved),
+                                     fill='none', stroke='black', **{'stroke-width': '1'})
+
+        etree.ElementTree(root).write(output_filepath, pretty_print=True, xml_declaration=True, encoding='UTF-8')
+        print(f"Comparison sheet saved to {output_filepath}")
+        return output_filepath
+
     # ----- Face landmarks -----
     def crop_to_largest_face(self, image, face_rect, target_width=800, target_height=800):
         """
