@@ -17,6 +17,19 @@ from utils import profile, wait_for_cooldown, get_random_color, pc
 
 SELFIE_SEGMENTER_URL = "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite"
 
+# Canonical dlib 68-point landmark groups; eye/lip loops repeat their first index to close
+LANDMARK_GROUPS = {
+    "jaw": list(range(0, 17)),
+    "right_brow": list(range(17, 22)),
+    "left_brow": list(range(22, 27)),
+    "nose_bridge": [27, 28, 29, 30],
+    "nose_base": [31, 32, 33, 34, 35],
+    "right_eye": [36, 37, 38, 39, 40, 41, 36],
+    "left_eye": [42, 43, 44, 45, 46, 47, 42],
+    "outer_lips": list(range(48, 60)) + [48],
+    "inner_lips": list(range(60, 68)) + [60],
+}
+
 class ImageParser:
     def __init__(self):
         print("Starting ImageParser ...")
@@ -53,8 +66,10 @@ class ImageParser:
         faces = self.face_detector(gray_image)
         return len(faces) > 0
     
-    def convert_to_svg(self, image_filepath, target_width=800, target_height=800, scale_x=1.0, scale_y=1.0, min_paths=30, max_paths=120, min_contour_area=16, suffix='', method=3, apply_depthmap=True):
-        """Convert input image to SVG with parameters."""
+    def convert_to_svg(self, image_filepath, target_width=800, target_height=800, scale_x=1.0, scale_y=1.0, min_paths=30, max_paths=120, min_contour_area=16, suffix='', method=3, apply_depthmap=True, style=None, feature_radius=18, snap_method=None):
+        """Convert input image to SVG with parameters.
+        style: optional '+'-separated styles ('features', 'outline', 'oneline'), e.g. 'features+outline+oneline'.
+        snap_method: force the point-snap style ('dynamic_grid'/'poisson_disk'/'none') instead of the random pick."""
         print(f"Converting {image_filepath}")
         if not os.path.isfile(image_filepath):
             print(f"File {image_filepath} does not exist.")
@@ -65,8 +80,9 @@ class ImageParser:
             print("Image loading failed.")
             return None
         
+        styles = set((style or "").split("+"))
         crop_image = self.handle_faces(image, target_width, target_height)
-        opt_image, faces = self.process_face_image(crop_image)
+        opt_image, faces, landmarks_list = self.process_face_image(crop_image)
         person_mask = None
 
         if apply_depthmap:
@@ -88,16 +104,42 @@ class ImageParser:
         mask_contours = self.sort_and_limit_contours(mask_contours, target_width, target_height, max_paths, faces=faces)
 
         # Merge contours
-        merged_contours = image_contours + mask_contours
-        
+        if "outline" in styles:
+            # Outline style: keep the person silhouette as open paths without the
+            # straight border-hugging segments; image contours only survive if the
+            # features filter is also active (features+outline)
+            if not mask_contours:
+                print("No person silhouette found: outline style has nothing to draw.")
+            mask_contours = self.split_contours_at_borders(mask_contours, target_width, target_height)
+            if "features" in styles:
+                image_contours = self.filter_contours_to_features(image_contours, landmarks_list, target_width, target_height, radius=feature_radius)
+            else:
+                image_contours = []
+            merged_contours = image_contours + mask_contours
+        else:
+            merged_contours = image_contours + mask_contours
+            # Keep only strokes overlapping the facial features (silhouette included,
+            # so only its jaw-adjacent parts survive)
+            if "features" in styles:
+                merged_contours = self.filter_contours_to_features(merged_contours, landmarks_list, target_width, target_height, radius=feature_radius)
+
         # Create the SVG with a style
         svg_filepath = self.create_svg(image_filepath, merged_contours, target_width, target_height, scale_x, scale_y, suffix)
-        methods = ["dynamic_grid", "poisson_disk", "none"]
-        weights = [0.025, 0.025, 0.95]  
-        method = random.choices(methods, weights=weights, k=1)[0]
-        
+        if snap_method is not None:
+            method = snap_method
+        else:
+            methods = ["dynamic_grid", "poisson_disk", "none"]
+            weights = [0.025, 0.025, 0.95]
+            method = random.choices(methods, weights=weights, k=1)[0]
+
         # Process SVG
         processed_svg_filepath = self.process_svg(svg_filepath, method)
+
+        # Chain everything into one continuous line (after dedup/simplify, so the
+        # single line is not chopped back apart by remove_duplicate_segments)
+        if "oneline" in styles:
+            processed_svg_filepath = self.chain_svg_polylines(processed_svg_filepath)
+
         print(f"{method}: Length Before {self.get_svgpath_length(svg_filepath)} / Output: {pc(self.get_svgpath_length(processed_svg_filepath))}")
         print(f"Processed SVG saved at: {processed_svg_filepath}")
         return processed_svg_filepath
@@ -182,10 +224,10 @@ class ImageParser:
     @profile
     def process_face_image(self, image, target_width=800, target_height=800):
         """Optimized method that detects, crops, enhances the face and draws facial features.
-        Returns the cleaned grayscale image and the detected face rectangles."""
+        Returns the cleaned grayscale image, the detected face rectangles and their landmarks."""
         if image is None:
             print("Failed to load image.")
-            return None, []
+            return None, [], []
 
         gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
@@ -203,11 +245,14 @@ class ImageParser:
             cleaned_image = cv2.bilateralFilter(cleaned_image, 9, 40, 9)
 
         # Apply facial landmarks
+        landmarks_list = []
         if faces:
             for face_rect in faces:
-                self.draw_facial_landmarks(cleaned_image, face_rect)
+                landmarks = self.draw_facial_landmarks(cleaned_image, face_rect)
+                if landmarks is not None:
+                    landmarks_list.append(landmarks)
 
-        return cleaned_image, faces
+        return cleaned_image, faces, landmarks_list
 
 
     # ----- Person Mask (segmentation) -----
@@ -371,6 +416,43 @@ class ImageParser:
         filtered = [c for c in contours if cv2.contourArea(c) > min_contour_area]
         return [cv2.approxPolyDP(c, 1.5, True) for c in filtered]
 
+    def split_contours_at_borders(self, contours, width, height, margin=3, min_run_length=10):
+        """Split closed contours where they run along the image borders,
+        returning open sub-contours without the border-hugging segments."""
+        result = []
+        for contour in contours:
+            pts = contour.reshape(-1, 2).astype(np.float64)
+            on_border = (
+                (pts[:, 0] <= margin) | (pts[:, 0] >= width - 1 - margin) |
+                (pts[:, 1] <= margin) | (pts[:, 1] >= height - 1 - margin)
+            )
+            inside = ~on_border
+
+            if inside.all():
+                result.append(contour)
+                continue
+            if not inside.any():
+                continue
+
+            # Rotate so index 0 is on the border: no inside-run straddles the array boundary
+            k = int(np.argmin(inside))
+            inside = np.roll(inside, -k)
+            pts = np.roll(pts, -k, axis=0)
+
+            start = None
+            for i, flag in enumerate(np.append(inside, False)):
+                if flag and start is None:
+                    start = i
+                elif not flag and start is not None:
+                    run = pts[start:i]
+                    start = None
+                    if len(run) < 2:
+                        continue
+                    arc_length = np.hypot(np.diff(run[:, 0]), np.diff(run[:, 1])).sum()
+                    if arc_length >= min_run_length:
+                        result.append(np.round(run).astype(np.int32).reshape(-1, 1, 2))
+        return result
+
     def sort_and_limit_contours(self, contours, target_width, target_height, max_paths, faces=None):
         """Sort and limit the number of contours to a specified maximum.
         Contours on/near a face come first; background fills the remaining budget."""
@@ -393,7 +475,90 @@ class ImageParser:
             sorted_contours = sorted(contours, key=lambda c: np.linalg.norm(np.mean(np.squeeze(c, axis=1), axis=0) - image_center))
         return sorted_contours[:max_paths]
 
-    # ----- SVG Handling -----  
+    # ----- Facial Feature Filtering -----
+    def build_feature_distance_map(self, landmarks_list, width, height):
+        """Distance (px) from every pixel to the nearest facial-feature polyline."""
+        mask = np.zeros((height, width), np.uint8)
+        for landmarks in landmarks_list:
+            pts = np.array([(landmarks.part(i).x, landmarks.part(i).y) for i in range(68)], np.int32)
+            for indices in LANDMARK_GROUPS.values():
+                cv2.polylines(mask, [pts[indices].reshape(-1, 1, 2)], False, 255, 1)
+        return cv2.distanceTransform(cv2.bitwise_not(mask), cv2.DIST_L2, 3)
+
+    def densify_closed(self, pts, max_seg):
+        """Insert interpolated points on edges longer than max_seg, treating pts as a closed loop."""
+        densified = []
+        n = len(pts)
+        for i in range(n):
+            a, b = pts[i], pts[(i + 1) % n]
+            densified.append(a)
+            length = np.hypot(*(b - a))
+            if length > max_seg:
+                steps = int(length // max_seg)
+                for t in np.linspace(0, 1, steps + 2)[1:-1]:
+                    densified.append(a + t * (b - a))
+        return np.array(densified)
+
+    def filter_contours_to_features(self, contours, landmarks_list, width, height, radius=18, gap_tol=2, min_run_length=8):
+        """Keep only the sub-segments of each contour that run within `radius` px
+        of a facial-feature line. Splits contours; returns (N,1,2) int32 arrays."""
+        if not landmarks_list:
+            print("No landmarks found: skipping feature filter.")
+            return contours
+
+        dist_map = self.build_feature_distance_map(landmarks_list, width, height)
+        radius_px = radius * width / 800.0
+        filtered = []
+
+        for contour in contours:
+            pts = contour.reshape(-1, 2).astype(np.float64)
+            dense = self.densify_closed(pts, radius_px)
+
+            xs = np.clip(dense[:, 0].astype(np.int32), 0, width - 1)
+            ys = np.clip(dense[:, 1].astype(np.int32), 0, height - 1)
+            inside = dist_map[ys, xs] <= radius_px
+
+            if inside.all():
+                # Keep the original contour untouched (no densification artifacts)
+                filtered.append(contour)
+                continue
+            if not inside.any():
+                continue
+
+            # Rotate so index 0 is outside: no inside-run straddles the array boundary
+            k = int(np.argmin(inside))
+            inside = np.roll(inside, -k)
+            dense = np.roll(dense, -k, axis=0)
+
+            # Scan maximal inside-runs, bridging short outside gaps to avoid chatter
+            runs = []
+            start, gap = None, 0
+            for i, flag in enumerate(inside):
+                if flag:
+                    if start is None:
+                        start = i
+                    gap = 0
+                elif start is not None:
+                    gap += 1
+                    if gap > gap_tol:
+                        runs.append((start, i - gap + 1))
+                        start, gap = None, 0
+            if start is not None:
+                runs.append((start, len(inside) - gap))
+
+            for start, end in runs:
+                run = dense[start:end]
+                if len(run) < 2:
+                    continue
+                arc_length = np.hypot(np.diff(run[:, 0]), np.diff(run[:, 1])).sum()
+                if arc_length < min_run_length:
+                    continue
+                filtered.append(np.round(run).astype(np.int32).reshape(-1, 1, 2))
+
+        print(f"Feature filter: {len(contours)} contours -> {len(filtered)} feature segments")
+        return filtered
+
+    # ----- SVG Handling -----
     def create_svg(self, image_filepath, contours, target_width, target_height, scale_x, scale_y, suffix):
         """Create an SVG file from contours."""
         dwg = svgwrite.Drawing(size=(target_width, target_height))
@@ -442,7 +607,147 @@ class ImageParser:
             processed_svg_filepath = self.simplify_svg(svg_filepath, removal_percentage=removal_percentage)
 
         return processed_svg_filepath
-    
+
+    def chain_paths(self, paths, closed_tol=3.0, max_opt_passes=10):
+        """Chain polylines into one continuous path, ordering and orienting them so the
+        straight connector jumps are as short as possible: greedy nearest-endpoint
+        construction refined by 2-opt reversals, path flips and loop re-entry.
+        :param paths: List of lists of (x, y) tuples.
+        :return: A single list of (x, y) tuples."""
+        items = []
+        for p in paths:
+            if len(p) < 2:
+                continue
+            pts = np.array(p, dtype=np.float64)
+            closed = np.hypot(*(pts[0] - pts[-1])) <= closed_tol
+            if closed and np.array_equal(pts[0], pts[-1]):
+                pts = pts[:-1]
+            items.append({"pts": pts, "closed": closed})
+        if not items:
+            return []
+
+        # Closed loops enter and exit at pts[0]; open paths run pts[0] -> pts[-1]
+        def start(it):
+            return it["pts"][0]
+
+        def end(it):
+            return it["pts"][0] if it["closed"] else it["pts"][-1]
+
+        def dist(a, b):
+            return float(np.hypot(*(a - b)))
+
+        def roll_loop(it, target):
+            """Enter a closed loop at the point nearest to target."""
+            pts = it["pts"]
+            d = np.hypot(pts[:, 0] - target[0], pts[:, 1] - target[1])
+            it["pts"] = np.roll(pts, -int(np.argmin(d)), axis=0)
+
+        def flip(it):
+            if not it["closed"]:
+                it["pts"] = it["pts"][::-1]
+            return it
+
+        # Greedy construction, seeded with the first path: document order is
+        # face-priority from sort_and_limit_contours, so the line starts on the face
+        seq = [items.pop(0)]
+        while items:
+            cur = end(seq[-1])
+            best_i, best_d = 0, None
+            for i, it in enumerate(items):
+                pts = it["pts"]
+                if it["closed"]:
+                    d = float(np.min(np.hypot(pts[:, 0] - cur[0], pts[:, 1] - cur[1])))
+                else:
+                    d = min(dist(cur, pts[0]), dist(cur, pts[-1]))
+                if best_d is None or d < best_d:
+                    best_i, best_d = i, d
+            it = items.pop(best_i)
+            if it["closed"]:
+                roll_loop(it, cur)
+            elif dist(cur, it["pts"][-1]) < dist(cur, it["pts"][0]):
+                it["pts"] = it["pts"][::-1]
+            seq.append(it)
+
+        # Refine the order to shorten the total connector length, keeping the
+        # first path fixed so the line still starts on the face
+        for _ in range(max_opt_passes):
+            improved = False
+
+            # Re-enter loops at the point nearest the predecessor's exit
+            for k in range(1, len(seq)):
+                if seq[k]["closed"]:
+                    prev_end = end(seq[k - 1])
+                    before = dist(prev_end, start(seq[k]))
+                    roll_loop(seq[k], prev_end)
+                    if dist(prev_end, start(seq[k])) < before - 1e-9:
+                        improved = True
+
+            # Flip open paths when it shortens their two connectors
+            for k in range(1, len(seq)):
+                if seq[k]["closed"]:
+                    continue
+                prev_end = end(seq[k - 1])
+                nxt = start(seq[k + 1]) if k + 1 < len(seq) else None
+                pts = seq[k]["pts"]
+                old = dist(prev_end, pts[0]) + (dist(pts[-1], nxt) if nxt is not None else 0)
+                new = dist(prev_end, pts[-1]) + (dist(pts[0], nxt) if nxt is not None else 0)
+                if new < old - 1e-9:
+                    seq[k]["pts"] = pts[::-1]
+                    improved = True
+
+            # 2-opt: reverse a sub-sequence when it shortens the two boundary
+            # connectors (internal connector lengths are unaffected by reversal)
+            for i in range(1, len(seq) - 1):
+                for j in range(i + 1, len(seq)):
+                    e_prev, s_i, e_j = end(seq[i - 1]), start(seq[i]), end(seq[j])
+                    s_next = start(seq[j + 1]) if j + 1 < len(seq) else None
+                    old = dist(e_prev, s_i) + (dist(e_j, s_next) if s_next is not None else 0)
+                    new = dist(e_prev, e_j) + (dist(s_i, s_next) if s_next is not None else 0)
+                    if new < old - 1e-9:
+                        seq[i:j + 1] = [flip(it) for it in reversed(seq[i:j + 1])]
+                        improved = True
+
+            if not improved:
+                break
+
+        chain = []
+        for it in seq:
+            pts = it["pts"]
+            if it["closed"]:
+                # Close the loop by repeating the entry point
+                pts = np.vstack([pts, pts[:1]])
+            chain.extend(map(tuple, pts))
+        return chain
+
+    def chain_svg_polylines(self, svg_filepath):
+        """Merge all polylines in an SVG into one continuous polyline (one-line drawing)."""
+        tree = etree.parse(svg_filepath)
+        root = tree.getroot()
+
+        namespace = {'svg': 'http://www.w3.org/2000/svg'}
+        polylines = root.findall('.//svg:polyline', namespaces=namespace)
+
+        paths = [self.parse_points(p.get('points')) for p in polylines if p.get('points')]
+        chained = self.chain_paths(paths)
+
+        for polyline in polylines:
+            parent = polyline.getparent()
+            if parent is not None:
+                parent.remove(polyline)
+
+        if chained:
+            etree.SubElement(
+                root, '{http://www.w3.org/2000/svg}polyline',
+                points=self.points_to_str(chained),
+                fill='none', stroke=get_random_color(),
+                **{'stroke-width': '1'}
+            )
+
+        output_svg_filepath = svg_filepath.rsplit('.', 1)[0] + '_oneline.svg'
+        tree.write(output_svg_filepath, pretty_print=True, xml_declaration=True, encoding='UTF-8')
+        print(f"Chained {len(paths)} polylines into one line: {output_svg_filepath}")
+        return output_svg_filepath
+
     # Ramer-Douglas-Peucker simplification via OpenCV (C-speed)
     def rdp(self, points, epsilon):
         """
@@ -1000,12 +1305,12 @@ class ImageParser:
     @profile
     def draw_facial_landmarks(self, image, face_rect):
         """
-        NOT IN USE: This function is no longer active.
-        Draw the 68 facial landmarks using dlib's shape predictor.
+        Draw a random subset of feature lines from the 68 facial landmarks into the image
+        and return the detected landmarks.
         """
         if image is None or image.size == 0:
             print("Error: Image is empty or not loaded properly.")
-            return
+            return None
 
         landmarks = self.landmark_detector(image, face_rect)
 
@@ -1050,6 +1355,8 @@ class ImageParser:
         
         if random.random() < probability_teeth: #teeth
             self.draw_feature_line(image, landmarks, [61, 67, 62, 66, 63, 65])
+
+        return landmarks
 
     def draw_feature_line(self, img, landmarks, points_indices, color=(255, 255, 255), thickness=2):
         """Helper method to draw lines connecting facial landmarks."""

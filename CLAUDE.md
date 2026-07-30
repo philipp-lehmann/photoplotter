@@ -26,6 +26,12 @@ On non-Raspberry Pi systems, the app automatically enters test mode and processe
 python plotfile.py /absolute/path/to/file.svg
 ```
 
+**Trace a single image to SVG (drawing-style test harness, no plotter needed):**
+```bash
+python parsefile.py photos/test/1.jpg --style oneline --seed 1 --open
+```
+Styles combine with `+`: `oneline` (one continuous line), `features` (only strokes near the 68-point facial landmarks), `outline` (person silhouette only; with `features` the silhouette stays whole while image strokes are feature-filtered), e.g. `features+outline+oneline`. `--snap dynamic_grid|poisson_disk` forces the point-snap post-process; `--radius` tunes the feature-overlap distance; `--seed` makes runs reproducible. Outputs land in `photos/parsefile/`.
+
 **Systemd services (Raspberry Pi):**
 ```bash
 sudo systemctl start photoplotter_lcd.service
