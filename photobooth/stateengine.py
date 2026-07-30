@@ -19,21 +19,21 @@ SlotGeometry = namedtuple("SlotGeometry", ["id", "kind", "x", "y", "width", "hei
 class StateEngine:
     # Hardcoded physical grid layout: one 2x2 "featured" slot (bottom-right) + 11 standard slots.
     #  1,  2,  3,  4,  5
-    #  6,  7  8,  -, -
-    # 11, 12, 13, -, -
+    #  6,  -,  8,  9, 10
+    #  -,  -, 13, 14, 15
     SLOT_LAYOUT = [
         Slot(id=1,  col=0, row=0),
         Slot(id=2,  col=1, row=0),
         Slot(id=3,  col=2, row=0),
         Slot(id=4,  col=3, row=0),
         Slot(id=5,  col=4, row=0),
-        Slot(id=6,  col=0, row=1),
-        Slot(id=7,  col=1, row=1),
+        Slot(id=6,  col=0, row=1, colspan=2, rowspan=2, kind="featured"),
         Slot(id=8,  col=2, row=1),
-        Slot(id=9,  col=3, row=1, colspan=2, rowspan=2, kind="featured"),
-        Slot(id=11, col=0, row=2),
-        Slot(id=12, col=1, row=2),
+        Slot(id=9,  col=3, row=1),
+        Slot(id=10, col=4, row=1),
         Slot(id=13, col=2, row=2),
+        Slot(id=14, col=3, row=2),
+        Slot(id=15, col=4, row=2),
     ]
 
     CELL_FILL_RATIO = 0.93   # tuned so standard slots render at the same visual size as before
