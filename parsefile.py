@@ -18,7 +18,7 @@ from photobooth.imageparser import ImageParser
 parser = argparse.ArgumentParser(description="Trace an image to SVG without plotting (style test harness).")
 parser.add_argument("file", help="Path to the source image (jpg/png).")
 parser.add_argument("--style", default=None,
-                    help="'+'-combinable styles: features, outline, shade, hair, oneline (e.g. features+hair+oneline).")
+                    help="'+'-combinable styles: features, outline, shade, hair, landmarks, oneline (e.g. features+hair+oneline).")
 parser.add_argument("--method", type=int, default=3, help="Contour method 1-4 (see extract_contours).")
 parser.add_argument("--snap", default=None, choices=["none", "dynamic_grid", "poisson_disk"],
                     help="Force the point-snap style instead of the random pick.")
@@ -35,7 +35,7 @@ parser.add_argument("--no-depthmap", action="store_true")
 parser.add_argument("--open", action="store_true", help="Open the resulting SVG (macOS).")
 args = parser.parse_args()
 
-valid_styles = {"default", "features", "outline", "shade", "hair", "oneline"}
+valid_styles = {"default", "features", "outline", "shade", "hair", "landmarks", "oneline"}
 if args.style:
     invalid = set(args.style.replace("-", "+").split("+")) - valid_styles
     if invalid:

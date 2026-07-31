@@ -15,7 +15,7 @@ class PhotoBooth:
         self.plotter = Plotter()
         self.image_parser = ImageParser()
         self.test_mode = "photos"  # "slots" (verify slot geometry, no plotter needed) | "photos" (original stress-level test loop)
-        self.test_styles = ["outline+features+hair", "features+hair+outline+shade+oneline"] # Combinations exercised by the "photos" test mode: every style x stress pair (None = classic contour tracing).
+        self.test_styles = ["features+hair+outline+shade+landmarks+oneline", "features+hair+outline+shade+oneline"] # Combinations exercised by the "photos" test mode: every style x stress pair (None = classic contour tracing).
         self.test_stress = [0.0, 1.0] # Test the stress levels
 
     # Handling states

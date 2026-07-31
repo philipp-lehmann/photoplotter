@@ -31,6 +31,19 @@ LANDMARK_GROUPS = {
     "inner_lips": list(range(60, 68)) + [60],
 }
 
+# Stylistic feature lines for the 'landmarks' style: (draw probability, index polylines).
+# Each entry is rolled once per face; all its polylines are drawn together.
+LANDMARK_LINES = [
+    (0.27, [[0, 1, 2, 3, 4, 5, 6, 7, 8]]),                            # left jaw
+    (0.24, [[17, 18, 19, 20, 21], [22, 23, 24, 25, 26]]),             # eyebrows
+    (0.34, [[32, 33, 34, 35]]),                                       # round nose
+    (0.21, [[27, 28, 29, 30, 33]]),                                   # vertical nose
+    (0.31, [[36, 37, 38, 39], [40, 41], [42, 43, 44, 45], [46, 47]]), # eyes
+    (0.35, [[37, 40], [41, 38], [43, 46], [47, 44]]),                 # crossed eyes
+    (0.22, [[60, 61, 62, 63, 64, 65, 66, 67, 60]]),                   # mouth
+    (0.17, [[61, 67, 62, 66, 63, 65]]),                               # teeth
+]
+
 class ImageParser:
     def __init__(self):
         print("Starting ImageParser ...")
@@ -73,7 +86,7 @@ class ImageParser:
     
     def convert_to_svg(self, image_filepath, target_width=800, target_height=800, scale_x=1.0, scale_y=1.0, min_paths=30, max_paths=120, min_contour_area=16, suffix='', method=3, apply_depthmap=True, style=None, feature_radius=18, snap_method=None, shades=2, hatch_spacing=10, simplify=80, hair_strokes=30, stress=0.0):
         """Convert input image to SVG with parameters.
-        style: optional '+'-separated styles ('features', 'outline', 'shade', 'hair', 'oneline'), e.g. 'features+hair+oneline'.
+        style: optional '+'-separated styles ('features', 'outline', 'shade', 'hair', 'landmarks', 'oneline'), e.g. 'features+hair+oneline'.
         snap_method: force the point-snap style ('dynamic_grid'/'poisson_disk'/'none') instead of the random pick.
         shades: tone count for the shade style, paper white included (2 = white + one hatched tone).
         hatch_spacing: hatch line spacing in px for the shade style (at 800px target size).
@@ -93,7 +106,7 @@ class ImageParser:
         # Tokens may be joined with '+' or '-'; warn on typos instead of silently
         # falling back to the classic tracing
         styles = set((style or "").replace("-", "+").split("+"))
-        unknown_styles = styles - {"", "features", "outline", "shade", "hair", "oneline"}
+        unknown_styles = styles - {"", "features", "outline", "shade", "hair", "landmarks", "oneline"}
         if unknown_styles:
             print(f"Warning: ignoring unknown style token(s): {', '.join(sorted(unknown_styles))}")
         crop_image = self.handle_faces(image, target_width, target_height)
@@ -146,6 +159,10 @@ class ImageParser:
         # Brush strokes following the hair flow (simulated where no texture shows)
         if "hair" in styles:
             merged_contours += self.generate_hair_stroke_contours(opt_image, crop_image, target_width, target_height, num_strokes=hair_strokes)
+
+        # Random subset of landmark feature lines, drawn directly into the SVG
+        if "landmarks" in styles:
+            merged_contours += self.generate_landmark_contours(landmarks_list)
 
         # Create the SVG with a style
         svg_filepath = self.create_svg(image_filepath, merged_contours, target_width, target_height, scale_x, scale_y, suffix)
@@ -247,7 +264,7 @@ class ImageParser:
     
     @profile
     def process_face_image(self, image, target_width=800, target_height=800):
-        """Optimized method that detects, crops, enhances the face and draws facial features.
+        """Optimized method that detects, crops and enhances the face.
         Returns the cleaned grayscale image, the detected face rectangles and their landmarks."""
         if image is None:
             print("Failed to load image.")
@@ -268,13 +285,9 @@ class ImageParser:
         for _ in range(2):
             cleaned_image = cv2.bilateralFilter(cleaned_image, 9, 40, 9)
 
-        # Apply facial landmarks
-        landmarks_list = []
-        if faces:
-            for face_rect in faces:
-                landmarks = self.draw_facial_landmarks(cleaned_image, face_rect)
-                if landmarks is not None:
-                    landmarks_list.append(landmarks)
+        # Detect landmarks only; feature lines are no longer baked into the raster
+        # (the 'landmarks' style draws them straight into the SVG instead)
+        landmarks_list = [self.landmark_detector(cleaned_image, face_rect) for face_rect in faces]
 
         return cleaned_image, faces, landmarks_list
 
@@ -526,14 +539,20 @@ class ImageParser:
         return sorted_contours[:max_paths]
 
     # ----- Facial Feature Filtering -----
-    def build_feature_distance_map(self, landmarks_list, width, height):
-        """Distance (px) from every pixel to the nearest facial-feature polyline."""
+    def build_feature_distance_map(self, landmarks_list, width, height, eye_scale=2.0):
+        """Distance (px) from every pixel to the nearest facial-feature polyline.
+        Eye distances are divided by eye_scale, widening the kept band around the
+        eyes so glasses frames survive the feature filter."""
         mask = np.zeros((height, width), np.uint8)
+        eye_mask = np.zeros((height, width), np.uint8)
         for landmarks in landmarks_list:
             pts = np.array([(landmarks.part(i).x, landmarks.part(i).y) for i in range(68)], np.int32)
-            for indices in LANDMARK_GROUPS.values():
-                cv2.polylines(mask, [pts[indices].reshape(-1, 1, 2)], False, 255, 1)
-        return cv2.distanceTransform(cv2.bitwise_not(mask), cv2.DIST_L2, 3)
+            for name, indices in LANDMARK_GROUPS.items():
+                target = eye_mask if name in ("right_eye", "left_eye") else mask
+                cv2.polylines(target, [pts[indices].reshape(-1, 1, 2)], False, 255, 1)
+        dist = cv2.distanceTransform(cv2.bitwise_not(mask), cv2.DIST_L2, 3)
+        eye_dist = cv2.distanceTransform(cv2.bitwise_not(eye_mask), cv2.DIST_L2, 3)
+        return np.minimum(dist, eye_dist / eye_scale)
 
     def densify_closed(self, pts, max_seg):
         """Insert interpolated points on edges longer than max_seg, treating pts as a closed loop."""
@@ -1643,65 +1662,15 @@ class ImageParser:
         blended_image = cv2.addWeighted(image, 0.8, enhanced_image, 0.2, 0)
         return blended_image
 
-    @profile
-    def draw_facial_landmarks(self, image, face_rect):
-        """
-        Draw a random subset of feature lines from the 68 facial landmarks into the image
-        and return the detected landmarks.
-        """
-        if image is None or image.size == 0:
-            print("Error: Image is empty or not loaded properly.")
-            return None
-
-        landmarks = self.landmark_detector(image, face_rect)
-
-        # Define probabilities for each scenario
-        probability_eyebrows = 0.24 
-        probability_mouth = 0.22 
-        probability_jawline = 0.27
-        probability_eyes_1 = 0.31
-        probability_eyes_2 = 0.35
-        probability_nose_1 = 0.34
-        probability_nose_2 = 0.21
-        probability_teeth = 0.17
-
-        # Randomly decide whether to draw each feature based on probabilities
-        if random.random() < probability_jawline: #leftjaw
-            self.draw_feature_line(image, landmarks, [0, 1, 2, 3, 4, 5, 6, 7, 8])
-
-        if random.random() < probability_eyebrows: #eybrows
-            self.draw_feature_line(image, landmarks, [17, 18, 19, 20, 21])
-            self.draw_feature_line(image, landmarks, [22, 23, 24, 25, 26])
-
-        if random.random() < probability_nose_1: #roundnose
-            self.draw_feature_line(image, landmarks, [32, 33, 34, 35])
-            
-        if random.random() < probability_nose_2: #verticalnose
-            self.draw_feature_line(image, landmarks, [27, 28, 29, 30, 33])
-
-        if random.random() < probability_eyes_1: #eyes
-            self.draw_feature_line(image, landmarks, [36, 37, 38, 39])
-            self.draw_feature_line(image, landmarks, [40, 41])
-            self.draw_feature_line(image, landmarks, [42, 43, 44, 45])
-            self.draw_feature_line(image, landmarks, [46, 47])
-        
-        if random.random() < probability_eyes_2: #cross_eyes
-            self.draw_feature_line(image, landmarks, [37, 40])
-            self.draw_feature_line(image, landmarks, [41, 38])
-            self.draw_feature_line(image, landmarks, [43, 46])                     
-            self.draw_feature_line(image, landmarks, [47, 44])                     
-
-        if random.random() < probability_mouth: #mouth
-            self.draw_feature_line(image, landmarks, [60, 61, 62, 63, 64, 65, 66, 67, 60]) 
-        
-        if random.random() < probability_teeth: #teeth
-            self.draw_feature_line(image, landmarks, [61, 67, 62, 66, 63, 65])
-
-        return landmarks
-
-    def draw_feature_line(self, img, landmarks, points_indices, color=(255, 255, 255), thickness=2):
-        """Helper method to draw lines connecting facial landmarks."""
-        points = [(landmarks.part(i).x, landmarks.part(i).y) for i in points_indices if 0 <= i < 68]
-
-        for i in range(len(points) - 1):
-            cv2.line(img, points[i], points[i + 1], color, thickness)
+    def generate_landmark_contours(self, landmarks_list):
+        """Random subset of the 68-landmark feature lines (LANDMARK_LINES) as
+        SVG-ready (N,1,2) int32 contours, drawn per detected face."""
+        contours = []
+        for landmarks in landmarks_list:
+            pts = np.array([(landmarks.part(i).x, landmarks.part(i).y) for i in range(68)], np.int32)
+            for probability, lines in LANDMARK_LINES:
+                if random.random() < probability:
+                    for indices in lines:
+                        contours.append(pts[indices].reshape(-1, 1, 2))
+        print(f"Landmark style: {len(contours)} feature lines")
+        return contours

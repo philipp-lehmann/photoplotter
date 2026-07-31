@@ -40,9 +40,9 @@ class StateEngine:
     DEFAULT_TARGET_SIZE = 800
 
     # Global drawing style for all plotted portraits (None = classic contour tracing).
-    # '+'-combinable tokens: 'features', 'outline', 'shade', 'hair', 'oneline',
+    # '+'-combinable tokens: 'features', 'outline', 'shade', 'hair', 'landmarks', 'oneline',
     # e.g. "features+outline+shade+oneline". Test styles with parsefile.py first.
-    DRAWING_STYLE = "features-hair-outline-shade-oneline"
+    DRAWING_STYLE = "features+hair+outline+shade+oneline"
     FEATURE_RADIUS = 18   # features: max distance (px at 800) from a landmark line
     SHADES = 2            # shade: tone count incl. paper white
     HATCH_SPACING = 10    # shade: hatch line spacing (px at 800)
