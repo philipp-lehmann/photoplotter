@@ -711,42 +711,28 @@ class ImageParser:
         wobble_px = wobble * (1 + 2.5 * stress)
         spacing_var = 0.15 + 0.35 * stress
         end_jitter = 2 + 6 * stress
-        base_angle = random.uniform(30 - 30 * stress, 60 + 120 * stress)
         angle_offsets = [0, 90, 45, 135]
 
         # Percentile cutoffs up to max_percentile, largest first: the lightest tone
         # hatches the whole shadow region, each darker tone adds a rotated family
         cutoffs = [np.percentile(person_pixels, max_percentile * k / (shades - 1)) for k in range(shades - 1, 0, -1)]
-        passes = [
-            (cutoff, base_angle + angle_offsets[i % 4] + random.uniform(-angle_jitter, angle_jitter), spacing_px)
-            for i, cutoff in enumerate(cutoffs)
-        ]
+        passes = [(cutoff, spacing_px, False) for cutoff in cutoffs]
         # Sparse cross-hatch over the darkest core, present in every image
-        passes.append((
-            np.percentile(person_pixels, cross_percentile),
-            base_angle + angle_offsets[len(cutoffs) % 4] + random.uniform(-angle_jitter, angle_jitter),
-            spacing_px * 1.6,
-        ))
+        passes.append((np.percentile(person_pixels, cross_percentile), spacing_px * 1.6, True))
 
+        # Every area of the lightest pass draws its own hatch angle so direction
+        # varies between regions; darker families rotate relative to the area they
+        # sit inside, and the cross pass opposes its area at 90 degrees
+        angle_map = np.full((height, width), np.nan, np.float32)
+        diag = int(np.ceil(np.hypot(width, height)))
         segments = []
-        for cutoff, angle, pass_spacing in passes:
-            tone_mask = np.where(person & (opt_image <= cutoff), 255, 0).astype(np.uint8)
-            tone_mask = cv2.morphologyEx(tone_mask, cv2.MORPH_OPEN, kernel)
 
-            # Drop confetti patches below the minimum region area
-            num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(tone_mask, connectivity=8)
-            for label in range(1, num_labels):
-                if stats[label, cv2.CC_STAT_AREA] < min_area_px:
-                    tone_mask[labels == label] = 0
-            if not tone_mask.any():
-                continue
-
-            # Rotate the mask so hatch lines become horizontal scanlines
-            diag = int(np.ceil(np.hypot(width, height)))
+        def hatch_region(region_mask, angle, pass_spacing):
+            # Rotate the region so hatch lines become horizontal scanlines
             M = cv2.getRotationMatrix2D((width / 2, height / 2), angle, 1.0)
             M[0, 2] += (diag - width) / 2
             M[1, 2] += (diag - height) / 2
-            rotated = cv2.warpAffine(tone_mask, M, (diag, diag), flags=cv2.INTER_NEAREST)
+            rotated = cv2.warpAffine(region_mask, M, (diag, diag), flags=cv2.INTER_NEAREST)
             M_inv = cv2.invertAffineTransform(M)
 
             y = random.uniform(0, pass_spacing)
@@ -778,6 +764,29 @@ class ImageParser:
                     segments.append(np.round(pts).astype(np.int32).reshape(-1, 1, 2))
 
                 y += pass_spacing * random.uniform(1 - spacing_var, 1 + spacing_var)
+
+        for i, (cutoff, pass_spacing, is_cross) in enumerate(passes):
+            tone_mask = np.where(person & (opt_image <= cutoff), 255, 0).astype(np.uint8)
+            tone_mask = cv2.morphologyEx(tone_mask, cv2.MORPH_OPEN, kernel)
+
+            num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(tone_mask, connectivity=8)
+            for label in range(1, num_labels):
+                # Skip confetti patches below the minimum region area
+                if stats[label, cv2.CC_STAT_AREA] < min_area_px:
+                    continue
+                region = labels == label
+                if i == 0:
+                    # Fresh angle per area; the stress level widens the spread
+                    angle = random.uniform(30 - 30 * stress, 60 + 120 * stress)
+                    angle_map[region] = angle
+                else:
+                    # Rotate relative to the lightest-pass area underneath
+                    under = angle_map[region]
+                    under = under[~np.isnan(under)]
+                    base = float(np.median(under)) if under.size else random.uniform(30 - 30 * stress, 60 + 120 * stress)
+                    offset = 90 if is_cross else angle_offsets[i % 4]
+                    angle = base + offset + random.uniform(-angle_jitter, angle_jitter)
+                hatch_region(np.where(region, 255, 0).astype(np.uint8), angle, pass_spacing)
 
         print(f"Shading: {len(passes)} pass(es) -> {len(segments)} hatch segments")
         return segments
