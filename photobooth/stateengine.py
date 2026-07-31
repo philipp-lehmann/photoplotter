@@ -41,6 +41,8 @@ class StateEngine:
 
     # Global drawing style for all plotted portraits (None = classic contour tracing).
     # '+'-combinable tokens: 'features', 'outline', 'shade', 'hair', 'landmarks', 'oneline',
+    # 'dynamic_grid', 'poisson_disk' (feature-weighted point snap: after a drawing token
+    # it snaps only that token's lines, placed first it snaps the whole drawing),
     # e.g. "features+outline+shade+oneline". Test styles with parsefile.py first.
     DRAWING_STYLE = "features+hair+outline+shade+oneline"
     FEATURE_RADIUS = 18   # features: max distance (px at 800) from a landmark line

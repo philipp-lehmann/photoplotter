@@ -15,8 +15,10 @@ class PhotoBooth:
         self.plotter = Plotter()
         self.image_parser = ImageParser()
         self.test_mode = "photos"  # "slots" (verify slot geometry, no plotter needed) | "photos" (original stress-level test loop)
-        self.test_styles = ["features+hair+outline+shade+landmarks+oneline", "features+hair+outline+shade+oneline"] # Combinations exercised by the "photos" test mode: every style x stress pair (None = classic contour tracing).
-        self.test_stress = [0.0, 1.0] # Test the stress levels
+        # '+'-combinable tokens: 'features', 'outline', 'shade', 'hair', 'landmarks', 'oneline',
+        self.test_styles = ["hair+poisson_disk+features+outline+shade+landmarks+oneline"] # Combinations exercised by the "photos" test mode: every style x stress pair (None = classic contour tracing).
+        self.test_stress = [0.0] # Test the stress levels
+        self.test_random_combos = 3 # Random token combos (up to 5 tokens, random order) rolled fresh per run, added to test_styles
 
     # Handling states
     # ------------------------------------------------------------------------
@@ -281,6 +283,18 @@ class PhotoBooth:
         print("Slot layout preview saved to photos/collection/photo-collection.svg")
         sys.exit()
 
+    def generate_random_style_combos(self, count, max_tokens=5):
+        """Random style combinations for the test run. Token order is kept random
+        on purpose: snap tokens bind to the drawing token right before them, so
+        order changes the outcome (see StateEngine.DRAWING_STYLE)."""
+        pool = ["features", "outline", "shade", "hair", "landmarks", "oneline", "dynamic_grid", "poisson_disk"]
+        combos = set()
+        while len(combos) < count:
+            combos.add("+".join(random.sample(pool, random.randint(1, max_tokens))))
+        combos = sorted(combos)
+        print(f"🎲 Random style combos: {combos}")
+        return combos
+
     def process_test_photos(self):
         print("🚩 Starting test (photos)")
         # Base directory
@@ -298,11 +312,15 @@ class PhotoBooth:
         # Traced SVGs per combination, in photo order: rows of the comparison sheet
         comparison_rows = {}
 
+        # Fixed combos plus freshly rolled random ones; same combos for every photo
+        # so the comparison rows stay comparable across columns
+        test_styles = self.test_styles + self.generate_random_style_combos(self.test_random_combos)
+
         # Process each .jpg file across every style x stress combination
         for jpg_file in jpg_files:
             self.state_engine.currentPhotoPath = os.path.join(photos_dir, jpg_file)
 
-            for style in self.test_styles:
+            for style in test_styles:
                 style_name = (style or "default").replace("+", "-")
 
                 for stress in self.test_stress:
@@ -348,8 +366,10 @@ class PhotoBooth:
         self.image_parser.collect_all_paths(output_directory, combined_file_path, "photo")
 
         # Comparison sheet: one row per style x stress combination, one column per
-        # test photo, so variants of the same photo line up vertically
-        comparison_file_path = os.path.join(parent_dir, "photos/collection/photo-comparison.svg")
+        # test photo, so variants of the same photo line up vertically; timestamped
+        # so successive test runs don't overwrite each other
+        timestamp = time.strftime("%Y%m%d-%H%M%S")
+        comparison_file_path = os.path.join(parent_dir, f"photos/collection/photo-comparison-{timestamp}.svg")
         self.image_parser.create_comparison_svg(list(comparison_rows.items()), jpg_files, comparison_file_path)
 
         print("All SVGs files processed.")

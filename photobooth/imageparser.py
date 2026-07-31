@@ -86,8 +86,10 @@ class ImageParser:
     
     def convert_to_svg(self, image_filepath, target_width=800, target_height=800, scale_x=1.0, scale_y=1.0, min_paths=30, max_paths=120, min_contour_area=16, suffix='', method=3, apply_depthmap=True, style=None, feature_radius=18, snap_method=None, shades=2, hatch_spacing=10, simplify=80, hair_strokes=30, stress=0.0):
         """Convert input image to SVG with parameters.
-        style: optional '+'-separated styles ('features', 'outline', 'shade', 'hair', 'landmarks', 'oneline'), e.g. 'features+hair+oneline'.
-        snap_method: force the point-snap style ('dynamic_grid'/'poisson_disk'/'none') instead of the random pick.
+        style: optional '+'-separated styles ('features', 'outline', 'shade', 'hair', 'landmarks', 'oneline', 'dynamic_grid', 'poisson_disk'), e.g. 'features+hair+oneline'.
+            A snap token snaps only the lines of the drawing token before it ('hair+poisson_disk');
+            placed first ('poisson_disk+features') it snaps the whole drawing.
+        snap_method: force the global point-snap style ('dynamic_grid'/'poisson_disk'/'none') instead of the random pick.
         shades: tone count for the shade style, paper white included (2 = white + one hatched tone).
         hatch_spacing: hatch line spacing in px for the shade style (at 800px target size).
         simplify: RDP simplification strength in percent (higher = fewer points).
@@ -105,10 +107,25 @@ class ImageParser:
         
         # Tokens may be joined with '+' or '-'; warn on typos instead of silently
         # falling back to the classic tracing
-        styles = set((style or "").replace("-", "+").split("+"))
-        unknown_styles = styles - {"", "features", "outline", "shade", "hair", "landmarks", "oneline"}
+        tokens = [t for t in (style or "").replace("-", "+").split("+") if t]
+        styles = set(tokens)
+        unknown_styles = styles - {"features", "outline", "shade", "hair", "landmarks", "oneline", "dynamic_grid", "poisson_disk"}
         if unknown_styles:
             print(f"Warning: ignoring unknown style token(s): {', '.join(sorted(unknown_styles))}")
+
+        # A snap token binds to the drawing token right before it and snaps only
+        # that token's lines (e.g. 'hair+poisson_disk' snaps just the hair strokes).
+        # A leading snap token (nothing before it) snaps the whole drawing
+        inline_snaps, global_snaps = {}, []
+        last_draw = None
+        for t in tokens:
+            if t in ("dynamic_grid", "poisson_disk"):
+                if last_draw is None:
+                    global_snaps.append(t)
+                else:
+                    inline_snaps[last_draw] = t
+            elif t in {"features", "outline", "shade", "hair", "landmarks"}:
+                last_draw = t
         crop_image = self.handle_faces(image, target_width, target_height)
         opt_image, faces, landmarks_list = self.process_face_image(crop_image)
         person_mask = None
@@ -131,6 +148,14 @@ class ImageParser:
         mask_contours = self.extract_mask_ring_contours(person_mask, min_contour_area)
         mask_contours = self.sort_and_limit_contours(mask_contours, target_width, target_height, max_paths, faces=faces)
 
+        def snap_inline(token, contours):
+            """Snap one token's contours to its bound point-snap method, if any."""
+            snap = inline_snaps.get(token)
+            if snap is None:
+                return contours
+            print(f"Inline snap: {snap} applied to {token} lines.")
+            return self.snap_contours_to_points(contours, snap, landmarks_list, target_width, target_height)
+
         # Merge contours
         if "outline" in styles:
             # Outline style: keep the person silhouette as open paths without the
@@ -138,9 +163,9 @@ class ImageParser:
             # features filter is also active (features+outline)
             if not mask_contours:
                 print("No person silhouette found: outline style has nothing to draw.")
-            mask_contours = self.split_contours_at_borders(mask_contours, target_width, target_height)
+            mask_contours = snap_inline("outline", self.split_contours_at_borders(mask_contours, target_width, target_height))
             if "features" in styles:
-                image_contours = self.filter_contours_to_features(image_contours, landmarks_list, target_width, target_height, radius=feature_radius)
+                image_contours = snap_inline("features", self.filter_contours_to_features(image_contours, landmarks_list, target_width, target_height, radius=feature_radius))
             else:
                 image_contours = []
             merged_contours = image_contours + mask_contours
@@ -149,23 +174,30 @@ class ImageParser:
             # Keep only strokes overlapping the facial features (silhouette included,
             # so only its jaw-adjacent parts survive)
             if "features" in styles:
-                merged_contours = self.filter_contours_to_features(merged_contours, landmarks_list, target_width, target_height, radius=feature_radius)
+                merged_contours = snap_inline("features", self.filter_contours_to_features(merged_contours, landmarks_list, target_width, target_height, radius=feature_radius))
 
         # Hatch dark person areas with parallel lines; added after the style filters
         # so shading is never feature-filtered or dropped by the outline style
         if "shade" in styles:
-            merged_contours += self.generate_hatch_contours(opt_image, person_mask, target_width, target_height, shades=shades, spacing=hatch_spacing, landmarks_list=landmarks_list, crop_image=crop_image, stress=stress)
+            merged_contours += snap_inline("shade", self.generate_hatch_contours(opt_image, person_mask, target_width, target_height, shades=shades, spacing=hatch_spacing, landmarks_list=landmarks_list, crop_image=crop_image, stress=stress))
 
         # Brush strokes following the hair flow (simulated where no texture shows)
         if "hair" in styles:
-            merged_contours += self.generate_hair_stroke_contours(opt_image, crop_image, target_width, target_height, num_strokes=hair_strokes)
+            merged_contours += snap_inline("hair", self.generate_hair_stroke_contours(opt_image, crop_image, target_width, target_height, num_strokes=hair_strokes))
 
         # Random subset of landmark feature lines, drawn directly into the SVG
         if "landmarks" in styles:
-            merged_contours += self.generate_landmark_contours(landmarks_list)
+            merged_contours += snap_inline("landmarks", self.generate_landmark_contours(landmarks_list))
 
         # Create the SVG with a style
         svg_filepath = self.create_svg(image_filepath, merged_contours, target_width, target_height, scale_x, scale_y, suffix)
+
+        # Leading snap tokens force the global method (an explicit snap_method
+        # argument still wins); otherwise keep the rare random pick. Snap tokens
+        # bound to a drawing token were already applied inline above
+        if snap_method is None and global_snaps:
+            snap_method = random.choice(global_snaps)
+
         if snap_method is not None:
             method = snap_method
         else:
@@ -174,7 +206,7 @@ class ImageParser:
             method = random.choices(methods, weights=weights, k=1)[0]
 
         # Process SVG
-        processed_svg_filepath = self.process_svg(svg_filepath, method, removal_percentage=simplify)
+        processed_svg_filepath = self.process_svg(svg_filepath, method, removal_percentage=simplify, landmarks_list=landmarks_list, width=target_width, height=target_height)
 
         # Chain everything into one continuous line (after dedup/simplify, so the
         # single line is not chopped back apart by remove_duplicate_segments)
@@ -898,18 +930,20 @@ class ImageParser:
 
     # ----- SVG Processing -----  
     @profile
-    def process_svg(self, svg_filepath, method="none", removal_percentage=80, angle=25):
-        """Process the SVG file to align it to points generated by various methods."""
-        
+    def process_svg(self, svg_filepath, method="none", removal_percentage=80, angle=25, landmarks_list=None, width=800, height=800):
+        """Process the SVG file to align it to points generated by various methods.
+        landmarks_list concentrates the point density on the facial features;
+        width/height must match the SVG's user space so the point field covers it."""
+
         grid_points = None
-        
+
         # Pick a point generation method
         if method == "dynamic_grid":
             print("Using Dynamic Grid method for point generation.")
-            grid_points = self.generate_dynamic_points()
+            grid_points = self.generate_dynamic_points(landmarks_list, width, height)
         elif method == "poisson_disk":
             print("Using Poisson Disk Sampling method for point generation.")
-            grid_points = self.generate_poisson_disk_points()
+            grid_points = self.generate_poisson_disk_points(landmarks_list, width, height)
             
         # SVG Clean up
         if grid_points:
@@ -1169,84 +1203,146 @@ class ImageParser:
 
 
 
-    def generate_dynamic_points(self, min_value=0, max_value=800, num_points_mean=70, num_points_std=10, center=400.0, plateau_radius=50, randomness_factor=0.1):
-        """Generate a dynamic grid as an array of (x, y) points with higher density near the center,
-        a plateau region, and increasing randomness towards the edges.
+    def snap_contours_to_points(self, contours, snap_method, landmarks_list, width, height):
+        """Snap the given contours' points to a freshly generated point field
+        ('dynamic_grid' or 'poisson_disk'), collapsing consecutive duplicates."""
+        if not contours:
+            return contours
+        if snap_method == "dynamic_grid":
+            field = self.generate_dynamic_points(landmarks_list, width, height)
+        else:
+            field = self.generate_poisson_disk_points(landmarks_list, width, height)
+        kdtree = self.precompute_kdtree(field)
 
-        num_points is sampled from a Gaussian distribution clipped between 40 and 100.
+        snapped = []
+        for contour in contours:
+            pts = contour.reshape(-1, 2).astype(np.float64)
+            _, idx = kdtree.query(pts)
+            aligned = np.asarray(kdtree.data[idx])
+            keep = np.ones(len(aligned), bool)
+            keep[1:] = (np.diff(aligned, axis=0) != 0).any(axis=1)
+            aligned = aligned[keep]
+            if len(aligned) >= 2:
+                snapped.append(np.round(aligned).astype(np.int32).reshape(-1, 1, 2))
+        return snapped
+
+    def get_feature_anchor_points(self, landmarks_list):
+        """Eye, nose and mouth landmark coordinates, used as density anchors by
+        the point-snap generators. Returns None when no face was detected."""
+        if not landmarks_list:
+            return None
+        indices = sorted({i for name in ("right_eye", "left_eye", "nose_bridge", "nose_base", "outer_lips")
+                          for i in LANDMARK_GROUPS[name]})
+        anchors = [(lm.part(i).x, lm.part(i).y) for lm in landmarks_list for i in indices]
+        return np.array(anchors, dtype=np.float64)
+
+    def generate_dynamic_points(self, landmarks_list=None, width=800, height=800, num_points_mean=70,
+                                num_points_std=10, sigma=80, base_density=0.18, falloff=320, max_drop=0.75):
+        """Generate a dynamic grid as (x, y) points whose density peaks at the facial
+        features (eyes, nose, mouth) and gradually decreases outwards.
+
+        Grid lines per axis are sampled from a Gaussian clipped between 40 and 100;
+        without landmarks the density falls back to the image center.
+        sigma and falloff are px at 800 width and self-scale with the target size.
         """
-        # Sample num_points from a Gaussian distribution and clip between 40 and 100
         num_points = int(np.clip(np.random.normal(loc=num_points_mean, scale=num_points_std), 40, 100))
         print(f"Generated grid with \033[1;31m{num_points}\033[0m points.")
+        scale = width / 800.0
+        sigma *= scale
+        falloff *= scale
 
-        # Generate cubic-scaled values for x and y
-        values = np.linspace(-1, 1, num_points)
-        scaled_values = center + (max_value - min_value) * values**3
+        anchors = self.get_feature_anchor_points(landmarks_list)
+        if anchors is None:
+            anchors = np.array([[width / 2.0, height / 2.0]])
 
+        def axis_positions(coords, size, n):
+            # Grid-line positions from the inverse CDF of a gaussian-mixture density:
+            # lines crowd around the feature projections, thin out towards the edges.
+            # The mixture is peak-normalized so base_density stays a meaningful
+            # fraction regardless of how many anchor points overlap
+            xs = np.linspace(0, size, 1024)
+            density = np.zeros_like(xs)
+            for c in coords:
+                density += np.exp(-0.5 * ((xs - c) / sigma) ** 2)
+            density = density / density.max() + base_density
+            cdf = np.cumsum(density)
+            cdf /= cdf[-1]
+            return np.interp(np.linspace(0, 1, n), cdf, xs)
+
+        grid_x = axis_positions(anchors[:, 0], width, num_points)
+        grid_y = axis_positions(anchors[:, 1], height, num_points)
+
+        # Thin the far field radially so density also drops diagonally, not just
+        # along each axis: keep probability sinks with distance to nearest feature
+        anchor_tree = cKDTree(anchors)
         grid_points = []
-        for x in scaled_values:
-            for y in scaled_values:
-                # Calculate the distance from the center
-                distance = ((x - center)**2 + (y - center)**2)**0.5
-
-                # Keep points within the plateau radius
-                if distance <= plateau_radius:
+        for x in grid_x:
+            for y in grid_y:
+                dist, _ = anchor_tree.query((x, y))
+                drop = max_drop * min(1.0, dist / falloff)
+                if random.random() >= drop:
                     grid_points.append((x, y))
-                else:
-                    # Introduce randomness for points outside the plateau radius
-                    edge_factor = min(1.0, distance / (max_value - min_value))  # Normalize edge factor to [0, 1]
-                    if random.random() > randomness_factor * edge_factor:
-                        grid_points.append((x, y))
-
         return grid_points
 
-    def generate_poisson_disk_points(self, width=800, height=800, radius=20, k=30):
-        """Generate points using Poisson Disk Sampling."""
-        def distance(p1, p2):
-            return np.sqrt((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)
-        
-        grid_size = radius / np.sqrt(2)
-        cols, rows = int(width // grid_size), int(height // grid_size)
-        grid = [None] * (cols * rows)
-        
-        def grid_index(x, y):
-            col = int(x // grid_size)
-            row = int(y // grid_size)
-            if 0 <= col < cols and 0 <= row < rows:
-                return col + row * cols
-            else:
-                return -1 
+    def generate_poisson_disk_points(self, landmarks_list=None, width=800, height=800,
+                                     min_radius=9, max_radius=40, falloff=300, k=30):
+        """Variable-density Poisson disk sampling (Bridson): tight point spacing at
+        the facial features (eyes, nose, mouth), gradually widening outwards.
+        Without landmarks the dense spot falls back to the image center.
+        Radii and falloff are px at 800 width and self-scale with the target size."""
+        scale = width / 800.0
+        min_radius *= scale
+        max_radius *= scale
+        falloff *= scale
+        anchors = self.get_feature_anchor_points(landmarks_list)
+        if anchors is None:
+            anchors = np.array([[width / 2.0, height / 2.0]])
+        anchor_tree = cKDTree(anchors)
 
-        points = []
-        active_list = []
+        def local_radius(x, y):
+            dist, _ = anchor_tree.query((x, y))
+            t = min(1.0, dist / falloff)
+            return min_radius + (max_radius - min_radius) * t * t * (3 - 2 * t)
+
+        # One point per cell is safe: the cell diagonal equals min_radius, the
+        # tightest spacing any two accepted points can have
+        grid_size = min_radius / np.sqrt(2)
+        cols, rows = int(np.ceil(width / grid_size)), int(np.ceil(height / grid_size))
+        grid = [None] * (cols * rows)
+
+        points, active_list = [], []
 
         def add_point(x, y):
-            idx = grid_index(x, y)
-            if idx != -1:
-                grid[idx] = (x, y)
-                points.append((x, y))
-                active_list.append((x, y))
+            grid[int(x // grid_size) + int(y // grid_size) * cols] = (x, y)
+            points.append((x, y))
+            active_list.append((x, y))
 
-        add_point(random.uniform(0, width), random.uniform(0, height))
+        # Seed at a feature anchor so the tight spacing grows out from the face
+        seed = anchors[random.randrange(len(anchors))]
+        add_point(float(np.clip(seed[0], 0, width - 1e-6)), float(np.clip(seed[1], 0, height - 1e-6)))
 
         while active_list:
             x, y = active_list.pop(random.randint(0, len(active_list) - 1))
+            r_here = local_radius(x, y)
             for _ in range(k):
                 angle = random.uniform(0, 2 * np.pi)
-                r = random.uniform(radius, 2 * radius)
+                r = random.uniform(r_here, 2 * r_here)
                 nx, ny = x + r * np.cos(angle), y + r * np.sin(angle)
                 if not (0 <= nx < width and 0 <= ny < height):
                     continue
-                neighbor_found = False
-                for i in range(-2, 3):
-                    for j in range(-2, 3):
-                        idx = grid_index(nx + i * grid_size, ny + j * grid_size)
-                        if 0 <= idx < len(grid) and grid[idx] and distance(grid[idx], (nx, ny)) < radius:
-                            neighbor_found = True
+                r_cand = local_radius(nx, ny)
+                col, row = int(nx // grid_size), int(ny // grid_size)
+                reach = int(np.ceil(r_cand / grid_size))
+                conflict = False
+                for j in range(max(0, row - reach), min(rows, row + reach + 1)):
+                    for i in range(max(0, col - reach), min(cols, col + reach + 1)):
+                        q = grid[i + j * cols]
+                        if q is not None and (q[0] - nx) ** 2 + (q[1] - ny) ** 2 < r_cand ** 2:
+                            conflict = True
                             break
-                    if neighbor_found:
+                    if conflict:
                         break
-                if not neighbor_found:
+                if not conflict:
                     add_point(nx, ny)
         return points
     
