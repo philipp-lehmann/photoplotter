@@ -19,6 +19,7 @@ class PhotoBooth:
         self.test_styles = ["hair+poisson_disk+features+outline+shade+landmarks+oneline"] # Combinations exercised by the "photos" test mode: every style x stress pair (None = classic contour tracing).
         self.test_stress = [0.0] # Test the stress levels
         self.test_random_combos = 3 # Random token combos (up to 5 tokens, random order) rolled fresh per run, added to test_styles
+        self.work_photo_queue = []  # shuffle-cycle queue of eligible photos/work/*.{jpg,jpeg,png} (exactly 1 detected face)
 
     # Handling states
     # ------------------------------------------------------------------------
@@ -34,8 +35,9 @@ class PhotoBooth:
         pass
     
     def process_waiting(self):
-        # Logic for "Waiting" state
-        time.sleep(1)
+        # Logic for "Waiting" state: brief pause after a drawing finishes so
+        # visitors have time to change places before tracking resumes.
+        time.sleep(3)
         self.state_engine.change_state("Tracking")
         pass
     
@@ -79,29 +81,71 @@ class PhotoBooth:
             self.state_engine.change_state("Tracking")
             pass
     
-    def process_working(self):        
-        print(f"Working started: {self.state_engine.workID}")
-        # Logic to retrieve work pattern and create output SVG
+    def _work_photos_dir(self):
         parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        self.state_engine.currentWorkPath = os.path.join(parent_dir, f"assets/work/work-event.svg")
-            
-        # Randomly pick one photo ID from the remaining list without removing it
-        random_photo_id = random.choice(self.state_engine.photoID)
-        geom = self.state_engine.get_slot_geometry(random_photo_id)
+        return os.path.join(parent_dir, "photos/work")
+
+    def _refill_work_photo_queue(self):
+        # Scans photos/work/, keeps only images with exactly one detected face, shuffles.
+        # Mirrors StateEngine.reset_photo_id()'s shuffle-cycle pattern. Re-scanning on every
+        # refill (rather than caching) means newly dropped-in photos are picked up automatically
+        # once the current cycle empties.
+        work_dir = self._work_photos_dir()
+        self.work_photo_queue = []
+        if not os.path.isdir(work_dir):
+            print(f"Work photos folder not found: {work_dir}")
+            return
+
+        exts = (".jpg", ".jpeg", ".png")
+        candidates = [
+            os.path.join(work_dir, f) for f in os.listdir(work_dir)
+            if f.lower().endswith(exts)
+        ]
+        eligible = [p for p in candidates if self.image_parser.count_faces(p) == 1]
+        random.shuffle(eligible)
+        self.work_photo_queue = eligible
+        print(f"Work photo queue refilled: {len(eligible)}/{len(candidates)} eligible (exactly 1 face), from {work_dir}")
+
+    def _next_work_photo(self):
+        if not self.work_photo_queue:
+            self._refill_work_photo_queue()
+        if not self.work_photo_queue:
+            return None
+        return self.work_photo_queue.pop()
+
+    def process_working(self):
+        print(f"Working started: {self.state_engine.workID}")
+        work_photo_path = self._next_work_photo()
+
+        if not work_photo_path:
+            print("Working skipped: no eligible work photo (folder missing/empty, or no single-face photo found).")
+            self.state_engine.change_state("Tracking")
+            return
+
+        # Trace the curated photo and place it into the featured slot, same building
+        # blocks process_processing/process_redrawing already use elsewhere.
+        target_id = self.state_engine.featured_slot_id
+        params = self.state_engine.get_render_params(target_id)
+        tempSVG = self.image_parser.convert_to_svg(work_photo_path, **params)
+
+        if not tempSVG or not os.path.isfile(tempSVG):
+            print("Error: Work SVG file was not created successfully.")
+            self.state_engine.change_state("Tracking")
+            return
+
+        geom = self.state_engine.get_slot_geometry(target_id)
         scale_factor = self.state_engine.compute_scale_factor(
-            geom.width, geom.height, source_size=self.state_engine.DEFAULT_TARGET_SIZE
+            geom.width, geom.height, source_size=params["target_width"]
+        )
+        self.state_engine.currentSVGPath = self.image_parser.create_output_svg(
+            tempSVG, "work-output-", offset_x=geom.x, offset_y=geom.y, scale_factor=scale_factor, id=target_id, paper_width=self.state_engine.paperSizeX, paper_height=self.state_engine.paperSizeY
         )
 
-        # Create output SVG using the randomly chosen photo ID
-        self.state_engine.currentSVGPath = self.image_parser.create_output_svg(
-            self.state_engine.currentWorkPath, "work-output-", offset_x=geom.x, offset_y=geom.y, scale_factor=scale_factor, id=random_photo_id, paper_width=self.state_engine.paperSizeX, paper_height=self.state_engine.paperSizeY
-        )
-        
-        print(f"Converted Work pattern to SVG: {self.state_engine.currentSVGPath}, random: {random_photo_id}, from {self.state_engine.photoID}")
+        print(f"Converted work photo to SVG: {self.state_engine.currentSVGPath}, from {work_photo_path}")
         stress = self.state_engine.update_stresslevel_from_interval()
         self.plotter.plot_image(self.state_engine.currentSVGPath, stresslevel=stress)
         self.state_engine.last_draw_end_time = time.time()
-       
+
         # Change state to Tracking after the work is done
         self.state_engine.change_state("Tracking")
         pass

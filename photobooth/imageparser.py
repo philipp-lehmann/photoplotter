@@ -73,16 +73,20 @@ class ImageParser:
         # style, so it is downloaded and initialized lazily on first use
         self.multiclass_segmenter = None
     
-    def detect_faces(self, image_filepath):
-        """Used when snapping an image. Quick method to check if a face is present in the image"""
+    def count_faces(self, image_filepath):
+        """Returns the number of faces dlib detects in the image (0 if the file can't be loaded)."""
         image = cv2.imread(image_filepath)
         if image is None:
             print("Failed to load image.")
-            return False
-        
+            return 0
+
         gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         faces = self.face_detector(gray_image)
-        return len(faces) > 0
+        return len(faces)
+
+    def detect_faces(self, image_filepath):
+        """Used when snapping an image. Quick method to check if a face is present in the image"""
+        return self.count_faces(image_filepath) > 0
     
     def convert_to_svg(self, image_filepath, target_width=800, target_height=800, scale_x=1.0, scale_y=1.0, min_paths=30, max_paths=120, min_contour_area=16, suffix='', method=3, apply_depthmap=True, style=None, feature_radius=18, snap_method=None, shades=2, hatch_spacing=10, simplify=80, hair_strokes=30, stress=0.0):
         """Convert input image to SVG with parameters.

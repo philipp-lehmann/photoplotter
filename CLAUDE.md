@@ -57,7 +57,7 @@ The system uses an event-driven state machine with two processes communicating v
 
 ### State Machine (11 states)
 
-`Startup` → `Waiting` ↔ `Tracking` (→ `Working` to look up a drawing pattern) → `Snapping` → `Processing` → `Drawing` → `Redrawing`/`Waiting`/`ResetPending` → `Template`. A separate `Test` state drives the non-Raspberry-Pi test mode.
+`Startup` → `Waiting` ↔ `Tracking` (→ `Working` to trace an idle-time portrait into the featured slot) → `Snapping` → `Processing` → `Drawing` → `Redrawing`/`Waiting`/`ResetPending` → `Template`. A separate `Test` state drives the non-Raspberry-Pi test mode.
 
 State logic lives in `photobooth/photobooth.py`; transitions are defined in `photobooth/stateengine.py`.
 
@@ -69,7 +69,11 @@ A float (0.0–1.0) computed from the time interval between drawing sessions. Sh
 
 ### Photo Grid Layout
 
-Portraits are placed on a 5×3 physical grid: 11 standard single-cell slots plus one 2×2 "featured" slot in the bottom-right, defined in `stateengine.py` (`SLOT_LAYOUT`). The featured slot is excluded from the normal visitor-photo rotation and is instead reprinted on demand (see `KEY2` handling in `photobooth.py`). Photo IDs are shuffled in blocks (`SHUFFLE_BLOCKS`). Grid position, borders, and gutters are configurable in `stateengine.py`.
+Portraits are placed on a 5×3 physical grid: 11 standard single-cell slots plus one 2×2 "featured" slot in the bottom-right, defined in `stateengine.py` (`SLOT_LAYOUT`). The featured slot is excluded from the normal visitor-photo rotation and is instead reprinted on demand (see `KEY2` handling in `photobooth.py`) or during idle-time `Working` cycles. Photo IDs are shuffled in blocks (`SHUFFLE_BLOCKS`). Grid position, borders, and gutters are configurable in `stateengine.py`.
+
+### Idle-Time Featured Collage
+
+When the booth has been idle for a while (`Tracking` sees 20+ consecutive faceless frames), it enters the `Working` state, which traces one photo from `photos/work/` and plots it into the featured slot (`process_working` in `photobooth.py`). Drop curated portrait photos (`.jpg`/`.jpeg`/`.png`) into `photos/work/` — only photos with **exactly one detected face** are eligible; others are skipped. Eligible photos are drawn from a shuffled queue that cycles through the whole folder before repeating, and is rescanned (picking up newly added photos) once exhausted. Because each cycle plots onto the same physical featured slot, repeated idle triggers layer additional linework there over time, building up a composite artwork. If `photos/work/` is missing, empty, or has no eligible photos, the state is skipped and the booth returns to `Tracking`.
 
 ## Key Files
 

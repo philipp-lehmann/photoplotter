@@ -73,7 +73,6 @@ class StateEngine:
         # State
         self.state = "Startup"
         self.currentPhotoPath = ""
-        self.currentWorkPath = ""
         self.currentSVGPath = ""
         self.imagesPerRow = 5
         self.imagesPerColumn = 3
