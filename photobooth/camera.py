@@ -28,15 +28,15 @@ class Camera:
         
         # Base libcamera command
         libcamera_command = [
-            "libcamera-still", 
-            "-o", image_filepath, 
-            "-t", "250", 
-            "-n", 
-            "--sharpness=5", 
-            "--autofocus-window=0.5,0.33,0.8,0.67", 
-            "--autofocus-speed=normal", 
-            "--lens-position=0.7",
-            "--autofocus-on-capture=0"
+            "libcamera-still",
+            "-o", image_filepath,
+            "-t", "1000",
+            "-n",
+            "--sharpness=5",
+            "--autofocus-mode=auto",
+            "--autofocus-window=0.5,0.33,0.8,0.67",
+            "--autofocus-speed=normal",
+            "--autofocus-on-capture=1"
         ]
         
         # Add Region of Interest (ROI) if provided
