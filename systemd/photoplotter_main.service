@@ -1,0 +1,16 @@
+[Unit]
+Description=Photoplotter main application
+After=network.target mosquitto.service photoplotter_lcd.service
+Requires=mosquitto.service
+Wants=photoplotter_lcd.service
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/Documents/photoplotter
+ExecStart=/home/pi/Documents/photoplotter/photoplotter-env/bin/python main.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

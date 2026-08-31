@@ -1,0 +1,15 @@
+[Unit]
+Description=Photoplotter LCD display service
+After=network.target mosquitto.service
+Requires=mosquitto.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/pi/Documents/photoplotter
+ExecStart=/home/pi/Documents/photoplotter/lcd-env/bin/python lcd/lcd.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
