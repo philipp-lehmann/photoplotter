@@ -8,6 +8,10 @@ Wants=photoplotter_lcd.service
 Type=simple
 User=pi
 WorkingDirectory=/home/pi/Documents/photoplotter
+# photoplotter_lcd.service is only guaranteed to be *started* by this point, not
+# finished initializing (LCD_Init + MQTT subscribe). Give it a grace period so
+# main.py doesn't publish state changes lcd.py isn't subscribed to receive yet.
+ExecStartPre=/bin/sleep 10
 ExecStart=/home/pi/Documents/photoplotter/photoplotter-env/bin/python main.py
 Restart=on-failure
 RestartSec=5
